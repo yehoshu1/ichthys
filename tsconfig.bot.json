@@ -1,0 +1,18 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "outDir": "./dist",
+        "noEmit": false,
+        "rootDir": "./src"
+    },
+    "include": [
+        "src/bot/**/*",
+        "src/shared/**/*"
+    ],
+    "exclude": [
+        "src/dashboard/**/*",
+        "node_modules"
+    ]
+}

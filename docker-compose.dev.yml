@@ -1,0 +1,21 @@
+services:
+  ixoye-dev:
+    build:
+      context: .
+      target: dev
+    container_name: ixoye-dev
+    restart: no
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/src/dashboard/.next
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+      - DATABASE_URL=file:/app/data/ixoye.db
+    # Ensure data directory exists
+    command: sh -c "mkdir -p /app/data && npm run dev:all"

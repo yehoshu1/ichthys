@@ -13,6 +13,7 @@ export const calculateLevel = (xp: number): number => {
 export const calculateXpForLevel = (level: number): number => {
     return 100 * Math.pow(level, 2);
 };
+export const xpForLevel = calculateXpForLevel;
 
 export async function checkAndAssignLevelRewards(member: GuildMember, newLevel: number) {
     if (!member.guild) return;

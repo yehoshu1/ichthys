@@ -2,7 +2,7 @@ module.exports = {
     apps: [
         {
             name: "ixoye-bot",
-            script: "./dist/index.js",
+            script: "./dist/bot/index.js",
             env: {
                 NODE_ENV: "production",
             },

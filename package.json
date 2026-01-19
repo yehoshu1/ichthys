@@ -4,8 +4,9 @@
   "description": "A scalable Discord bot built with TypeScript",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.bot.json",
     "dev": "tsx watch src/bot/index.ts",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dashboard:dev\"",
     "dashboard:dev": "next dev src/dashboard",
     "dashboard:build": "next build src/dashboard",
     "dashboard:start": "next start src/dashboard",
@@ -60,6 +61,7 @@
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.23",
+    "concurrently": "^9.2.1",
     "drizzle-kit": "^0.31.8",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",

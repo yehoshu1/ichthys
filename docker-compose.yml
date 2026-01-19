@@ -1,0 +1,14 @@
+services:
+  ixoye:
+    build: .
+    container_name: ixoye-app
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/ixoye.db

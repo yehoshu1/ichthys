@@ -6,7 +6,7 @@ export default function setupInteractionHandler() {
     client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         if (!interaction.isChatInputCommand()) return;
 
-        const command = client.commands.get(interaction.commandName);
+        const command = client.commands?.get(interaction.commandName);
 
         if (!command) {
             logger.warn(`No command matching ${interaction.commandName} was found.`);

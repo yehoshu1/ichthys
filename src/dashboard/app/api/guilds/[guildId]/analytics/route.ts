@@ -64,7 +64,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
                 });
 
                 if (membersRes.ok) {
-                    const members = await membersRes.json();
+                    const members: any[] = await membersRes.json();
                     console.log(`[Analytics] Fetched ${members.length} members.`);
 
                     // 1. Calculate Verified Count (Live)

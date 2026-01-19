@@ -38,19 +38,10 @@ export const authOptions: NextAuthOptions = {
             return session;
         },
         async jwt({ token, account, user, profile }) {
-            const fs = require('fs');
             // Log when a sign-in event happens (account is only present on sign-in)
             if (account) {
-                try {
-                    fs.appendFileSync('debug_auth.txt', `[${new Date().toISOString()}] SIGN-IN: Account keys: ${Object.keys(account).join(', ')}\n`);
-                    fs.appendFileSync('debug_auth.txt', `[${new Date().toISOString()}] SIGN-IN: Access Token: ${!!account.access_token}\n`);
-                } catch (e) { console.error("Log error", e) }
                 token.accessToken = account.access_token;
             }
-
-            try {
-                fs.appendFileSync('debug_auth.txt', `[${new Date().toISOString()}] JWT: Token accessToken: ${!!token.accessToken}\n`);
-            } catch (e) { console.error("Log error", e) }
             return token;
         },
     },

@@ -1,6 +1,6 @@
-import { SlashCommandBuilder, CommandInteraction, CacheType, ChatInputCommandInteraction, SlashCommandSubcommandsOnlyBuilder } from 'discord.js';
+import { SlashCommandBuilder, CommandInteraction, CacheType, ChatInputCommandInteraction, SlashCommandSubcommandsOnlyBuilder, SlashCommandOptionsOnlyBuilder } from 'discord.js';
 
 export interface Command {
-    data: SlashCommandBuilder | Omit<SlashCommandBuilder, "addBooleanOption" | "addUserOption" | "addChannelOption" | "addRoleOption" | "addAttachmentOption" | "addMentionableOption" | "addStringOption" | "addIntegerOption" | "addNumberOption">;
-    execute: (interaction: ChatInputCommandInteraction<CacheType>) => Promise<void>;
+    data: SlashCommandBuilder | Omit<SlashCommandBuilder, any> | SlashCommandSubcommandsOnlyBuilder | SlashCommandOptionsOnlyBuilder;
+    execute: (interaction: ChatInputCommandInteraction<CacheType>) => Promise<any>;
 }
