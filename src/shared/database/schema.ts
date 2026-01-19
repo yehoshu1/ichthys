@@ -103,6 +103,7 @@ export const userJoin = sqliteTable('user_join', {
     joinedAt: integer('joined_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
     verifiedAt: integer('verified_at', { mode: 'timestamp' }),
     isVerified: integer('is_verified', { mode: 'boolean' }).default(false).notNull(),
+    isBot: integer('is_bot', { mode: 'boolean' }).default(false).notNull(),
     kickedAt: integer('kicked_at', { mode: 'timestamp' }),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),

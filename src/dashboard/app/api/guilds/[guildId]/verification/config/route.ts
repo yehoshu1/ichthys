@@ -68,6 +68,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
                 verificationGraceDays,
                 verificationKickDmEnabled,
                 verificationMessage,
+                lastMemberSync: null, // Force re-sync to recalculate verified status
                 updatedAt: new Date()
             }
         });

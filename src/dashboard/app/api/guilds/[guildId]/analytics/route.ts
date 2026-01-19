@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
         });
         if (res.ok) {
             const data = await res.json();
-            memberCount = data.approximate_member_count || 0;
+            memberCount = data.approximate_member_count || 0; // Fallback only
             boostCount = data.premium_subscription_count || 0;
         } else {
             console.warn(`[Analytics] Failed to fetch live guild counts: ${res.status}`);
@@ -81,6 +81,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
                         guildId: guildId,
                         joinedAt: m.joined_at ? new Date(m.joined_at) : new Date(),
                         isVerified: verificationRoleId ? m.roles.includes(verificationRoleId) : false,
+                        isBot: m.user.bot || false,
                         updatedAt: new Date()
                     }));
 
@@ -94,6 +95,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
                                         target: [userJoin.userId, userJoin.guildId],
                                         set: {
                                             isVerified: sql`excluded.is_verified`,
+                                            isBot: sql`excluded.is_bot`,
                                             updatedAt: new Date()
                                         }
                                     });
@@ -113,7 +115,16 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
 
                 } else {
                     console.warn(`[Analytics] Failed to fetch members: ${membersRes.status}`);
-                    // Fallback to DB query
+                    // Wait a bit for DB to settle? No need, we just awaited.
+
+                    // Fetch HUMAN Member Count from DB
+                    const dbMemberCount = await db
+                        .select({ count: sql<number>`count(*)` })
+                        .from(userJoin)
+                        .where(and(eq(userJoin.guildId, guildId), eq(userJoin.isBot, false)));
+                    memberCount = dbMemberCount[0]?.count || memberCount;
+
+                    // Fallback to DB query for verified
                     const dbVerified = await db
                         .select({ count: sql<number>`count(*)` })
                         .from(userJoin)
@@ -130,6 +141,12 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             }
         } else {
             // Skip sync, use Database
+            const dbMemberCount = await db
+                .select({ count: sql<number>`count(*)` })
+                .from(userJoin)
+                .where(and(eq(userJoin.guildId, guildId), eq(userJoin.isBot, false)));
+            memberCount = dbMemberCount[0]?.count || memberCount;
+
             const dbVerified = await db
                 .select({ count: sql<number>`count(*)` })
                 .from(userJoin)

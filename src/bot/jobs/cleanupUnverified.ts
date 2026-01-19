@@ -42,7 +42,7 @@ export default function startCleanupJob() {
                         const member = await guild.members.fetch(userRecord.userId);
                         if (member) {
                             // SKIP BOTS
-                            if (member.user.bot) return;
+                            if (member.user.bot) continue;
 
                             if (config.verificationKickDmEnabled) {
                                 try {
