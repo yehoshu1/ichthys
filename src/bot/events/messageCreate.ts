@@ -113,8 +113,14 @@ export default function setupMessageCreateHandler() {
                     };
 
                     // Default message if plain text is missing
-                    const defaultMessage = `🎉 **Level Up!** {user} has reached level **{level}**!`;
-                    const content = config.levelUpMessage || defaultMessage;
+                    let content = config.levelUpMessage;
+                    const embedConfig = config.levelUpMessageEmbed as any;
+                    const isEmbedEnabled = embedConfig?.enabled || (embedConfig && (embedConfig.title || embedConfig.description));
+
+                    // Only use default message if no content AND no embed is configured
+                    if (!content && !isEmbedEnabled) {
+                        content = `🎉 **Level Up!** {user} has reached level **{level}**!`;
+                    }
 
                     const messageData = buildMessage(
                         content,

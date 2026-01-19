@@ -5,6 +5,7 @@ import { db } from '../../shared/database/client';
 import { guildConfig, levelProfile } from '../../shared/database/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { calculateLevel, checkAndAssignLevelRewards } from '../utils/leveling';
+import { buildMessage } from '../utils/embeds';
 
 export default function setupVoiceStateUpdateHandler() {
     client.on(Events.VoiceStateUpdate, async (oldState: VoiceState, newState: VoiceState) => {
@@ -95,14 +96,29 @@ export default function setupVoiceStateUpdateHandler() {
                             if (channelId) {
                                 const channel = guild.channels.cache.get(channelId) as TextChannel;
                                 if (channel && channel.isTextBased()) {
-                                    let messageContent = config.levelUpMessage
-                                        ? config.levelUpMessage
-                                            .replace(/{user}/g, member.toString())
-                                            .replace(/{level}/g, newLevel.toString())
-                                            .replace(/{xp}/g, newTotalXp.toString())
-                                        : `🎉 ** Level Up! ** ${member.toString()} has reached level ** ${newLevel}** via voice activity!`;
+                                    const variables = {
+                                        'user': member.toString(),
+                                        'level': newLevel.toString(),
+                                        'xp': newTotalXp.toString()
+                                    };
 
-                                    await channel.send(messageContent);
+                                    let content = config.levelUpMessage;
+                                    const embedConfig = config.levelUpMessageEmbed as any;
+                                    const isEmbedEnabled = embedConfig?.enabled || (embedConfig && (embedConfig.title || embedConfig.description));
+
+                                    if (!content && !isEmbedEnabled) {
+                                        content = `🎉 **Level Up!** {user} has reached level **{level}** via voice activity!`;
+                                    }
+
+                                    const messageData = buildMessage(
+                                        content,
+                                        config.levelUpMessageEmbed as any,
+                                        variables
+                                    );
+
+                                    if (messageData) {
+                                        await channel.send(messageData);
+                                    }
                                 }
                             }
                         }
