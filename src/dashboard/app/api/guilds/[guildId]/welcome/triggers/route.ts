@@ -66,3 +66,57 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
+
+export async function PATCH(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
+    const params = await props.params;
+    const guildId = params.guildId;
+    const session = await checkAuth(req, guildId);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    try {
+        const body = await req.json();
+        const { id, roleId, templateId, channelId, enabled } = body;
+
+        if (!id) {
+            return NextResponse.json({ error: "ID is required" }, { status: 400 });
+        }
+
+        const [updated] = await db.update(welcomeTrigger)
+            .set({
+                roleId,
+                templateId,
+                channelId: channelId || null,
+                enabled: enabled ?? true,
+                updatedAt: new Date(),
+            })
+            .where(and(eq(welcomeTrigger.id, id), eq(welcomeTrigger.guildId, guildId)))
+            .returning();
+
+        return NextResponse.json(updated);
+    } catch (error) {
+        console.error("Error updating trigger:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
+    const params = await props.params;
+    const guildId = params.guildId;
+    const session = await checkAuth(req, guildId);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    try {
+        const { searchParams } = new URL(req.url);
+        const id = searchParams.get("id");
+
+        if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
+
+        await db.delete(welcomeTrigger)
+            .where(and(eq(welcomeTrigger.id, id), eq(welcomeTrigger.guildId, guildId)));
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error("Error deleting trigger:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+}

@@ -24,23 +24,39 @@ export default function GuildOverviewPage() {
     const [loading, setLoading] = useState(true);
 
     // Fetch Analytics Data
-    useEffect(() => {
-        async function fetchData() {
-            try {
-                const res = await fetch(`/api/guilds/${guildId}/analytics`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.stats) setStats(data.stats);
-                    if (data.growth) setGrowthData(data.growth);
-                }
-            } catch (error) {
-                console.error("Failed to fetch analytics:", error);
-            } finally {
-                setLoading(false);
+    const fetchData = async () => {
+        try {
+            const res = await fetch(`/api/guilds/${guildId}/analytics`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.stats) setStats(data.stats);
+                if (data.growth) setGrowthData(data.growth);
             }
+        } catch (error) {
+            console.error("Failed to fetch analytics:", error);
+        } finally {
+            setLoading(false);
         }
+    };
+
+    useEffect(() => {
         fetchData();
     }, [guildId]);
+
+    const downloadReport = () => {
+        const payload = {
+            generatedAt: new Date().toISOString(),
+            stats,
+            growth: growthData,
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `ixoye-report-${guildId}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
 
     return (
         <div className="flex flex-col gap-8">
@@ -50,8 +66,8 @@ export default function GuildOverviewPage() {
                     <p className="text-muted-foreground">Here's what's happening with your server today.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline">Last 30 Days</Button>
-                    <Button>Download Report</Button>
+                    <Button variant="outline" onClick={fetchData}>Refresh</Button>
+                    <Button onClick={downloadReport}>Download Report</Button>
                 </div>
             </div>
 
@@ -93,28 +109,24 @@ export default function GuildOverviewPage() {
 
             {/* Content Grid */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                {/* Main Action Area (Overview & Promo) */}
-                <Card className="col-span-4 min-h-[400px] flex flex-col justify-center items-center text-center p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-                    <CardHeader>
-                        <CardTitle className="text-2xl">Server Analytics</CardTitle>
-                        <CardDescription className="text-lg">
-                            Track growth, engagement, and more with deep insights.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="mb-6 max-w-lg text-muted-foreground">
-                            View detailed charts for member growth, verified user trends, and active boost history.
-                        </p>
+                <Card className="col-span-4">
+                    <CardHeader className="flex items-center justify-between space-y-0 md:flex-row">
+                        <div>
+                            <CardTitle className="text-xl">Member Growth</CardTitle>
+                            <CardDescription>New joins and verified members over time.</CardDescription>
+                        </div>
                         <Link href={`/dashboard/${guildId}/analytics`}>
-                            <Button size="lg" className="gap-2">
+                            <Button variant="outline" size="sm" className="gap-2">
                                 <Rocket className="h-4 w-4" />
-                                View Full Analytics
+                                Full Analytics
                             </Button>
                         </Link>
+                    </CardHeader>
+                    <CardContent>
+                        <GrowthChart data={growthData} />
                     </CardContent>
                 </Card>
 
-                {/* Quick Actions */}
                 <Card className="col-span-3">
                     <CardHeader>
                         <CardTitle>Setup Guide</CardTitle>

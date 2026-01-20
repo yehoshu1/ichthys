@@ -8,10 +8,10 @@ import { Input } from "../../../../components/ui/input";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "../../../../components/ui/card";
 import { Label } from "../../../../components/ui/label";
 import { Switch } from "../../../../components/ui/switch";
-import { Textarea } from "../../../../components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../components/ui/table";
-import { Zap, Clock, Users } from "lucide-react";
+import { Zap, Clock } from "lucide-react";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
+import Image from "next/image";
 
 interface BoostConfig {
     boostEnabled: boolean;
@@ -44,6 +44,7 @@ export default function BoostsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const [memberMap, setMemberMap] = useState<Record<string, { username: string; avatar: string | null }>>({});
 
     useEffect(() => {
         fetchData();
@@ -75,6 +76,21 @@ export default function BoostsPage() {
             setLoading(false);
         }
     }
+
+    useEffect(() => {
+        if (boosters.length === 0) return;
+        const ids = boosters.map((b) => b.userId).join(",");
+        fetch(`/api/guilds/${guildId}/members?ids=${ids}`)
+            .then((res) => res.json())
+            .then((data) => {
+                const map: Record<string, { username: string; avatar: string | null }> = {};
+                (data.members || []).forEach((member: any) => {
+                    map[member.id] = { username: member.username, avatar: member.avatar };
+                });
+                setMemberMap(map);
+            })
+            .catch((err) => console.error(err));
+    }, [boosters, guildId]);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -254,7 +270,26 @@ export default function BoostsPage() {
                                 <TableBody>
                                     {boosters.map((b) => (
                                         <TableRow key={b.id}>
-                                            <TableCell className="font-mono text-xs">{b.userId}</TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    {memberMap[b.userId]?.avatar ? (
+                                                        <Image
+                                                            src={memberMap[b.userId].avatar as string}
+                                                            alt={memberMap[b.userId].username}
+                                                            width={24}
+                                                            height={24}
+                                                            className="rounded-full"
+                                                        />
+                                                    ) : (
+                                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-[10px] font-semibold">
+                                                            {(memberMap[b.userId]?.username || "U").charAt(0)}
+                                                        </div>
+                                                    )}
+                                                    <span className="text-sm">
+                                                        {memberMap[b.userId]?.username || b.userId}
+                                                    </span>
+                                                </div>
+                                            </TableCell>
                                             <TableCell>{new Date(b.boostedAt).toLocaleDateString()}</TableCell>
                                             <TableCell>
                                                 <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${b.roleRemoved ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'

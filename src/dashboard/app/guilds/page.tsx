@@ -2,8 +2,14 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { Card } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Search } from "lucide-react";
+import ThemeToggle from "../../components/ThemeToggle";
 
 interface Guild {
     id: string;
@@ -20,6 +26,7 @@ export default function GuildsPage() {
     const [guilds, setGuilds] = useState<Guild[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [query, setQuery] = useState("");
 
     useEffect(() => {
         if (status === "unauthenticated") {
@@ -47,6 +54,12 @@ export default function GuildsPage() {
         }
     }
 
+    const filteredGuilds = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return guilds;
+        return guilds.filter((guild) => guild.name.toLowerCase().includes(q));
+    }, [guilds, query]);
+
     if (status === "loading" || loading) {
         return (
             <main style={styles.container}>
@@ -64,43 +77,76 @@ export default function GuildsPage() {
     }
 
     return (
-        <main style={styles.container}>
-            <h1 style={styles.title}>Select a Server</h1>
-            <p style={styles.subtitle}>Choose a server to manage with ΙΧΘΥΣ</p>
-
-            <div style={styles.grid}>
-                {guilds.map((guild) => (
-                    <div
-                        key={guild.id}
-                        style={styles.card}
-                        onClick={() => router.push(`/dashboard/${guild.id}`)}
-                    >
-                        {guild.iconUrl ? (
-                            <Image
-                                src={guild.iconUrl}
-                                alt={guild.name}
-                                width={64}
-                                height={64}
-                                style={styles.guildIcon}
-                            />
-                        ) : (
-                            <div style={styles.guildIconPlaceholder}>
-                                {guild.name.charAt(0).toUpperCase()}
-                            </div>
-                        )}
-                        <h3 style={styles.guildName}>{guild.name}</h3>
-                        <button style={styles.manageButton}>
-                            {guild.botPresent ? "Manage" : "Setup"}
-                        </button>
+        <main className="min-h-screen px-6 py-12">
+            <div className="mx-auto max-w-6xl space-y-8">
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                    <div>
+                        <Link href="/" className="inline-flex items-center text-sm font-semibold text-primary hover:opacity-80">
+                            ΙΧΘΥΣ Dashboard
+                        </Link>
+                        <h1 className="text-3xl font-semibold tracking-tight">Select a server</h1>
+                        <p className="text-muted-foreground">Choose a server to manage with ΙΧΘΥΣ.</p>
                     </div>
-                ))}
-            </div>
+                    <div className="flex w-full flex-col gap-3 md:max-w-sm">
+                        <div className="flex items-center justify-end">
+                            <ThemeToggle />
+                        </div>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder="Search servers..."
+                                className="pl-9"
+                            />
+                        </div>
+                    </div>
+                </div>
 
-            {guilds.length === 0 && (
-                <p style={styles.emptyText}>
-                    No servers found. Make sure you have Manage Server permissions.
-                </p>
-            )}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {filteredGuilds.map((guild) => (
+                        <Card
+                            key={guild.id}
+                            className="group cursor-pointer overflow-hidden border bg-card/70 transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
+                            onClick={() => router.push(`/dashboard/${guild.id}`)}
+                        >
+                            <div className="flex items-center gap-4 p-5">
+                                {guild.iconUrl ? (
+                                    <Image
+                                        src={guild.iconUrl}
+                                        alt={guild.name}
+                                        width={56}
+                                        height={56}
+                                        className="rounded-2xl border"
+                                    />
+                                ) : (
+                                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-lg font-semibold text-primary">
+                                        {guild.name.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                                <div className="flex-1">
+                                    <h3 className="truncate text-lg font-semibold">{guild.name}</h3>
+                                    <p className="text-xs text-muted-foreground">
+                                        {guild.botPresent ? "Bot connected" : "Bot not installed"}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between border-t bg-background/60 px-5 py-3 text-xs text-muted-foreground">
+                                <span>{guild.hasManagePermission ? "Manage server" : "Limited access"}</span>
+                                <Button size="sm" variant={guild.botPresent ? "default" : "outline"}>
+                                    {guild.botPresent ? "Manage" : "Setup"}
+                                </Button>
+                            </div>
+                        </Card>
+                    ))}
+                </div>
+
+                {filteredGuilds.length === 0 && (
+                    <div className="rounded-xl border border-dashed bg-card/60 p-10 text-center text-muted-foreground">
+                        No servers found. Make sure you have Manage Server permissions.
+                    </div>
+                )}
+            </div>
         </main>
     );
 }
@@ -112,81 +158,14 @@ const styles: { [key: string]: React.CSSProperties } = {
         maxWidth: "1200px",
         margin: "0 auto",
     },
-    title: {
-        fontSize: "2rem",
-        fontWeight: "bold",
-        marginBottom: "8px",
-        textAlign: "center",
-    },
-    subtitle: {
-        color: "#B9BBBE",
-        textAlign: "center",
-        marginBottom: "40px",
-    },
-    grid: {
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-        gap: "20px",
-    },
-    card: {
-        backgroundColor: "#2F3136",
-        borderRadius: "12px",
-        padding: "24px",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        cursor: "pointer",
-        transition: "transform 0.2s, background-color 0.2s",
-    },
-    guildIcon: {
-        borderRadius: "50%",
-        marginBottom: "12px",
-    },
-    guildIconPlaceholder: {
-        width: "64px",
-        height: "64px",
-        borderRadius: "50%",
-        backgroundColor: "#5865F2",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "24px",
-        fontWeight: "bold",
-        marginBottom: "12px",
-    },
-    guildName: {
-        fontSize: "1rem",
-        fontWeight: "600",
-        marginBottom: "12px",
-        textAlign: "center",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-        maxWidth: "100%",
-    },
-    manageButton: {
-        backgroundColor: "#5865F2",
-        color: "white",
-        border: "none",
-        borderRadius: "4px",
-        padding: "8px 16px",
-        cursor: "pointer",
-        fontSize: "0.875rem",
-        fontWeight: "500",
-    },
     loadingText: {
         textAlign: "center",
-        color: "#B9BBBE",
+        color: "#94a3b8",
         marginTop: "100px",
     },
     errorText: {
         textAlign: "center",
-        color: "#ED4245",
+        color: "#ef4444",
         marginTop: "100px",
-    },
-    emptyText: {
-        textAlign: "center",
-        color: "#B9BBBE",
-        marginTop: "40px",
     },
 };

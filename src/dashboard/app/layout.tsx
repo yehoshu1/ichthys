@@ -1,14 +1,33 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { DM_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "../components/AuthProvider";
 
-const inter = Inter({ subsets: ["latin"] });
+const dmSans = DM_Sans({
+    subsets: ["latin"],
+    variable: "--font-sans",
+});
+const spaceGrotesk = Space_Grotesk({
+    subsets: ["latin"],
+    variable: "--font-display",
+});
 
 export const metadata: Metadata = {
     title: "ΙΧΘΥΣ | Dashboard",
     description: "Manage your Discord server with ease",
 };
+
+const themeScript = `
+(() => {
+  try {
+    const stored = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const theme = stored || (prefersDark ? "dark" : "light");
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.dataset.theme = theme;
+  } catch (e) {}
+})();
+`;
 
 export default function RootLayout({
     children,
@@ -17,7 +36,10 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body className={inter.className}>
+            <head>
+                <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+            </head>
+            <body className={`${dmSans.variable} ${spaceGrotesk.variable}`}>
                 <AuthProvider>{children}</AuthProvider>
             </body>
         </html>

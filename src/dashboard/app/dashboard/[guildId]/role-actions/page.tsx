@@ -8,10 +8,11 @@ import { Input } from "../../../../components/ui/input";
 import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from "../../../../components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { Textarea } from "../../../../components/ui/textarea";
-import { Checkbox } from "../../../../components/ui/checkbox";
 import { Label } from "../../../../components/ui/label";
 import { PlusCircle, Pencil, Trash2, X } from "lucide-react";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
+import { Switch } from "../../../../components/ui/switch";
+import { useDiscordData } from "../../../../components/useDiscordData";
 
 interface RoleAction {
     id: string;
@@ -36,6 +37,7 @@ export default function RoleActionsPage() {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingAction, setEditingAction] = useState<Partial<RoleAction> | null>(null);
     const [saving, setSaving] = useState(false);
+    const { rolesById, channelsById } = useDiscordData(guildId);
 
     useEffect(() => {
         fetchActions();
@@ -85,6 +87,19 @@ export default function RoleActionsPage() {
         }
     }
 
+    async function toggleAction(action: RoleAction, enabled: boolean) {
+        try {
+            await fetch(`/api/guilds/${guildId}/role-actions`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...action, enabled }),
+            });
+            await fetchActions();
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
     if (loading) return <div className="p-8 text-center text-muted-foreground">Loading role actions...</div>;
 
     return (
@@ -121,9 +136,18 @@ export default function RoleActionsPage() {
                     <Card key={action.id} className="relative overflow-hidden">
                         <CardHeader className="pb-3">
                             <div className="flex justify-between items-start">
-                                <span className="inline-flex items-center rounded-md bg-secondary px-2 py-1 text-xs font-medium ring-1 ring-inset ring-gray-500/10 mb-2">
-                                    Role: {action.roleId}
-                                </span>
+                                <div className="flex flex-col gap-2">
+                                    <span className="inline-flex items-center rounded-md bg-secondary px-2 py-1 text-xs font-medium ring-1 ring-inset ring-gray-500/10">
+                                        Role: {rolesById.get(action.roleId)?.name || action.roleId}
+                                    </span>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <Switch
+                                            checked={action.enabled}
+                                            onCheckedChange={(checked) => toggleAction(action, checked)}
+                                        />
+                                        {action.enabled ? "Enabled" : "Disabled"}
+                                    </div>
+                                </div>
                                 <div className="flex gap-1">
                                     <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-white ring-1 ring-inset ring-gray-500/10 ${action.triggerType === 'REMOVE' ? 'bg-orange-500' : 'bg-blue-500'}`}>
                                         {action.triggerType === 'REMOVE' ? 'REMOVED' : 'ADDED'}
@@ -145,7 +169,7 @@ export default function RoleActionsPage() {
                                     <p className="line-clamp-2"><span className="font-semibold text-muted-foreground">Message:</span> {action.dmMessage}</p>
                                 )}
                                 {action.channelId && (
-                                    <p><span className="font-semibold text-muted-foreground">Channel:</span> {action.channelId}</p>
+                                    <p><span className="font-semibold text-muted-foreground">Channel:</span> #{channelsById.get(action.channelId)?.name || action.channelId}</p>
                                 )}
                                 {action.kickReason && (
                                     <p><span className="font-semibold text-muted-foreground">Reason:</span> {action.kickReason}</p>

@@ -24,34 +24,34 @@ export default function AnalyticsPage() {
     const [leaderboard, setLeaderboard] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function fetchData() {
-            try {
-                const res = await fetch(`/api/guilds/${guildId}/analytics`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.stats) setStats(data.stats);
-                    // Removed: Growth and Role data processing
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/guilds/${guildId}/analytics`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.stats) setStats(data.stats);
 
-                    // Transform Heatmap Data (Day x Hour Grid)
-                    if (data.heatmap) {
-                        const matrix = Array.from({ length: 7 }, () => Array(24).fill(0));
-                        data.heatmap.forEach((h: any) => {
-                            if (matrix[h.day] && matrix[h.day][h.hour] !== undefined) {
-                                matrix[h.day][h.hour] += h.count;
-                            }
-                        });
-                        setHeatmapData(matrix);
-                    }
-
-                    if (data.leaderboard) setLeaderboard(data.leaderboard);
+                if (data.heatmap) {
+                    const matrix = Array.from({ length: 7 }, () => Array(24).fill(0));
+                    data.heatmap.forEach((h: any) => {
+                        if (matrix[h.day] && matrix[h.day][h.hour] !== undefined) {
+                            matrix[h.day][h.hour] += h.count;
+                        }
+                    });
+                    setHeatmapData(matrix);
                 }
-            } catch (error) {
-                console.error("Failed to fetch analytics:", error);
-            } finally {
-                setLoading(false);
+
+                if (data.leaderboard) setLeaderboard(data.leaderboard);
             }
+        } catch (error) {
+            console.error("Failed to fetch analytics:", error);
+        } finally {
+            setLoading(false);
         }
+    };
+
+    useEffect(() => {
         fetchData();
     }, [guildId]);
 
@@ -63,7 +63,7 @@ export default function AnalyticsPage() {
                     <p className="text-muted-foreground">Detailed insights into your server's performance.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline">Refresh</Button>
+                    <Button variant="outline" onClick={fetchData}>Refresh</Button>
                 </div>
             </div>
 

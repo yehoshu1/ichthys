@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "../../../components/ui/sheet";
+import ThemeToggle from "../../../components/ThemeToggle";
 
 const navItems = [
     { name: "Overview", href: "", icon: LayoutDashboard },
@@ -374,6 +375,7 @@ export default function DashboardLayout({
                         <Button variant="ghost" size="icon" className="sm:hidden">
                             <Search className="h-5 w-5" />
                         </Button>
+                        <ThemeToggle />
                         <Button variant="ghost" size="icon">
                             <Bell className="h-5 w-5" />
                         </Button>

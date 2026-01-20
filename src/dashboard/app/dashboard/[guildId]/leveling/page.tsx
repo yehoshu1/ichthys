@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../components/ui/table";
 import { Trophy, Trash } from "lucide-react";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
+import { useDiscordData } from "../../../../components/useDiscordData";
 
 // Types
 interface LevelingConfig {
@@ -249,6 +250,7 @@ function LevelRewardsManager({ guildId }: { guildId: string }) {
     const [newLevel, setNewLevel] = useState(1);
     const [newRoleId, setNewRoleId] = useState("");
     const [loading, setLoading] = useState(true);
+    const { rolesById } = useDiscordData(guildId);
 
     useEffect(() => {
         fetchRewards();
@@ -331,7 +333,7 @@ function LevelRewardsManager({ guildId }: { guildId: string }) {
                             <div className="flex items-center gap-4">
                                 <span className="font-medium">Level {reward.level}</span>
                                 <span className="text-muted-foreground">→</span>
-                                <RoleBadge guildId={guildId} roleId={reward.roleId} />
+                                <RoleBadge roleName={rolesById.get(reward.roleId)?.name || reward.roleId} />
                             </div>
                             <Button variant="ghost" size="sm" onClick={() => deleteReward(reward.id)}>
                                 <Trash className="h-4 w-4 text-red-500" />
@@ -347,20 +349,12 @@ function LevelRewardsManager({ guildId }: { guildId: string }) {
 // Helper component to display role name (fetching if needed, or just ID if lazy)
 // Assuming RoleSelect handles fetching, we might need a similar component for display or just fetch all roles.
 // For now, I'll create a simple RoleBadge that might need the RoleSelect's role list or fetch it efficiently.
-function RoleBadge({ guildId, roleId }: { guildId: string, roleId: string }) {
-    const [roleName, setRoleName] = useState(roleId);
-
-    useEffect(() => {
-        // Fetch role info if not cached/known. 
-        // Logic simplified: assumes we can fetch basic role info or uses ID.
-        // In a real app we'd likely have a roles context or SWR hook.
-        fetch(`/api/guilds/${guildId}/roles?id=${roleId}`)
-            .then(res => res.json())
-            .then(data => { if (data.name) setRoleName(data.name); })
-            .catch(() => { });
-    }, [guildId, roleId]);
-
-    return <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">{roleName}</span>;
+function RoleBadge({ roleName }: { roleName: string }) {
+    return (
+        <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
+            {roleName}
+        </span>
+    );
 }
 
 function LeaderboardTab({ guildId }: { guildId: string }) {

@@ -10,10 +10,10 @@ import { Label } from "../../../../components/ui/label";
 import { Switch } from "../../../../components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../components/ui/table";
-import { Textarea } from "../../../../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
-import { PlusCircle, FileText, Bot, Settings, Trash2, Check, X } from "lucide-react";
+import { PlusCircle, Trash2, Check, X, Pencil } from "lucide-react";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
+import { useDiscordData } from "../../../../components/useDiscordData";
 
 // Types
 interface Template {
@@ -193,35 +193,6 @@ function GeneralSettings({ guildId }: { guildId: string }) {
                         </div>
                         <div className="space-y-2">
                             <Label>Message Template</Label>
-                            <Textarea
-                                placeholder="Welcome {user} to {server}! We now have {memberCount} members."
-                                value={config.joinMessage}
-                                onChange={(e) => setConfig({ ...config, joinMessage: e.target.value })}
-                                className="min-h-[100px]"
-                            />
-                            <p className="text-[0.8rem] text-muted-foreground">
-                                Available placeholders: {"{user}"}, {"{username}"}, {"{server}"}, {"{memberCount}"}, {"{date}"}, {"{time}"}
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Join Message</CardTitle>
-                        <CardDescription>Sent when a user joins.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label>Channel</Label>
-                            <ChannelSelect
-                                guildId={guildId}
-                                value={config.joinMessageChannelId}
-                                onChange={(value) => setConfig({ ...config, joinMessageChannelId: value })}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Message Template</Label>
                             <MessageEditor
                                 content={config.joinMessage}
                                 embed={config.joinMessageEmbed}
@@ -280,6 +251,7 @@ function TemplatesTab({ guildId }: { guildId: string }) {
     const [templates, setTemplates] = useState<Template[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     // Form State
     const [formData, setFormData] = useState<Partial<Template>>({
@@ -310,13 +282,14 @@ function TemplatesTab({ guildId }: { guildId: string }) {
         e.preventDefault();
         try {
             const res = await fetch(`/api/guilds/${guildId}/welcome/templates`, {
-                method: "POST",
+                method: editingId ? "PUT" : "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData),
+                body: JSON.stringify(editingId ? { ...formData, id: editingId } : formData),
             });
 
             if (res.ok) {
                 setIsCreating(false);
+                setEditingId(null);
                 fetchTemplates();
                 setFormData({ name: "", content: "Welcome {user} to {server}!", embedEnabled: false, embedData: {} });
             }
@@ -325,7 +298,26 @@ function TemplatesTab({ guildId }: { guildId: string }) {
         }
     }
 
-    // ... handleDelete same ...
+    async function handleDelete(id: string) {
+        if (!confirm("Delete this template?")) return;
+        try {
+            const res = await fetch(`/api/guilds/${guildId}/welcome/templates?id=${id}`, { method: "DELETE" });
+            if (res.ok) fetchTemplates();
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    function startEdit(template: Template) {
+        setIsCreating(true);
+        setEditingId(template.id);
+        setFormData({
+            name: template.name,
+            content: template.content,
+            embedEnabled: template.embedEnabled,
+            embedData: template.embedData || {},
+        });
+    }
 
     if (loading) return <div className="p-8 text-center text-muted-foreground">Loading templates...</div>;
 
@@ -338,7 +330,7 @@ function TemplatesTab({ guildId }: { guildId: string }) {
             ) : (
                 <Card>
                     <CardHeader>
-                        <CardTitle>New Template</CardTitle>
+                        <CardTitle>{editingId ? "Edit Template" : "New Template"}</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-4">
@@ -365,7 +357,17 @@ function TemplatesTab({ guildId }: { guildId: string }) {
                             />
 
                             <div className="flex gap-2 justify-end">
-                                <Button type="button" variant="ghost" onClick={() => setIsCreating(false)}>Cancel</Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => {
+                                        setIsCreating(false);
+                                        setEditingId(null);
+                                        setFormData({ name: "", content: "Welcome {user} to {server}!", embedEnabled: false, embedData: {} });
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
                                 <Button type="submit">Save Template</Button>
                             </div>
                         </form>
@@ -385,8 +387,15 @@ function TemplatesTab({ guildId }: { guildId: string }) {
                         <CardContent className="text-sm text-muted-foreground pb-3">
                             <p className="line-clamp-3">{t.content}</p>
                         </CardContent>
-                        <CardFooter className="pt-0">
-                            {/* Add edit/delete buttons later */}
+                        <CardFooter className="pt-0 flex gap-2">
+                            <Button variant="outline" size="sm" className="gap-2" onClick={() => startEdit(t)}>
+                                <Pencil className="h-3 w-3" />
+                                Edit
+                            </Button>
+                            <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDelete(t.id)}>
+                                <Trash2 className="h-3 w-3" />
+                                Delete
+                            </Button>
                         </CardFooter>
                     </Card>
                 ))}
@@ -400,7 +409,9 @@ function TriggersTab({ guildId }: { guildId: string }) {
     const [templates, setTemplates] = useState<Template[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState({ roleId: "", templateId: "", channelId: "" });
+    const { rolesById, channelsById } = useDiscordData(guildId);
 
     useEffect(() => {
         fetchData();
@@ -421,19 +432,59 @@ function TriggersTab({ guildId }: { guildId: string }) {
         e.preventDefault();
         try {
             const res = await fetch(`/api/guilds/${guildId}/welcome/triggers`, {
-                method: "POST",
+                method: editingId ? "PATCH" : "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData),
+                body: JSON.stringify(editingId ? { ...formData, id: editingId } : formData),
             });
 
             if (res.ok) {
                 setIsCreating(false);
+                setEditingId(null);
                 fetchData();
                 setFormData({ roleId: "", templateId: "", channelId: "" });
             }
         } catch (err) {
             console.error(err);
         }
+    }
+
+    async function handleDelete(id: string) {
+        if (!confirm("Delete this trigger?")) return;
+        try {
+            const res = await fetch(`/api/guilds/${guildId}/welcome/triggers?id=${id}`, { method: "DELETE" });
+            if (res.ok) fetchData();
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async function toggleTrigger(trigger: Trigger, enabled: boolean) {
+        try {
+            await fetch(`/api/guilds/${guildId}/welcome/triggers`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: trigger.id,
+                    roleId: trigger.roleId,
+                    templateId: trigger.templateId,
+                    channelId: trigger.channelId,
+                    enabled,
+                }),
+            });
+            fetchData();
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    function startEdit(trigger: Trigger) {
+        setIsCreating(true);
+        setEditingId(trigger.id);
+        setFormData({
+            roleId: trigger.roleId,
+            templateId: trigger.templateId,
+            channelId: trigger.channelId || "",
+        });
     }
 
     if (loading) return <div className="p-8 text-center text-muted-foreground">Loading triggers...</div>;
@@ -447,7 +498,7 @@ function TriggersTab({ guildId }: { guildId: string }) {
             ) : (
                 <Card>
                     <CardHeader>
-                        <CardTitle>New Trigger</CardTitle>
+                        <CardTitle>{editingId ? "Edit Trigger" : "New Trigger"}</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-4">
@@ -487,7 +538,17 @@ function TriggersTab({ guildId }: { guildId: string }) {
                                 />
                             </div>
                             <div className="flex gap-2 justify-end">
-                                <Button type="button" variant="ghost" onClick={() => setIsCreating(false)}>Cancel</Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => {
+                                        setIsCreating(false);
+                                        setEditingId(null);
+                                        setFormData({ roleId: "", templateId: "", channelId: "" });
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
                                 <Button type="submit">Save Trigger</Button>
                             </div>
                         </form>
@@ -503,24 +564,43 @@ function TriggersTab({ guildId }: { guildId: string }) {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Role ID</TableHead>
+                                <TableHead>Role</TableHead>
                                 <TableHead>Template</TableHead>
                                 <TableHead>Type</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {triggers.map(tr => (
                                 <TableRow key={tr.id}>
-                                    <TableCell className="font-mono text-xs">{tr.roleId}</TableCell>
+                                    <TableCell className="font-medium">
+                                        {rolesById.get(tr.roleId)?.name || tr.roleId}
+                                    </TableCell>
                                     <TableCell>{tr.templateName}</TableCell>
-                                    <TableCell>{tr.channelId ? "Channel" : "DM"}</TableCell>
                                     <TableCell>
-                                        {tr.enabled ? (
-                                            <span className="flex items-center text-green-500"><Check className="mr-1 h-3 w-3" /> Active</span>
-                                        ) : (
-                                            <span className="flex items-center text-red-500"><X className="mr-1 h-3 w-3" /> Inactive</span>
-                                        )}
+                                        {tr.channelId ? `#${channelsById.get(tr.channelId)?.name || tr.channelId}` : "DM"}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <Switch
+                                                checked={tr.enabled}
+                                                onCheckedChange={(checked) => toggleTrigger(tr, checked)}
+                                            />
+                                            {tr.enabled ? (
+                                                <span className="flex items-center text-green-500"><Check className="mr-1 h-3 w-3" /> Active</span>
+                                            ) : (
+                                                <span className="flex items-center text-red-500"><X className="mr-1 h-3 w-3" /> Inactive</span>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right space-x-2">
+                                        <Button variant="outline" size="sm" onClick={() => startEdit(tr)}>
+                                            <Pencil className="h-3 w-3" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDelete(tr.id)}>
+                                            <Trash2 className="h-3 w-3" />
+                                        </Button>
                                     </TableCell>
                                 </TableRow>
                             ))}

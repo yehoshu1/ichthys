@@ -3,35 +3,65 @@
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    --background: 30 40% 97%;
+    --foreground: 222 25% 12%;
 
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 25% 12%;
 
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 25% 12%;
 
-    --primary: 263.4 70% 50.4%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 190 85% 36%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 220 18% 92%;
+    --secondary-foreground: 222 25% 14%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted: 220 20% 94%;
+    --muted-foreground: 220 12% 42%;
 
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 44 90% 55%;
+    --accent-foreground: 20 20% 12%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --border: 220 16% 88%;
+    --input: 220 16% 88%;
+    --ring: 190 85% 36%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222 30% 6%;
+    --foreground: 210 40% 96%;
+
+    --card: 222 28% 10%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 222 28% 10%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 190 85% 45%;
+    --primary-foreground: 222 40% 8%;
+
+    --secondary: 225 18% 16%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 225 18% 16%;
+    --muted-foreground: 220 12% 62%;
+
+    --accent: 44 90% 60%;
+    --accent-foreground: 24 20% 10%;
+
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 225 18% 20%;
+    --input: 225 18% 20%;
+    --ring: 190 85% 45%;
   }
 }
 
@@ -42,5 +72,20 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    background-image:
+      radial-gradient(1200px 500px at 20% -10%, hsl(var(--primary) / 0.12), transparent 60%),
+      radial-gradient(900px 400px at 90% 0%, hsl(var(--accent) / 0.16), transparent 55%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+
+  html {
+    color-scheme: light dark;
   }
 }
