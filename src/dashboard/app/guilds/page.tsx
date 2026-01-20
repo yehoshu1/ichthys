@@ -97,6 +97,7 @@ export default function GuildsPage() {
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 placeholder="Search servers..."
+                                aria-label="Search servers"
                                 className="pl-9"
                             />
                         </div>

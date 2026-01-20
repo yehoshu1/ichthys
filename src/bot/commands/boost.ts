@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { Command } from '../types/Command';
 import { db } from '../../shared/database/client';
 import { userBoost, guildConfig } from '../../shared/database/schema';
@@ -7,14 +7,170 @@ import { eq, and } from 'drizzle-orm';
 export const boost: Command = {
     data: new SlashCommandBuilder()
         .setName('boost')
-        .setDescription('Check your server boost status')
+        .setDescription('Manage boost rewards')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('status')
-                .setDescription('Check your current boost status and rewards')),
+                .setDescription('Check your current boost status and rewards'))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('claim')
+                .setDescription('Claim your boost reward role'))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('setup')
+                .setDescription('Create or configure the boost reward role')
+                .addStringOption(option =>
+                    option
+                        .setName('role_name')
+                        .setDescription('Name for the reward role')
+                        .setRequired(true))
+                .addStringOption(option =>
+                    option
+                        .setName('primary_color')
+                        .setDescription('Primary hex color (e.g. #FF6B6B)')
+                        .setRequired(true))
+                .addStringOption(option =>
+                    option
+                        .setName('secondary_color')
+                        .setDescription('Secondary hex color for gradient (optional)')
+                        .setRequired(false))),
 
     async execute(interaction) {
         const subcommand = interaction.options.getSubcommand();
+
+        if (subcommand === 'setup') {
+            await interaction.deferReply({ ephemeral: true });
+            const guildId = interaction.guildId!;
+            const roleName = interaction.options.getString('role_name', true);
+            const primaryColor = interaction.options.getString('primary_color', true);
+            const secondaryColor = interaction.options.getString('secondary_color');
+            const hasPerms = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+            if (!hasPerms) {
+                await interaction.editReply('❌ You need Manage Server permissions to configure boost rewards.');
+                return;
+            }
+
+            const parseHex = (value: string) => {
+                const cleaned = value.replace('#', '');
+                if (!/^[0-9a-fA-F]{6}$/.test(cleaned)) return null;
+                return parseInt(cleaned, 16);
+            };
+
+            const colorValue = parseHex(primaryColor);
+            if (colorValue === null) {
+                await interaction.editReply('❌ Invalid primary color. Use a hex value like #FF6B6B.');
+                return;
+            }
+
+            try {
+                const guild = interaction.guild!;
+                const existingConfig = await db.query.guildConfig.findFirst({
+                    where: eq(guildConfig.guildId, guildId)
+                });
+                if (!existingConfig) {
+                    await db.insert(guildConfig).values({ guildId }).returning();
+                }
+
+                let roleId = existingConfig?.boostRoleId || null;
+                let role = roleId ? await guild.roles.fetch(roleId).catch(() => null) : null;
+
+                if (!role) {
+                    role = await guild.roles.create({
+                        name: roleName,
+                        color: colorValue,
+                        mentionable: false
+                    });
+                    roleId = role.id;
+                } else {
+                    await role.edit({
+                        name: roleName,
+                        color: colorValue
+                    });
+                }
+
+                await db.update(guildConfig)
+                    .set({
+                        boostRoleId: roleId,
+                        boostRoleName: roleName,
+                        boostRoleColorPrimary: primaryColor,
+                        boostRoleColorSecondary: secondaryColor || null,
+                        boostClaimRequired: true,
+                        updatedAt: new Date()
+                    })
+                    .where(eq(guildConfig.guildId, guildId));
+
+                const embed = new EmbedBuilder()
+                    .setTitle('✅ Boost reward configured')
+                    .setColor(colorValue)
+                    .setDescription(`Role **${roleName}** is ready for boosters to claim.`)
+                    .addFields(
+                        { name: 'Primary Color', value: primaryColor, inline: true },
+                        { name: 'Secondary Color', value: secondaryColor || 'None (single color)', inline: true },
+                        { name: 'Role', value: `<@&${roleId}>`, inline: true }
+                    )
+                    .setFooter({ text: secondaryColor ? 'Gradient colors saved. If enhanced styles are unavailable, primary color is used.' : 'Single color applied.' });
+
+                await interaction.editReply({ embeds: [embed] });
+            } catch (error) {
+                await interaction.editReply('❌ Failed to configure boost reward. Check bot role permissions.');
+            }
+            return;
+        }
+
+        if (subcommand === 'claim') {
+            await interaction.deferReply({ ephemeral: true });
+            const guildId = interaction.guildId!;
+            const member = interaction.member as any;
+            const guild = interaction.guild!;
+            const premiumRole = guild.premiumSubscriberRole;
+            const hasBoost = member?.premiumSince || (premiumRole && member.roles.cache.has(premiumRole.id));
+
+            if (!hasBoost) {
+                await interaction.editReply('❌ You must be an active Server Booster to claim rewards.');
+                return;
+            }
+
+            const config = await db.query.guildConfig.findFirst({
+                where: eq(guildConfig.guildId, guildId)
+            });
+
+            if (!config?.boostRoleId) {
+                await interaction.editReply('❌ Boost reward role is not configured. Ask an admin to run `/boost setup`.');
+                return;
+            }
+
+            try {
+                await member.roles.add(config.boostRoleId);
+                const boostStart = member.premiumSince ? new Date(member.premiumSince) : new Date();
+                const boostEndsAt = new Date(boostStart);
+                boostEndsAt.setDate(boostEndsAt.getDate() + 30 + (config.boostRoleRemovalDays || 0));
+
+                const existing = await db.query.userBoost.findFirst({
+                    where: and(eq(userBoost.guildId, guildId), eq(userBoost.userId, member.id))
+                });
+
+                if (existing) {
+                    await db.update(userBoost)
+                        .set({ roleAssigned: true, updatedAt: new Date() })
+                        .where(and(eq(userBoost.guildId, guildId), eq(userBoost.userId, member.id)));
+                } else {
+                    await db.insert(userBoost).values({
+                        guildId,
+                        userId: member.id,
+                        boostedAt: boostStart,
+                        boostEndsAt,
+                        roleAssigned: true,
+                        boostCountTotal: 1,
+                        updatedAt: new Date()
+                    });
+                }
+                await interaction.editReply(`✅ Reward claimed! You now have <@&${config.boostRoleId}>.`);
+            } catch (error) {
+                await interaction.editReply('❌ Failed to assign reward role. Check bot permissions.');
+            }
+            return;
+        }
 
         if (subcommand === 'status') {
             const guildId = interaction.guildId!;
@@ -73,6 +229,15 @@ export const boost: Command = {
                         });
                     }
                 }
+
+                const activeBoosts = isPremium ? 1 : 0;
+                const totalBoosts = boostRecord?.boostCountTotal || 0;
+
+                embed.addFields({
+                    name: 'Your Boosts',
+                    value: `Active: **${activeBoosts}**\nAll-time: **${totalBoosts}**`,
+                    inline: false
+                });
 
                 // Server boost stats
                 const guild = interaction.guild!;

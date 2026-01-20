@@ -30,7 +30,10 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             count: sql<number>`count(*)`
         })
             .from(userJoin)
-            .where(eq(userJoin.guildId, guildId))
+            .where(and(
+                eq(userJoin.guildId, guildId),
+                eq(userJoin.isBot, false)
+            ))
             .groupBy(sql`CASE 
                 WHEN ${userJoin.kickedAt} IS NOT NULL THEN 'kicked'
                 WHEN ${userJoin.isVerified} = 1 THEN 'verified'

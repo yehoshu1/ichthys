@@ -413,7 +413,7 @@ function LeaderboardTab({ guildId }: { guildId: string }) {
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             {u.avatar ? (
-                                                <img src={u.avatar} alt="" className="h-6 w-6 rounded-full" />
+                                                <img src={u.avatar} alt={u.username} className="h-6 w-6 rounded-full" />
                                             ) : (
                                                 <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs">
                                                     {u.username?.charAt(0) || '?'}

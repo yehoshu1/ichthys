@@ -4,7 +4,7 @@ import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "../..
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../components/ui/table";
 import { Badge } from "../../../../components/ui/badge";
-import { BookOpen, Command, Terminal, Shield, Zap, Star } from "lucide-react";
+import { BookOpen, Command, Terminal, Shield, Zap, Star, Wrench, Sparkles, AlertTriangle } from "lucide-react";
 
 export default function DocsPage() {
     return (
@@ -17,7 +17,7 @@ export default function DocsPage() {
             </div>
 
             <Tabs defaultValue="commands" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+                <TabsList className="grid w-full grid-cols-3 lg:w-[520px]">
                     <TabsTrigger value="commands" className="gap-2">
                         <Terminal className="h-4 w-4" />
                         Command Reference
@@ -25,6 +25,10 @@ export default function DocsPage() {
                     <TabsTrigger value="guide" className="gap-2">
                         <BookOpen className="h-4 w-4" />
                         Dashboard Guide
+                    </TabsTrigger>
+                    <TabsTrigger value="setup" className="gap-2">
+                        <Wrench className="h-4 w-4" />
+                        Setup & Tips
                     </TabsTrigger>
                 </TabsList>
 
@@ -46,6 +50,16 @@ export default function DocsPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
+                                    <TableRow>
+                                        <TableCell className="font-mono font-medium">/info</TableCell>
+                                        <TableCell>View a quick analytics overview for the server.</TableCell>
+                                        <TableCell><Badge variant="secondary">Public</Badge></TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell className="font-mono font-medium">/setup</TableCell>
+                                        <TableCell>Interactive setup panel with toggles and role/channel selectors.</TableCell>
+                                        <TableCell><Badge variant="destructive">Manage Server</Badge></TableCell>
+                                    </TableRow>
                                     <TableRow>
                                         <TableCell className="font-mono font-medium">/rank</TableCell>
                                         <TableCell>View your current experience, level, and rank card.</TableCell>
@@ -173,6 +187,47 @@ export default function DocsPage() {
                                 For example, you can create a rule: <em>"When the 'Muted' role is ADDED, send a DM to the user explaining why."</em>
                                 Supported actions include <strong>DM</strong>, <strong>Kick</strong>, and <strong>Log</strong>.
                             </p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Sparkles className="h-5 w-5 text-primary" />
+                                Boosts
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm text-muted-foreground">
+                            <p>Reward boosters automatically, manage role removal grace periods, and send custom thank-you messages.</p>
+                            <p>Use the Boosts dashboard page to view active boosters and recent changes.</p>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="setup" className="mt-6 space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Quick Setup</CardTitle>
+                            <CardDescription>Fastest path to a working configuration.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4 text-sm text-muted-foreground">
+                            <ol className="list-decimal space-y-2 pl-5">
+                                <li>Invite Ixoye with Manage Server + Manage Roles permissions.</li>
+                                <li>Run <span className="font-mono">/setup</span> to toggle modules and set roles/channels.</li>
+                                <li>Open the dashboard to configure templates, triggers, and analytics preferences.</li>
+                            </ol>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <AlertTriangle className="h-5 w-5 text-primary" />
+                                Troubleshooting
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm text-muted-foreground">
+                            <p>Missing roles in dropdowns? Ensure the bot role is above the target roles.</p>
+                            <p>XP not updating? Confirm Leveling is enabled and the bot has message intent access.</p>
+                            <p>Welcome messages not sending? Check the Welcome System toggle and trigger status.</p>
                         </CardContent>
                     </Card>
                 </TabsContent>

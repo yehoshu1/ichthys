@@ -2,8 +2,8 @@ import { Events, GuildMember, PartialGuildMember, TextChannel, EmbedBuilder } fr
 import client from '../client';
 import logger from '../utils/logger';
 import { db } from '../../shared/database/client';
-import { welcomeTrigger, messageTemplate, userJoin, guildConfig, userBoost, roleAction, actionLog } from '../../shared/database/schema';
-import { eq, and } from 'drizzle-orm';
+import { welcomeTrigger, messageTemplate, userJoin, guildConfig, userBoost, roleAction, actionLog, verificationMessageRule } from '../../shared/database/schema';
+import { eq, and, sql } from 'drizzle-orm';
 import { buildMessage } from '../utils/embeds';
 
 export default function setupGuildMemberUpdateHandler() {
@@ -13,27 +13,43 @@ export default function setupGuildMemberUpdateHandler() {
         const newRoles = newMember.roles.cache;
         const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
         const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
+        let verificationConfig = null;
+        let verificationProfiles: Array<typeof verificationMessageRule.$inferSelect> = [];
+
+        try {
+            verificationConfig = await db.query.guildConfig.findFirst({
+                where: eq(guildConfig.guildId, newMember.guild.id)
+            });
+
+            verificationProfiles = await db.query.verificationMessageRule.findMany({
+                where: and(
+                    eq(verificationMessageRule.guildId, newMember.guild.id),
+                    eq(verificationMessageRule.enabled, true)
+                )
+            });
+        } catch (error) {
+            logger.error('Error fetching verification configuration:', error);
+        }
 
         // Handle Removed Roles (Un-verify & Remove Actions)
         if (removedRoles.size > 0) {
             try {
-                const config = await db.query.guildConfig.findFirst({
-                    where: eq(guildConfig.guildId, newMember.guild.id)
-                });
-
-                if (config?.verificationEnabled && config.verificationRoleId) {
-                    if (removedRoles.has(config.verificationRoleId)) {
-                        await db.update(userJoin)
-                            .set({
-                                isVerified: false,
-                                verifiedAt: null,
-                                updatedAt: new Date()
-                            })
-                            .where(and(
-                                eq(userJoin.guildId, newMember.guild.id),
-                                eq(userJoin.userId, newMember.id)
-                            ));
-                        logger.info(`User ${newMember.user.tag} un-verified in ${newMember.guild.name}`);
+                if (verificationConfig?.verificationEnabled && verificationConfig.verificationRoleId) {
+                    if (removedRoles.has(verificationConfig.verificationRoleId)) {
+                        const stillVerified = newMember.roles.cache.has(verificationConfig.verificationRoleId);
+                        if (!stillVerified) {
+                            await db.update(userJoin)
+                                .set({
+                                    isVerified: false,
+                                    verifiedAt: null,
+                                    updatedAt: new Date()
+                                })
+                                .where(and(
+                                    eq(userJoin.guildId, newMember.guild.id),
+                                    eq(userJoin.userId, newMember.id)
+                                ));
+                            logger.info(`User ${newMember.user.tag} un-verified in ${newMember.guild.name}`);
+                        }
                     }
                 }
             } catch (error) {
@@ -64,13 +80,8 @@ export default function setupGuildMemberUpdateHandler() {
         if (addedRoles.size > 0) {
             // Check for Verification Role
             try {
-                const config = await db.query.guildConfig.findFirst({
-                    where: eq(guildConfig.guildId, newMember.guild.id)
-                });
-
-                if (config?.verificationEnabled && config.verificationRoleId) {
-                    if (addedRoles.has(config.verificationRoleId)) {
-                        // User Verified!
+                if (verificationConfig?.verificationEnabled && verificationConfig.verificationRoleId) {
+                    if (addedRoles.has(verificationConfig.verificationRoleId)) {
                         await db.update(userJoin)
                             .set({
                                 isVerified: true,
@@ -86,6 +97,37 @@ export default function setupGuildMemberUpdateHandler() {
                 }
             } catch (error) {
                 logger.error('Error checking verification role:', error);
+            }
+
+            for (const profile of verificationProfiles) {
+                if (addedRoles.has(profile.roleId)) {
+                    try {
+                        if (profile.notifyChannelId) {
+                            const channel = await newMember.guild.channels.fetch(profile.notifyChannelId);
+                            if (channel && channel.isTextBased()) {
+                                const variables = {
+                                    user: newMember.toString(),
+                                    username: newMember.user.username,
+                                    server: newMember.guild.name,
+                                    memberCount: newMember.guild.memberCount.toString()
+                                };
+
+                                const messageData = buildMessage(
+                                    profile.message,
+                                    profile.messageEmbed as any,
+                                    variables
+                                );
+
+                                if (messageData) {
+                                    await (channel as TextChannel).send(messageData);
+                                }
+                            }
+                        }
+                        logger.info(`Applied verification profile ${profile.name || profile.roleId} to ${newMember.user.tag}`);
+                    } catch (error) {
+                        logger.error(`Failed to send profile verification message for ${newMember.user.tag}:`, error);
+                    }
+                }
             }
 
             for (const [roleId, role] of addedRoles) {
@@ -174,39 +216,33 @@ async function handleBoost(member: GuildMember, boostDate: Date, type: 'new' | '
 
         logger.info(`User ${member.user.tag} ${type === 'new' ? 'started boosting' : 'renewed boost for'} ${member.guild.name}`);
 
-        // 1. Assign Role
-        if (config.boostRoleId) {
-            try {
-                await member.roles.add(config.boostRoleId);
-                logger.info(`Assigned boost role ${config.boostRoleId} to ${member.user.tag}`);
-            } catch (roleError) {
-                logger.error(`Failed to assign boost role to ${member.user.tag}:`, roleError);
-            }
-        }
-
-        // 2. Update Database
+        // 1. Update Database
         const boostEndsAt = new Date(boostDate);
         boostEndsAt.setDate(boostEndsAt.getDate() + 30 + (config.boostRoleRemovalDays || 0));
+        const now = new Date();
+        const isNewBoost = type === 'new';
 
         await db.insert(userBoost).values({
             guildId: member.guild.id,
             userId: member.id,
             boostedAt: boostDate,
             boostEndsAt: boostEndsAt,
-            roleAssigned: !!config.boostRoleId,
-            updatedAt: new Date()
+            roleAssigned: false,
+            boostCountTotal: isNewBoost ? 1 : 0,
+            updatedAt: now
         }).onConflictDoUpdate({
-            target: [userBoost.guildId, userBoost.userId], // I should check if there's a unique constraint
+            target: [userBoost.guildId, userBoost.userId],
             set: {
                 boostedAt: boostDate,
                 boostEndsAt: boostEndsAt,
                 roleRemoved: false,
                 roleRemovedAt: null,
-                updatedAt: new Date()
+                boostCountTotal: isNewBoost ? sql`boost_count_total + 1` : sql`boost_count_total`,
+                updatedAt: now
             }
         });
 
-        // 3. Send Announcement
+        // 2. Send Announcement
         const announcementChannelId = config.boostAnnouncementChannelId;
         if (announcementChannelId) {
             const channel = await member.guild.channels.fetch(announcementChannelId);

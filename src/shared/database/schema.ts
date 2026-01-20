@@ -35,6 +35,10 @@ export const guildConfig = sqliteTable('guild_config', {
     boostEnabled: integer('boost_enabled', { mode: 'boolean' }).default(false).notNull(),
     boostAnnouncementChannelId: text('boost_announcement_channel_id'),
     boostRoleId: text('boost_role_id'),
+    boostRoleName: text('boost_role_name'),
+    boostRoleColorPrimary: text('boost_role_color_primary'),
+    boostRoleColorSecondary: text('boost_role_color_secondary'),
+    boostClaimRequired: integer('boost_claim_required', { mode: 'boolean' }).default(true).notNull(),
     boostWelcomeMessage: text('boost_welcome_message'),
     boostWelcomeMessageEmbed: text('boost_welcome_message_embed', { mode: 'json' }),
     boostReBoostMessage: text('boost_re_boost_message'),
@@ -116,14 +120,31 @@ export const userJoin = sqliteTable('user_join', {
 export const verificationMessageRule = sqliteTable('verification_message_rule', {
     id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
     guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    name: text('name'),
     roleId: text('role_id').notNull(),
+    notifyChannelId: text('notify_channel_id'),
     message: text('message').notNull(),
     messageEmbed: text('message_embed', { mode: 'json' }), // JSON Embed config
+    enabled: integer('enabled', { mode: 'boolean' }).default(true).notNull(),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 }, (table) => ({
     guildRoleUnique: uniqueIndex('verification_message_rule_guild_role_unique').on(table.guildId, table.roleId),
     guildIdIdx: index('verification_message_rule_guild_id_idx').on(table.guildId),
+}));
+
+export const verificationRoleMessage = sqliteTable('verification_role_message', {
+    id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    roleId: text('role_id').notNull(),
+    message: text('message').notNull(),
+    messageEmbed: text('message_embed', { mode: 'json' }),
+    enabled: integer('enabled', { mode: 'boolean' }).default(true).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+}, (table) => ({
+    guildRoleUnique: uniqueIndex('verification_role_message_guild_role_unique').on(table.guildId, table.roleId),
+    guildIdIdx: index('verification_role_message_guild_id_idx').on(table.guildId),
 }));
 
 // ====================
@@ -140,6 +161,7 @@ export const userBoost = sqliteTable('user_boost', {
     roleRemoved: integer('role_removed', { mode: 'boolean' }).default(false).notNull(),
     roleRemovedAt: integer('role_removed_at', { mode: 'timestamp' }),
     notifiedBeforeRemoval: integer('notified_before_removal', { mode: 'boolean' }).default(false).notNull(),
+    boostCountTotal: integer('boost_count_total').default(0).notNull(),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 }, (table) => ({
@@ -269,6 +291,8 @@ export type NewUserJoin = typeof userJoin.$inferInsert;
 
 export type VerificationMessageRule = typeof verificationMessageRule.$inferSelect;
 export type NewVerificationMessageRule = typeof verificationMessageRule.$inferInsert;
+export type VerificationRoleMessage = typeof verificationRoleMessage.$inferSelect;
+export type NewVerificationRoleMessage = typeof verificationRoleMessage.$inferInsert;
 
 export type UserBoost = typeof userBoost.$inferSelect;
 export type NewUserBoost = typeof userBoost.$inferInsert;

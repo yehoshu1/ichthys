@@ -17,6 +17,10 @@ interface BoostConfig {
     boostEnabled: boolean;
     boostAnnouncementChannelId: string | null;
     boostRoleId: string | null;
+    boostRoleName?: string | null;
+    boostRoleColorPrimary?: string | null;
+    boostRoleColorSecondary?: string | null;
+    boostClaimRequired?: boolean;
     boostWelcomeMessage: string;
     boostWelcomeMessageEmbed?: EmbedData;
     boostReBoostMessage: string;
@@ -40,7 +44,7 @@ export default function BoostsPage() {
 
     const [config, setConfig] = useState<BoostConfig | null>(null);
     const [boosters, setBoosters] = useState<Booster[]>([]);
-    const [stats, setStats] = useState({ activeCount: 0, totalHistorical: 0 });
+    const [stats, setStats] = useState({ activeCount: 0, totalHistorical: 0, totalBoosts: 0 });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -61,6 +65,7 @@ export default function BoostsPage() {
                 const data = await configRes.json();
                 setConfig({
                     ...data,
+                    boostClaimRequired: data.boostClaimRequired ?? true,
                     boostWelcomeMessageEmbed: data.boostWelcomeMessageEmbed || {},
                     boostReBoostMessageEmbed: data.boostReBoostMessageEmbed || {}
                 });
@@ -138,12 +143,12 @@ export default function BoostsPage() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Boost History</CardTitle>
+                        <CardTitle className="text-sm font-medium">All-Time Boosts</CardTitle>
                         <Clock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.totalHistorical}</div>
-                        <p className="text-xs text-muted-foreground">All-time distinct boosters</p>
+                        <div className="text-2xl font-bold">{stats.totalBoosts}</div>
+                        <p className="text-xs text-muted-foreground">Total boosts claimed over time</p>
                     </CardContent>
                 </Card>
             </div>
@@ -165,19 +170,54 @@ export default function BoostsPage() {
                                     <div className="space-y-0.5">
                                         <Label className="text-base">Enable Boost Management</Label>
                                         <p className="text-sm text-muted-foreground">
-                                            Automate role assignment and announcements.
+                                            Rewards are claim-based. Boosters use <code>/boost claim</code> to receive the role.
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label>Reward Role</Label>
-                                    <RoleSelect
-                                        guildId={guildId}
-                                        value={config?.boostRoleId || ""}
-                                        onChange={(value) => setConfig({ ...config!, boostRoleId: value })}
-                                    />
-                                    <p className="text-[0.8rem] text-muted-foreground">This role will be automatically given when someone boosts.</p>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label>Reward Role Name</Label>
+                                        <Input
+                                            value={config?.boostRoleName || ""}
+                                            onChange={(e) => setConfig({ ...config!, boostRoleName: e.target.value })}
+                                            placeholder="Booster"
+                                        />
+                                        <p className="text-[0.8rem] text-muted-foreground">
+                                            Used when admins create the role via <code>/boost setup</code>.
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Existing Reward Role (optional)</Label>
+                                        <RoleSelect
+                                            guildId={guildId}
+                                            value={config?.boostRoleId || ""}
+                                            onChange={(value) => setConfig({ ...config!, boostRoleId: value })}
+                                            allowNone={true}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label>Primary Color</Label>
+                                        <Input
+                                            value={config?.boostRoleColorPrimary || ""}
+                                            onChange={(e) => setConfig({ ...config!, boostRoleColorPrimary: e.target.value })}
+                                            placeholder="#2CB7C9"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Secondary Color (gradient)</Label>
+                                        <Input
+                                            value={config?.boostRoleColorSecondary || ""}
+                                            onChange={(e) => setConfig({ ...config!, boostRoleColorSecondary: e.target.value })}
+                                            placeholder="#F4B740"
+                                        />
+                                    </div>
+                                    <p className="text-[0.8rem] text-muted-foreground md:col-span-2">
+                                        Gradient colors are stored for enhanced role styles. If unavailable, the primary color is used.
+                                    </p>
                                 </div>
 
                                 <div className="space-y-2">

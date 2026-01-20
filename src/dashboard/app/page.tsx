@@ -36,6 +36,9 @@ export default function Home() {
                                 Login with Discord
                                 <ArrowRight className="h-4 w-4" />
                             </Button>
+                            <Link href="/docs">
+                                <Button variant="outline" size="lg">Docs</Button>
+                            </Link>
                         </div>
                     ) : (
                         <div className="flex flex-wrap items-center gap-3">
@@ -44,6 +47,9 @@ export default function Home() {
                                     Go to Dashboard
                                     <ArrowRight className="h-4 w-4" />
                                 </Button>
+                            </Link>
+                            <Link href="/docs">
+                                <Button variant="outline" size="lg">Docs</Button>
                             </Link>
                             <Button variant="outline" size="lg" onClick={() => signOut()}>
                                 Logout

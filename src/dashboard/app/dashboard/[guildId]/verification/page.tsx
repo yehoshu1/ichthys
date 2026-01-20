@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { RoleSelect } from "../../../../components/DiscordSelectors";
+import { RoleSelect, ChannelSelect } from "../../../../components/DiscordSelectors";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "../../../../components/ui/card";
 import { Label } from "../../../../components/ui/label";
 import { Switch } from "../../../../components/ui/switch";
 import { Trash2, Plus, ShieldCheck, UserX, UserCheck } from "lucide-react";
+import Image from "next/image";
+import { useDiscordData } from "../../../../components/useDiscordData";
 
 // Types
 interface VerificationConfig {
@@ -22,14 +24,38 @@ interface VerificationConfig {
 
 interface VerificationRule {
     id: string;
+    name: string;
     roleId: string;
+    notifyChannelId: string | null;
     message: string;
+    enabled: boolean;
 }
 
 interface VerificationStats {
     verified: number;
     unverified: number;
     kicked: number;
+}
+
+interface KickedUser {
+    userId: string;
+    username: string;
+    avatar: string | null;
+    executedAt: string;
+}
+
+interface UnverifiedUser {
+    userId: string;
+    username: string;
+    avatar: string | null;
+    joinedAt: string;
+}
+
+interface RoleMessageRule {
+    id: string;
+    roleId: string;
+    message: string;
+    enabled: boolean;
 }
 
 export default function VerificationPage() {
@@ -48,15 +74,27 @@ export default function VerificationPage() {
     });
 
     const [rules, setRules] = useState<VerificationRule[]>([]);
+    const [newRuleName, setNewRuleName] = useState("");
     const [newRuleRoleId, setNewRuleRoleId] = useState("");
+    const [newRuleChannelId, setNewRuleChannelId] = useState("");
     const [newRuleMessage, setNewRuleMessage] = useState("");
     const [addingRule, setAddingRule] = useState(false);
+    const [ruleError, setRuleError] = useState<string | null>(null);
+    const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+    const [roleMessages, setRoleMessages] = useState<RoleMessageRule[]>([]);
+    const [newRoleMessageRoleId, setNewRoleMessageRoleId] = useState("");
+    const [newRoleMessageText, setNewRoleMessageText] = useState("");
+    const [roleMessageError, setRoleMessageError] = useState<string | null>(null);
+    const [addingRoleMessage, setAddingRoleMessage] = useState(false);
+    const { rolesById, channelsById } = useDiscordData(guildId);
 
     const [stats, setStats] = useState<VerificationStats>({
         verified: 0,
         unverified: 0,
         kicked: 0
     });
+    const [kickedUsers, setKickedUsers] = useState<KickedUser[]>([]);
+    const [unverifiedUsers, setUnverifiedUsers] = useState<UnverifiedUser[]>([]);
 
     useEffect(() => {
         fetchData();
@@ -64,15 +102,35 @@ export default function VerificationPage() {
 
     async function fetchData() {
         try {
-            const [configRes, statsRes, rulesRes] = await Promise.all([
+            const [configRes, statsRes, rulesRes, roleMessageRes, kickedRes, unverifiedRes] = await Promise.all([
                 fetch(`/api/guilds/${guildId}/verification/config`),
                 fetch(`/api/guilds/${guildId}/verification/stats`),
-                fetch(`/api/guilds/${guildId}/verification/rules`)
+                fetch(`/api/guilds/${guildId}/verification/rules`),
+                fetch(`/api/guilds/${guildId}/verification/role-messages`),
+                fetch(`/api/guilds/${guildId}/verification/kicked?limit=10`),
+                fetch(`/api/guilds/${guildId}/verification/unverified?limit=10`)
             ]);
 
             if (configRes.ok) setConfig(await configRes.json());
             if (statsRes.ok) setStats(await statsRes.json());
-            if (rulesRes.ok) setRules(await rulesRes.json());
+            if (rulesRes.ok) {
+                const data = await rulesRes.json();
+                setRules(data.map((rule: VerificationRule) => ({
+                    ...rule,
+                    enabled: rule.enabled ?? true,
+                    name: rule.name || "",
+                    notifyChannelId: rule.notifyChannelId || null
+                })));
+            }
+            if (roleMessageRes.ok) {
+                const data = await roleMessageRes.json();
+                setRoleMessages(data.map((rule: RoleMessageRule) => ({
+                    ...rule,
+                    enabled: rule.enabled ?? true
+                })));
+            }
+            if (kickedRes.ok) setKickedUsers(await kickedRes.json());
+            if (unverifiedRes.ok) setUnverifiedUsers(await unverifiedRes.json());
         } catch (err) {
             console.error(err);
         } finally {
@@ -99,26 +157,49 @@ export default function VerificationPage() {
     }
 
     async function handleAddRule() {
-        if (!newRuleRoleId || !newRuleMessage) return;
+        if (!newRuleName || !newRuleRoleId || !newRuleChannelId || !newRuleMessage) {
+            setRuleError("Please provide a profile name, role, notification channel, and message.");
+            return;
+        }
         setAddingRule(true);
+        setRuleError(null);
         try {
-            const res = await fetch(`/api/guilds/${guildId}/verification/rules`, {
-                method: "POST",
+            const url = editingRuleId
+                ? `/api/guilds/${guildId}/verification/rules/${editingRuleId}`
+                : `/api/guilds/${guildId}/verification/rules`;
+            const method = editingRuleId ? "PATCH" : "POST";
+
+            const res = await fetch(url, {
+                method,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    name: newRuleName,
                     roleId: newRuleRoleId,
-                    message: newRuleMessage
+                    notifyChannelId: newRuleChannelId || null,
+                    message: newRuleMessage,
+                    enabled: true
                 }),
             });
 
             if (res.ok) {
-                const newRule = await res.json();
-                setRules([...rules, newRule]);
+                const updatedRule = await res.json();
+                if (editingRuleId) {
+                    setRules(rules.map(rule => rule.id === editingRuleId ? updatedRule : rule));
+                } else {
+                    setRules([...rules, updatedRule]);
+                }
+                setNewRuleName("");
                 setNewRuleRoleId("");
+                setNewRuleChannelId("");
                 setNewRuleMessage("");
+                setEditingRuleId(null);
+            } else {
+                const data = await res.json().catch(() => ({}));
+                setRuleError(data.error || "Failed to add verification profile.");
             }
         } catch (err) {
             console.error(err);
+            setRuleError("Failed to add verification profile.");
         } finally {
             setAddingRule(false);
         }
@@ -137,6 +218,102 @@ export default function VerificationPage() {
         } catch (err) {
             console.error(err);
         }
+    }
+
+    async function toggleRule(ruleId: string, enabled: boolean) {
+        try {
+            const res = await fetch(`/api/guilds/${guildId}/verification/rules/${ruleId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enabled })
+            });
+            if (res.ok) {
+                setRules(rules.map(r => r.id === ruleId ? { ...r, enabled } : r));
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async function handleAddRoleMessage() {
+        if (!newRoleMessageRoleId || !newRoleMessageText) {
+            setRoleMessageError("Please provide a role and message.");
+            return;
+        }
+        setAddingRoleMessage(true);
+        setRoleMessageError(null);
+        try {
+            const res = await fetch(`/api/guilds/${guildId}/verification/role-messages`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    roleId: newRoleMessageRoleId,
+                    message: newRoleMessageText,
+                    enabled: true
+                }),
+            });
+            if (res.ok) {
+                const newRule = await res.json();
+                setRoleMessages([...roleMessages, newRule]);
+                setNewRoleMessageRoleId("");
+                setNewRoleMessageText("");
+            } else {
+                const data = await res.json().catch(() => ({}));
+                setRoleMessageError(data.error || "Failed to add role message.");
+            }
+        } catch (err) {
+            console.error(err);
+            setRoleMessageError("Failed to add role message.");
+        } finally {
+            setAddingRoleMessage(false);
+        }
+    }
+
+    async function toggleRoleMessage(ruleId: string, enabled: boolean) {
+        try {
+            const res = await fetch(`/api/guilds/${guildId}/verification/role-messages/${ruleId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enabled })
+            });
+            if (res.ok) {
+                setRoleMessages(roleMessages.map(r => r.id === ruleId ? { ...r, enabled } : r));
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async function deleteRoleMessage(ruleId: string) {
+        if (!confirm("Delete this role message?")) return;
+        try {
+            const res = await fetch(`/api/guilds/${guildId}/verification/role-messages/${ruleId}`, {
+                method: "DELETE"
+            });
+            if (res.ok) {
+                setRoleMessages(roleMessages.filter(r => r.id !== ruleId));
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    function startEditRule(rule: VerificationRule) {
+        setEditingRuleId(rule.id);
+        setNewRuleName(rule.name || "");
+        setNewRuleRoleId(rule.roleId);
+        setNewRuleChannelId(rule.notifyChannelId || "");
+        setNewRuleMessage(rule.message);
+        setRuleError(null);
+    }
+
+    function resetRuleForm() {
+        setEditingRuleId(null);
+        setNewRuleName("");
+        setNewRuleRoleId("");
+        setNewRuleChannelId("");
+        setNewRuleMessage("");
+        setRuleError(null);
     }
 
     if (loading) return <div className="p-8 text-center text-muted-foreground">Loading verification settings...</div>;
@@ -241,21 +418,20 @@ export default function VerificationPage() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Role-Specific Messages</CardTitle>
-                            <CardDescription>Send different messages based on the user's role.</CardDescription>
+                            <CardDescription>Send different messages based on the user's existing roles.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="space-y-4">
-                                {rules.map(rule => (
+                                {roleMessages.map(rule => (
                                     <div key={rule.id} className="flex items-start justify-between rounded-lg border p-4">
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">Role:</span>
-                                                <RoleSelect
-                                                    guildId={guildId}
-                                                    value={rule.roleId}
-                                                    onChange={() => { }} // Read-only in list
-                                                    allowNone={false}
-                                                // disabled // Component doesn't support disabled prop yet? Assuming it might not
+                                                <span className="text-sm font-medium">
+                                                    Role: {rolesById.get(rule.roleId)?.name || rule.roleId}
+                                                </span>
+                                                <Switch
+                                                    checked={rule.enabled}
+                                                    onCheckedChange={(checked) => toggleRoleMessage(rule.id, checked)}
                                                 />
                                             </div>
                                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{rule.message}</p>
@@ -263,11 +439,96 @@ export default function VerificationPage() {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            onClick={() => handleDeleteRule(rule.id)}
+                                            onClick={() => deleteRoleMessage(rule.id)}
                                             className="text-destructive hover:text-destructive"
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
+                                    </div>
+                                ))}
+                                {roleMessages.length === 0 && (
+                                    <p className="text-sm text-muted-foreground">No role-specific messages configured.</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-4 rounded-lg border border-dashed p-4">
+                                <h4 className="text-sm font-medium">Add Role Message</h4>
+                                <div className="space-y-2">
+                                    <Label>Role</Label>
+                                    <RoleSelect
+                                        guildId={guildId}
+                                        value={newRoleMessageRoleId}
+                                        onChange={setNewRoleMessageRoleId}
+                                        allowNone={false}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Message</Label>
+                                    <textarea
+                                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        placeholder="Welcome {user}!"
+                                        value={newRoleMessageText}
+                                        onChange={(e) => setNewRoleMessageText(e.target.value)}
+                                    />
+                                </div>
+                                <Button
+                                    onClick={handleAddRoleMessage}
+                                    disabled={addingRoleMessage || !newRoleMessageRoleId || !newRoleMessageText}
+                                    className="w-full"
+                                >
+                                    <Plus className="mr-2 h-4 w-4" /> Add Role Message
+                                </Button>
+                                {roleMessageError && (
+                                    <p className="text-sm text-destructive">{roleMessageError}</p>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Additional Verification Profiles</CardTitle>
+                            <CardDescription>Assign separate verified roles and notify a channel when applied.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="space-y-4">
+                                {rules.map(rule => (
+                                    <div key={rule.id} className="flex items-start justify-between rounded-lg border p-4">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">
+                                                    {rule.name || rolesById.get(rule.roleId)?.name || rule.roleId}
+                                                </span>
+                                                <Switch
+                                                    checked={rule.enabled}
+                                                    onCheckedChange={(checked) => toggleRule(rule.id, checked)}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Role: {rolesById.get(rule.roleId)?.name || rule.roleId}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Notify: {rule.notifyChannelId ? `#${channelsById.get(rule.notifyChannelId)?.name || rule.notifyChannelId}` : "Not set"}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{rule.message}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => startEditRule(rule)}
+                                            >
+                                                Edit
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handleDeleteRule(rule.id)}
+                                                className="text-destructive hover:text-destructive"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 ))}
 
@@ -279,14 +540,34 @@ export default function VerificationPage() {
                             </div>
 
                             <div className="space-y-4 rounded-lg border border-dashed p-4">
-                                <h4 className="text-sm font-medium">Add New Rule</h4>
+                                <h4 className="text-sm font-medium">
+                                    {editingRuleId ? "Edit Verification Profile" : "Add Verification Profile"}
+                                </h4>
                                 <div className="space-y-2">
-                                    <Label>If user has role:</Label>
+                                    <Label>Profile Name</Label>
+                                    <Input
+                                        value={newRuleName}
+                                        onChange={(e) => setNewRuleName(e.target.value)}
+                                        placeholder="Adult"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Verified Role</Label>
                                     <RoleSelect
                                         guildId={guildId}
                                         value={newRuleRoleId}
                                         onChange={setNewRuleRoleId}
                                         allowNone={false}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Notification Channel</Label>
+                                    <ChannelSelect
+                                        guildId={guildId}
+                                        value={newRuleChannelId}
+                                        onChange={setNewRuleChannelId}
+                                        allowNone={false}
+                                        placeholder="Select a channel"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -300,11 +581,20 @@ export default function VerificationPage() {
                                 </div>
                                 <Button
                                     onClick={handleAddRule}
-                                    disabled={addingRule || !newRuleRoleId || !newRuleMessage}
+                                    disabled={addingRule || !newRuleName || !newRuleRoleId || !newRuleChannelId || !newRuleMessage}
                                     className="w-full"
                                 >
-                                    <Plus className="mr-2 h-4 w-4" /> Add Rule
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    {editingRuleId ? "Save Changes" : "Add Rule"}
                                 </Button>
+                                {editingRuleId && (
+                                    <Button variant="ghost" onClick={resetRuleForm} className="w-full">
+                                        Cancel Edit
+                                    </Button>
+                                )}
+                                {ruleError && (
+                                    <p className="text-sm text-destructive">{ruleError}</p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -341,6 +631,80 @@ export default function VerificationPage() {
                                 </div>
                                 <p className="text-right text-xs text-muted-foreground">{verifiedPercent.toFixed(1)}% Verified</p>
                             </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Recently Auto-Kicked</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {kickedUsers.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No auto-kicks recorded.</p>
+                            ) : (
+                                kickedUsers.map((user) => (
+                                    <div key={user.userId} className="flex items-center justify-between rounded-lg border p-3">
+                                        <div className="flex items-center gap-3">
+                                            {user.avatar ? (
+                                                <Image
+                                                    src={user.avatar}
+                                                    alt={user.username}
+                                                    width={32}
+                                                    height={32}
+                                                    className="rounded-full"
+                                                />
+                                            ) : (
+                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                                                    {user.username.charAt(0)}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <p className="text-sm font-medium">{user.username}</p>
+                                                <p className="text-xs text-muted-foreground">{user.userId}</p>
+                                            </div>
+                                        </div>
+                                        <span className="text-xs text-muted-foreground">
+                                            {new Date(user.executedAt).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                ))
+                            )}
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Unverified Users</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {unverifiedUsers.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No unverified users right now.</p>
+                            ) : (
+                                unverifiedUsers.map((user) => (
+                                    <div key={user.userId} className="flex items-center justify-between rounded-lg border p-3">
+                                        <div className="flex items-center gap-3">
+                                            {user.avatar ? (
+                                                <Image
+                                                    src={user.avatar}
+                                                    alt={user.username}
+                                                    width={32}
+                                                    height={32}
+                                                    className="rounded-full"
+                                                />
+                                            ) : (
+                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                                                    {user.username.charAt(0)}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <p className="text-sm font-medium">{user.username}</p>
+                                                <p className="text-xs text-muted-foreground">{user.userId}</p>
+                                            </div>
+                                        </div>
+                                        <span className="text-xs text-muted-foreground">
+                                            Joined {new Date(user.joinedAt).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                ))
+                            )}
                         </CardContent>
                     </Card>
                 </div>

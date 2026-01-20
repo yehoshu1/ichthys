@@ -368,6 +368,7 @@ export default function DashboardLayout({
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search..."
+                                aria-label="Search dashboard"
                                 className="w-[150px] md:w-[250px] pl-9"
                             />
                         </div>

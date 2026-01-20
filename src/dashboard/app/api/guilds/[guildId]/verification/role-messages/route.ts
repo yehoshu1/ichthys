@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { verificationMessageRule } from "@/lib/db";
+import { verificationRoleMessage } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
 async function checkAuth(req: NextRequest, guildId: string) {
@@ -18,13 +18,13 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     try {
-        const rules = await db.query.verificationMessageRule.findMany({
-            where: eq(verificationMessageRule.guildId, guildId)
+        const rules = await db.query.verificationRoleMessage.findMany({
+            where: eq(verificationRoleMessage.guildId, guildId)
         });
 
         return NextResponse.json(rules);
     } catch (error) {
-        console.error("Error fetching verification rules:", error);
+        console.error("Error fetching role messages:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -37,17 +37,15 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
 
     try {
         const body = await req.json();
-        const { name, roleId, notifyChannelId, message, messageEmbed, enabled } = body;
+        const { roleId, message, messageEmbed, enabled } = body;
 
-        if (!name || !roleId || !message || !notifyChannelId) {
+        if (!roleId || !message) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
-        const [newRule] = await db.insert(verificationMessageRule).values({
+        const [newRule] = await db.insert(verificationRoleMessage).values({
             guildId,
-            name,
             roleId,
-            notifyChannelId,
             message,
             messageEmbed,
             enabled: enabled ?? true
@@ -55,7 +53,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
 
         return NextResponse.json(newRule);
     } catch (error) {
-        console.error("Error creating verification rule:", error);
+        console.error("Error creating role message:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userBoost } from "@/lib/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 async function checkAuth(req: NextRequest, guildId: string) {
     const session = await getServerSession(authOptions);
@@ -27,12 +27,14 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
         // Calculate some basic stats
         const activeCount = currentBoosters.filter(b => !b.roleRemoved).length;
         const totalHistorical = currentBoosters.length;
+        const totalBoosts = currentBoosters.reduce((sum, b) => sum + (b.boostCountTotal || 0), 0);
 
         return NextResponse.json({
             boosters: currentBoosters,
             stats: {
                 activeCount,
-                totalHistorical
+                totalHistorical,
+                totalBoosts
             }
         });
     } catch (error) {
