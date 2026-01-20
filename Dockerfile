@@ -52,6 +52,7 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/dashboard/.next ./src/dashboard/.next
+COPY --from=builder /app/src/dashboard/next.config.js ./src/dashboard/next.config.js
 # COPY --from=builder /app/public ./public
 COPY --from=builder /app/ecosystem.config.js ./
 # Copy database schema for drizzle-kit if needed
