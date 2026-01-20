@@ -123,7 +123,7 @@ export const boost: Command = {
             const guildId = interaction.guildId!;
             const member = interaction.member as any;
             const guild = interaction.guild!;
-            const premiumRole = guild.premiumSubscriberRole;
+            const premiumRole = guild.roles.cache.find(role => role.tags?.premiumSubscriberRole);
             const hasBoost = member?.premiumSince || (premiumRole && member.roles.cache.has(premiumRole.id));
 
             if (!hasBoost) {
