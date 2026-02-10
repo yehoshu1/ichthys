@@ -15,7 +15,7 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 ### Tech Stack
 - **Bot**: [Discord.js](https://discord.js.org/) v14, TypeScript, Node.js
 - **Dashboard**: [Next.js](https://nextjs.org/) 16 (App Router), [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/)
-- **Database**: [SQLite](https://www.sqlite.org/) with [Drizzle ORM](https://orm.drizzle.team/)
+- **Database**: [PostgreSQL 17](https://www.postgresql.org/) with [Drizzle ORM](https://orm.drizzle.team/)
 - **UI Components**: [shadcn/ui](https://ui.shadcn.com/), [Lucide Icons](https://lucide.dev/)
 - **Charts**: [Recharts](https://recharts.org/)
 
@@ -45,9 +45,9 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
     cp .env.example .env
     ```
 
-4.  **Initialize Database**
+4.  **Apply Database Migrations**
     ```bash
-    npm run db:push
+    npm run db:migrate
     ```
 
 5.  **Run Development**
@@ -62,7 +62,7 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 
 ## 🐳 Docker
 
-Run with Docker Compose (includes automatic daily backups at 1 AM):
+Run with Docker Compose (includes Postgres + scheduled `pg_dump` backups):
 
 ```bash
 # Development with hot reload
@@ -87,7 +87,7 @@ npm run db:backup:list
 npm run db:restore
 ```
 
-When running in Docker, backups are created automatically every day at 1:00 AM UTC.
+When running in Docker, backups are handled by the `ixoye-pg-backup` sidecar using `BACKUP_INTERVAL_SECONDS` and `BACKUP_RETENTION_COUNT`.
 
 ## 🤝 Contributing
 

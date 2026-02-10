@@ -31,7 +31,7 @@ async function checkDatabase(): Promise<{ status: "healthy" | "unhealthy"; respo
     const start = Date.now();
     try {
         // Simple query to check connectivity
-        await db.run(sql`SELECT 1`);
+        await db.execute(sql`SELECT 1`);
         return {
             status: "healthy",
             responseTimeMs: Date.now() - start,

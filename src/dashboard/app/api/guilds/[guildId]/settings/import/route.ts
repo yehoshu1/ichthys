@@ -113,7 +113,7 @@ function normalizeCsvDiscordIds(
     value: unknown,
     warnings: ImportWarnings,
     warningKey: string
-): string | null {
+): string[] | null {
     if (value === null || value === undefined) return null;
     if (typeof value !== "string") {
         addWarning(warnings, warningKey);
@@ -130,7 +130,7 @@ function normalizeUnknownIdListToCsv(
     value: unknown,
     warnings: ImportWarnings,
     warningKey: string
-): string | null {
+): string[] | null {
     if (value === null || value === undefined) return null;
 
     if (Array.isArray(value)) {

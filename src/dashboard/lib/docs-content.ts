@@ -45,12 +45,16 @@ export const scripts: ScriptDoc[] = [
     { name: "start", description: "Run compiled bot from dist.", typicalUse: "Production runtime" },
     { name: "deploy", description: "Deploy slash commands to Discord.", typicalUse: "After command schema changes" },
     { name: "db:generate", description: "Generate Drizzle migrations from schema changes.", typicalUse: "Migration authoring" },
-    { name: "db:push", description: "Push current schema to configured DB.", typicalUse: "Local schema sync" },
+    { name: "db:migrate", description: "Apply versioned Drizzle migrations.", typicalUse: "Standard schema rollout" },
+    { name: "db:push", description: "Push current schema to configured DB (prefer migrations).", typicalUse: "Local prototyping" },
     { name: "db:studio", description: "Open Drizzle Studio.", typicalUse: "Manual DB inspection" },
     { name: "db:backup", description: "Create timestamped database backup.", typicalUse: "Pre-change safety" },
     { name: "db:backup:list", description: "List available backups.", typicalUse: "Backup auditing" },
     { name: "db:restore", description: "Restore database from backup.", typicalUse: "Recovery" },
     { name: "db:restore:list", description: "List backups available for restore.", typicalUse: "Recovery planning" },
+    { name: "db:migrate:sqlite-import", description: "Full SQLite to PostgreSQL import pass.", typicalUse: "Initial cutover load" },
+    { name: "db:migrate:delta", description: "Delta sync SQLite changes to PostgreSQL.", typicalUse: "Near-zero cutover sync" },
+    { name: "db:migrate:verify", description: "Verify table counts and checksums between SQLite and PostgreSQL.", typicalUse: "Cutover validation" },
     { name: "deploy:safe", description: "Run safe deployment flow with backup wrapper.", typicalUse: "Production deploy hardening" },
 ];
 
@@ -1189,7 +1193,7 @@ export const setupSections = [
         bullets: [
             "Node.js 22.x recommended.",
             "npm 11.9.0 (project package manager).",
-            "SQLite database via DATABASE_URL.",
+            "PostgreSQL 17 database via DATABASE_URL.",
             "Discord.js bot + Next.js dashboard.",
         ],
     },
@@ -1201,7 +1205,7 @@ export const setupSections = [
             "DISCORD_CLIENT_SECRET",
             "NEXTAUTH_SECRET",
             "NEXTAUTH_URL (local: http://localhost:4000)",
-            "DATABASE_URL (default: file:./data/ixoye.db)",
+            "DATABASE_URL (default: postgresql://ixoye:change_me@localhost:5432/ixoye)",
         ],
     },
     {
@@ -1209,7 +1213,7 @@ export const setupSections = [
         commands: [
             "cp .env.example .env",
             "npm ci",
-            "npm run db:push",
+            "npm run db:migrate",
             "npm run dev:all",
         ],
     },

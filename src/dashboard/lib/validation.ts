@@ -166,14 +166,17 @@ export function normalizeDiscordIdList(inputs: Iterable<unknown>): string[] {
     return [...unique];
 }
 
-export function parseDiscordIdCsv(value: string | null | undefined): string[] {
+export function parseDiscordIdCsv(value: string[] | string | null | undefined): string[] {
     if (!value) return [];
+    if (Array.isArray(value)) {
+        return normalizeDiscordIdList(value);
+    }
     return normalizeDiscordIdList(value.split(","));
 }
 
-export function serializeDiscordIdList(values: Iterable<unknown>): string | null {
+export function serializeDiscordIdList(values: Iterable<unknown>): string[] | null {
     const normalized = normalizeDiscordIdList(values);
-    return normalized.length > 0 ? normalized.join(",") : null;
+    return normalized.length > 0 ? normalized : null;
 }
 
 /** UUID string */

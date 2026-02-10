@@ -6,7 +6,7 @@ This module handles configuration portability and operational safety:
 
 - Export guild configuration to JSON
 - Import/restore configuration from JSON
-- Database-level backup and restore scripts
+- PostgreSQL backup and restore scripts (`pg_dump` / `pg_restore`)
 
 ## Dashboard Location
 
@@ -36,6 +36,8 @@ This module handles configuration portability and operational safety:
 - Import is destructive for the target guild config domain.
 - Validate JSON source before import.
 - Keep export snapshots in versioned storage for rollback.
+- Export payload format is `version: 3` with array-native list fields (`allowedChannels`, `enabledRoles`, etc.).
+- Import accepts array-native fields first; legacy CSV values are still accepted for migration compatibility.
 
 ## Typical Workflow
 
@@ -51,4 +53,4 @@ This module handles configuration portability and operational safety:
 - Partial restore expectations:
 - Import flow is full config overwrite, not selective merge.
 - Backup script failures:
-- Check filesystem permissions for `backups/` and `data/`.
+- Check filesystem permissions for `backups/`.

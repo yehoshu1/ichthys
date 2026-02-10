@@ -1,55 +1,43 @@
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import * as schema from './schema';
 
-// Create SQLite database connection
-const sqlite = new Database(process.env.DATABASE_URL?.replace('file:', '') || './data/ixoye.db');
+const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://ixoye:ixoye@localhost:5432/ixoye';
 
-// Enable foreign keys
-sqlite.pragma('foreign_keys = ON');
-sqlite.pragma('journal_mode = WAL');
-sqlite.pragma('synchronous = NORMAL');
-sqlite.pragma('busy_timeout = 5000');
+export const pool = new Pool({
+    connectionString: databaseUrl,
+    max: Number(process.env.PG_POOL_MAX ?? 20),
+    idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS ?? 30_000),
+    connectionTimeoutMillis: Number(process.env.PG_CONNECT_TIMEOUT_MS ?? 10_000),
+});
 
-function tableExists(tableName: string): boolean {
-    const row = sqlite.prepare(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1"
-    ).get(tableName) as { name?: string } | undefined;
+pool.on('error', (error) => {
+    console.error('Unexpected PostgreSQL pool error:', error);
+});
 
-    return row?.name === tableName;
+export const db = drizzle(pool, { schema });
+
+let shutdownHookRegistered = false;
+
+function registerShutdownHook(): void {
+    if (shutdownHookRegistered) return;
+    shutdownHookRegistered = true;
+
+    const shutdown = async () => {
+        await pool.end().catch((error) => {
+            console.error('Error closing PostgreSQL pool:', error);
+        });
+    };
+
+    process.once('SIGINT', () => {
+        void shutdown().finally(() => process.exit(0));
+    });
+
+    process.once('SIGTERM', () => {
+        void shutdown().finally(() => process.exit(0));
+    });
 }
 
-function getTableColumns(tableName: string): Set<string> {
-    const escapedTableName = tableName.replace(/'/g, "''");
-    const rows = sqlite.prepare(`PRAGMA table_info('${escapedTableName}')`).all() as Array<{ name: string }>;
-    return new Set(rows.map((row) => row.name));
-}
-
-function ensureColumn(tableName: string, columnName: string, addColumnSql: string): void {
-    if (!tableExists(tableName)) {
-        return;
-    }
-
-    const columns = getTableColumns(tableName);
-    if (columns.has(columnName)) {
-        return;
-    }
-
-    sqlite.exec(addColumnSql);
-}
-
-function runCompatibilityMigrations(): void {
-    // Legacy compatibility: older instances may have command_config without max_limit.
-    ensureColumn(
-        'command_config',
-        'max_limit',
-        'ALTER TABLE command_config ADD COLUMN max_limit INTEGER;'
-    );
-}
-
-runCompatibilityMigrations();
-
-// Create Drizzle instance
-export const db = drizzle(sqlite, { schema });
+registerShutdownHook();
 
 export default db;

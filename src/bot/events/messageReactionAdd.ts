@@ -84,7 +84,7 @@ async function handleToggle(
     member: GuildMember,
     role: Role,
     reaction: MessageReaction | PartialMessageReaction,
-    exclusiveRoleIds?: string | null
+    exclusiveRoleIds?: string[] | null
 ) {
     // If user already has the role, remove it
     if (member.roles.cache.has(role.id)) {
@@ -95,8 +95,8 @@ async function handleToggle(
         await member.roles.add(role.id);
 
         // Handle exclusive roles if configured
-        if (exclusiveRoleIds) {
-            const rolesToRemove = exclusiveRoleIds.split(',').filter(id => id !== role.id);
+        if (exclusiveRoleIds && exclusiveRoleIds.length > 0) {
+            const rolesToRemove = exclusiveRoleIds.filter((id) => id !== role.id);
             for (const roleId of rolesToRemove) {
                 if (member.roles.cache.has(roleId)) {
                     await member.roles.remove(roleId).catch(() => null);
@@ -122,10 +122,10 @@ async function handleUnique(
     member: GuildMember,
     role: Role,
     reaction: MessageReaction | PartialMessageReaction,
-    exclusiveRoleIds?: string | null
+    exclusiveRoleIds?: string[] | null
 ) {
     // Remove all exclusive roles first
-    const exclusiveIds = exclusiveRoleIds?.split(',') || [];
+    const exclusiveIds = exclusiveRoleIds ?? [];
 
     // Also find other reaction roles on the same message and treat them as exclusive
     const otherReactionRoles = await db.query.reactionRole.findMany({

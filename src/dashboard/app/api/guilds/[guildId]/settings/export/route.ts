@@ -61,7 +61,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
         ]);
 
         const exportData = {
-            version: 2,
+            version: 3,
             timestamp: new Date().toISOString(),
             guildId,
             config,

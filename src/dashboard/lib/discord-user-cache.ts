@@ -133,6 +133,9 @@ export async function getDiscordUsers(userIds: string[]): Promise<Map<string, Ca
                     avatar: sql`excluded.avatar`,
                     updatedAt: new Date(),
                 },
+                where: sql`${discordUserCache.username} IS DISTINCT FROM excluded.username
+                    OR ${discordUserCache.globalName} IS DISTINCT FROM excluded.global_name
+                    OR ${discordUserCache.avatar} IS DISTINCT FROM excluded.avatar`,
             });
 
         for (const user of fetched.values()) {

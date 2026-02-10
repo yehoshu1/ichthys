@@ -149,33 +149,35 @@ export class MessageAliasService {
     /**
      * Parse allowed channels from string
      */
-    parseAllowedChannels(channelsStr: string | null): string[] {
-        if (!channelsStr) return [];
-        return channelsStr.split(',').map(id => id.trim()).filter(Boolean);
+    parseAllowedChannels(channels: string[] | string | null): string[] {
+        if (!channels) return [];
+        if (Array.isArray(channels)) return channels.filter(Boolean);
+        return channels.split(',').map(id => id.trim()).filter(Boolean);
     }
 
     /**
      * Parse allowed roles from string
      */
-    parseAllowedRoles(rolesStr: string | null): string[] {
-        if (!rolesStr) return [];
-        return rolesStr.split(',').map(id => id.trim()).filter(Boolean);
+    parseAllowedRoles(roles: string[] | string | null): string[] {
+        if (!roles) return [];
+        if (Array.isArray(roles)) return roles.filter(Boolean);
+        return roles.split(',').map(id => id.trim()).filter(Boolean);
     }
 
     /**
      * Serialize channels array to string
      */
-    serializeAllowedChannels(channels: string[]): string | null {
+    serializeAllowedChannels(channels: string[]): string[] | null {
         if (channels.length === 0) return null;
-        return channels.join(',');
+        return channels;
     }
 
     /**
      * Serialize roles array to string
      */
-    serializeAllowedRoles(roles: string[]): string | null {
+    serializeAllowedRoles(roles: string[]): string[] | null {
         if (roles.length === 0) return null;
-        return roles.join(',');
+        return roles;
     }
 
     /**

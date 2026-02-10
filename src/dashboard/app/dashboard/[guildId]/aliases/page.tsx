@@ -28,8 +28,8 @@ interface MessageAlias {
     caseSensitive: boolean;
     deleteTrigger: boolean;
     requirePrefix: string | null;
-    allowedChannels: string | null;
-    allowedRoles: string | null;
+    allowedChannels: string[] | null;
+    allowedRoles: string[] | null;
     cooldownSeconds: number;
     usageCount: number;
     createdBy: string;
@@ -74,8 +74,9 @@ function normalizeIdList(values: string[]): string[] {
     return [...unique];
 }
 
-function parseStoredIdList(value: string | null): string[] {
+function parseStoredIdList(value: string[] | string | null): string[] {
     if (!value) return [];
+    if (Array.isArray(value)) return normalizeIdList(value);
     return normalizeIdList(value.split(","));
 }
 

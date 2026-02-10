@@ -29,7 +29,7 @@ const updateCommandConfigSchema = z.object({
 function sanitizeDiscordIdField(
     fieldName: string,
     incomingValues: string[],
-    existingStoredCsv: string | null | undefined,
+    existingStoredCsv: string[] | string | null | undefined,
     warnings: string[]
 ): { ok: true; normalized: string[] } | { ok: false; error: string } {
     const normalizedIncoming = normalizeUniqueList(incomingValues);
