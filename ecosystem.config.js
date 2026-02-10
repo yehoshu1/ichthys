@@ -3,6 +3,7 @@ module.exports = {
         {
             name: "ixoye-bot",
             script: "./dist/bot/index.js",
+            interpreter: "node",
             env: {
                 NODE_ENV: "production",
             },

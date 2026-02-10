@@ -4,9 +4,11 @@ services:
     container_name: ixoye-app
     restart: always
     ports:
-      - "3000:3000"
+      - "4000:3000"
     volumes:
       - ./data:/app/data
+      - ./backups:/app/backups
+      - ./logs:/app/logs
     env_file:
       - .env
     environment:

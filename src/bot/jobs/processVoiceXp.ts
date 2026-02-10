@@ -1,0 +1,230 @@
+import cron from 'node-cron';
+import { GuildMember } from 'discord.js';
+import { and, asc, eq, gt, isNotNull } from 'drizzle-orm';
+import client from '../client';
+import logger from '../utils/logger';
+import { db } from '../../shared/database/client';
+import { levelProfile, type GuildConfig } from '../../shared/database/schema';
+import { getGuildLevelingConfig, processVoiceXpForMember } from '../services/voiceXpService';
+
+const CHUNK_SIZE = 100;
+const VOICE_XP_CRON = '*/5 * * * *';
+
+interface VoiceXpRunStats {
+    processedProfiles: number;
+    awardedProfiles: number;
+    staleFinalized: number;
+    skippedNoElapsed: number;
+    skippedDisabled: number;
+    skippedUnavailable: number;
+    casConflicts: number;
+    errors: number;
+    totalMinutesProcessed: number;
+    totalXpAwarded: number;
+    totalLevelUps: number;
+}
+
+interface ActiveVoiceProfile {
+    id: string;
+    guildId: string;
+    userId: string;
+}
+
+let isRunning = false;
+
+function getHumanMemberCountInVoice(member: GuildMember): number {
+    const voiceChannel = member.voice.channel;
+    if (!voiceChannel) return 0;
+
+    let count = 0;
+    for (const channelMember of voiceChannel.members.values()) {
+        if (!channelMember.user.bot) count += 1;
+    }
+    return count;
+}
+
+async function getGuildConfigCached(
+    cache: Map<string, GuildConfig | null>,
+    guildId: string
+): Promise<GuildConfig | null> {
+    if (cache.has(guildId)) {
+        return cache.get(guildId) ?? null;
+    }
+
+    const config = await getGuildLevelingConfig(guildId);
+    cache.set(guildId, config ?? null);
+    return config ?? null;
+}
+
+export async function processVoiceXpOnce(): Promise<void> {
+    const stats: VoiceXpRunStats = {
+        processedProfiles: 0,
+        awardedProfiles: 0,
+        staleFinalized: 0,
+        skippedNoElapsed: 0,
+        skippedDisabled: 0,
+        skippedUnavailable: 0,
+        casConflicts: 0,
+        errors: 0,
+        totalMinutesProcessed: 0,
+        totalXpAwarded: 0,
+        totalLevelUps: 0
+    };
+
+    const configCache = new Map<string, GuildConfig | null>();
+    let cursorId: string | null = null;
+
+    while (true) {
+        const activeProfiles: ActiveVoiceProfile[] = cursorId
+            ? await db.select({
+                id: levelProfile.id,
+                guildId: levelProfile.guildId,
+                userId: levelProfile.userId
+            })
+                .from(levelProfile)
+                .where(and(
+                    isNotNull(levelProfile.voiceJoinedAt),
+                    gt(levelProfile.id, cursorId)
+                ))
+                .orderBy(asc(levelProfile.id))
+                .limit(CHUNK_SIZE)
+            : await db.select({
+                id: levelProfile.id,
+                guildId: levelProfile.guildId,
+                userId: levelProfile.userId
+            })
+                .from(levelProfile)
+                .where(isNotNull(levelProfile.voiceJoinedAt))
+                .orderBy(asc(levelProfile.id))
+                .limit(CHUNK_SIZE);
+
+        if (activeProfiles.length === 0) {
+            break;
+        }
+
+        cursorId = activeProfiles[activeProfiles.length - 1].id;
+        const now = new Date();
+
+        for (const activeProfile of activeProfiles) {
+            stats.processedProfiles += 1;
+
+            try {
+                const config = await getGuildConfigCached(configCache, activeProfile.guildId);
+                if (!config?.levelingEnabled) {
+                    stats.skippedDisabled += 1;
+
+                    const guild = client.guilds.cache.get(activeProfile.guildId)
+                        ?? await client.guilds.fetch(activeProfile.guildId).catch(() => null);
+                    const member = guild
+                        ? guild.members.cache.get(activeProfile.userId)
+                        ?? await guild.members.fetch(activeProfile.userId).catch(() => null)
+                        : null;
+
+                    const nextAnchor = member && !member.user.bot && member.voice.channelId ? now : null;
+                    await db.update(levelProfile)
+                        .set({
+                            voiceJoinedAt: nextAnchor,
+                            updatedAt: now
+                        })
+                        .where(and(
+                            eq(levelProfile.guildId, activeProfile.guildId),
+                            eq(levelProfile.userId, activeProfile.userId)
+                        ));
+
+                    continue;
+                }
+
+                const guild = client.guilds.cache.get(activeProfile.guildId)
+                    ?? await client.guilds.fetch(activeProfile.guildId).catch(() => null);
+
+                if (!guild) {
+                    stats.skippedUnavailable += 1;
+                    continue;
+                }
+
+                const member = guild.members.cache.get(activeProfile.userId)
+                    ?? await guild.members.fetch(activeProfile.userId).catch(() => null);
+
+                if (!member || member.user.bot) {
+                    stats.skippedUnavailable += 1;
+                    continue;
+                }
+
+                if (!member.voice.channelId) {
+                    const result = await processVoiceXpForMember({
+                        member,
+                        config,
+                        eligibleForXp: false,
+                        finalizeSession: true,
+                        now
+                    });
+
+                    if (result.status === 'processed') {
+                        stats.staleFinalized += 1;
+                    } else if (result.status === 'cas_conflict') {
+                        stats.casConflicts += 1;
+                    } else if (result.status === 'no_elapsed') {
+                        stats.skippedNoElapsed += 1;
+                    }
+                    continue;
+                }
+
+                const isEligibleForXp = getHumanMemberCountInVoice(member) >= 2;
+                const result = await processVoiceXpForMember({
+                    member,
+                    config,
+                    eligibleForXp: isEligibleForXp,
+                    now
+                });
+
+                if (result.status === 'processed') {
+                    stats.totalMinutesProcessed += result.minutesProcessed;
+                    stats.totalXpAwarded += result.xpEarned;
+                    stats.totalLevelUps += result.levelUps;
+
+                    if (result.xpEarned > 0) {
+                        stats.awardedProfiles += 1;
+                    }
+                    if (result.minutesProcessed === 0) {
+                        stats.skippedNoElapsed += 1;
+                    }
+                } else if (result.status === 'no_elapsed') {
+                    stats.skippedNoElapsed += 1;
+                } else if (result.status === 'cas_conflict') {
+                    stats.casConflicts += 1;
+                }
+            } catch (error) {
+                stats.errors += 1;
+                logger.error(`Failed processing voice XP for ${activeProfile.guildId}/${activeProfile.userId}:`, error);
+            }
+        }
+    }
+
+    logger.info(
+        `Voice XP run complete: profiles=${stats.processedProfiles}, awarded=${stats.awardedProfiles}, `
+        + `minutes=${stats.totalMinutesProcessed}, xp=${stats.totalXpAwarded}, levelUps=${stats.totalLevelUps}, `
+        + `staleFinalized=${stats.staleFinalized}, noElapsed=${stats.skippedNoElapsed}, `
+        + `disabled=${stats.skippedDisabled}, unavailable=${stats.skippedUnavailable}, `
+        + `casConflicts=${stats.casConflicts}, errors=${stats.errors}`
+    );
+}
+
+export function setupVoiceXpProcessingJob(): void {
+    cron.schedule(VOICE_XP_CRON, async () => {
+        if (isRunning) {
+            logger.warn('Skipping voice XP job because previous run is still active.');
+            return;
+        }
+
+        isRunning = true;
+        try {
+            await processVoiceXpOnce();
+        } catch (error) {
+            logger.error('Voice XP job failed:', error);
+        } finally {
+            isRunning = false;
+        }
+    });
+
+    logger.info('Voice XP processing job scheduled (every 5 minutes).');
+}

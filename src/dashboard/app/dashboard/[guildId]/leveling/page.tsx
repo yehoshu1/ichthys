@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { ChannelSelect, RoleSelect } from "../../../../components/DiscordSelectors";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Trophy, Trash } from "lucide-react";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
 import { useDiscordData } from "../../../../components/useDiscordData";
+import { toast } from "sonner";
 
 // Types
 interface LevelingConfig {
@@ -44,9 +45,22 @@ interface LevelReward {
     level: number;
 }
 
+const LEVELING_TABS = ["settings", "leaderboard"] as const;
+type LevelingTab = (typeof LEVELING_TABS)[number];
+
 export default function LevelingPage() {
     const params = useParams();
+    const searchParams = useSearchParams();
     const guildId = params.guildId as string;
+    const requestedTab = searchParams.get("tab");
+    const resolvedTab: LevelingTab = (requestedTab && LEVELING_TABS.includes(requestedTab as LevelingTab))
+        ? (requestedTab as LevelingTab)
+        : "settings";
+    const [activeTab, setActiveTab] = useState<LevelingTab>(resolvedTab);
+
+    useEffect(() => {
+        setActiveTab(resolvedTab);
+    }, [resolvedTab]);
 
     return (
         <div className="container mx-auto p-6 max-w-5xl">
@@ -55,7 +69,7 @@ export default function LevelingPage() {
                 <p className="text-muted-foreground">Reward members for activity with XP and levels.</p>
             </div>
 
-            <Tabs defaultValue="settings" className="space-y-4">
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as LevelingTab)} className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="settings">Settings</TabsTrigger>
                     <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
@@ -110,14 +124,20 @@ function SettingsTab({ guildId }: { guildId: string }) {
         e.preventDefault();
         setSaving(true);
         try {
-            await fetch(`/api/guilds/${guildId}/leveling/config`, {
+            const res = await fetch(`/api/guilds/${guildId}/leveling/config`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(config),
             });
-            // Ideally show a toast here
-            alert("Settings saved!");
-        } catch (e) { console.error(e); }
+            if (!res.ok) {
+                toast.error("Failed to save settings");
+                return;
+            }
+            toast.success("Settings saved");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to save settings");
+        }
         finally { setSaving(false); }
     }
 

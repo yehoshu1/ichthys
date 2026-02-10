@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { RoleSelect, ChannelSelect } from "../../../../components/DiscordSelectors";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { PlusCircle, Trash2, Check, X, Pencil } from "lucide-react";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
 import { useDiscordData } from "../../../../components/useDiscordData";
+import { toast } from "sonner";
 
 // Types
 interface Template {
@@ -37,9 +38,22 @@ interface Trigger {
     templateName: string;
 }
 
+const WELCOME_TABS = ["general", "triggers", "templates"] as const;
+type WelcomeTab = (typeof WELCOME_TABS)[number];
+
 export default function WelcomePage() {
     const params = useParams();
+    const searchParams = useSearchParams();
     const guildId = params.guildId as string;
+    const requestedTab = searchParams.get("tab");
+    const resolvedTab: WelcomeTab = (requestedTab && WELCOME_TABS.includes(requestedTab as WelcomeTab))
+        ? (requestedTab as WelcomeTab)
+        : "general";
+    const [activeTab, setActiveTab] = useState<WelcomeTab>(resolvedTab);
+
+    useEffect(() => {
+        setActiveTab(resolvedTab);
+    }, [resolvedTab]);
 
     return (
         <div className="container mx-auto p-6 max-w-5xl">
@@ -48,7 +62,7 @@ export default function WelcomePage() {
                 <p className="text-muted-foreground">Configure welcome messages, auto-roles, and join/leave notifications.</p>
             </div>
 
-            <Tabs defaultValue="general" className="space-y-4">
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as WelcomeTab)} className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="general">General Settings</TabsTrigger>
                     <TabsTrigger value="triggers">Role Triggers</TabsTrigger>
@@ -126,12 +140,12 @@ function GeneralSettings({ guildId }: { guildId: string }) {
                 body: JSON.stringify(config)
             });
             if (res.ok) {
-                alert("✅ Settings saved successfully!");
+                toast.success("Settings saved");
             } else {
-                alert("❌ Failed to save settings");
+                toast.error("Failed to save settings");
             }
         } catch (error) {
-            alert("❌ Error saving settings");
+            toast.error("Error saving settings");
         } finally {
             setSaving(false);
         }

@@ -1,25 +1,36 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { guildConfig } from "@/lib/db";
+import { db, guildConfig } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { requireGuildManageAccess, requireGuildManageRolesAccess } from "@/lib/guild-auth";
+import { nullableDiscordIdSchema, optionalEmbedSchema, optionalTextSchema, parseJsonBody } from "@/lib/validation";
+import logger from "@/lib/logger";
 
-async function checkAuth(req: NextRequest, guildId: string) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return null;
-    return session;
-}
+const boostsConfigSchema = z.object({
+    boostEnabled: z.boolean().optional(),
+    boostAnnouncementChannelId: nullableDiscordIdSchema,
+    boostRoleId: nullableDiscordIdSchema,
+    boostRoleName: optionalTextSchema,
+    boostRoleColorPrimary: optionalTextSchema,
+    boostRoleColorSecondary: optionalTextSchema,
+    boostClaimRequired: z.boolean().optional(),
+    boostWelcomeMessage: optionalTextSchema,
+    boostWelcomeMessageEmbed: optionalEmbedSchema,
+    boostReBoostMessage: optionalTextSchema,
+    boostReBoostMessageEmbed: optionalEmbedSchema,
+    boostRoleRemovalDays: z.number().int().min(0).max(365).optional(),
+    boostRoleRemovalDmEnabled: z.boolean().optional(),
+}).strict();
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) return auth.response;
 
     try {
         const config = await db.query.guildConfig.findFirst({
-            where: eq(guildConfig.guildId, guildId)
+            where: eq(guildConfig.guildId, guildId),
         });
 
         if (!config) {
@@ -34,13 +45,13 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
                 boostWelcomeMessage: "Thank you {user} for boosting {server}! 🚀",
                 boostReBoostMessage: "Thank you {user} for renewing your boost for {server}! 🚀",
                 boostRoleRemovalDays: 30,
-                boostRoleRemovalDmEnabled: true
+                boostRoleRemovalDmEnabled: true,
             });
         }
 
         return NextResponse.json(config);
     } catch (error) {
-        console.error("Error fetching boost config:", error);
+        logger.error("Error fetching boost config", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -48,66 +59,53 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
 export async function POST(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageRolesAccess(guildId, req);
+    if ("response" in auth) return auth.response;
+
+    const parsed = await parseJsonBody(req, boostsConfigSchema);
+    if (!parsed.success) return parsed.response;
 
     try {
-        const body = await req.json();
-        const {
-            boostEnabled,
-            boostAnnouncementChannelId,
-            boostRoleId,
-            boostRoleName,
-            boostRoleColorPrimary,
-            boostRoleColorSecondary,
-            boostClaimRequired,
-            boostWelcomeMessage,
-            boostWelcomeMessageEmbed, // <--- Added
-            boostReBoostMessage,
-            boostReBoostMessageEmbed, // <--- Added
-            boostRoleRemovalDays,
-            boostRoleRemovalDmEnabled
-        } = body;
+        const body = parsed.data;
 
-        // Upsert logic
         await db.insert(guildConfig).values({
             guildId,
-            boostEnabled,
-            boostAnnouncementChannelId,
-            boostRoleId,
-            boostRoleName,
-            boostRoleColorPrimary,
-            boostRoleColorSecondary,
-            boostClaimRequired,
-            boostWelcomeMessage,
-            boostWelcomeMessageEmbed,
-            boostReBoostMessage,
-            boostReBoostMessageEmbed,
-            boostRoleRemovalDays,
-            boostRoleRemovalDmEnabled
+            boostEnabled: body.boostEnabled ?? false,
+            boostAnnouncementChannelId: body.boostAnnouncementChannelId || null,
+            boostRoleId: body.boostRoleId || null,
+            boostRoleName: body.boostRoleName || null,
+            boostRoleColorPrimary: body.boostRoleColorPrimary || null,
+            boostRoleColorSecondary: body.boostRoleColorSecondary || null,
+            boostClaimRequired: body.boostClaimRequired ?? true,
+            boostWelcomeMessage: body.boostWelcomeMessage || null,
+            boostWelcomeMessageEmbed: body.boostWelcomeMessageEmbed || null,
+            boostReBoostMessage: body.boostReBoostMessage || null,
+            boostReBoostMessageEmbed: body.boostReBoostMessageEmbed || null,
+            boostRoleRemovalDays: body.boostRoleRemovalDays ?? 30,
+            boostRoleRemovalDmEnabled: body.boostRoleRemovalDmEnabled ?? true,
         }).onConflictDoUpdate({
             target: guildConfig.guildId,
             set: {
-                boostEnabled,
-                boostAnnouncementChannelId,
-                boostRoleId,
-                boostRoleName,
-                boostRoleColorPrimary,
-                boostRoleColorSecondary,
-                boostClaimRequired,
-                boostWelcomeMessage,
-                boostWelcomeMessageEmbed,
-                boostReBoostMessage,
-                boostReBoostMessageEmbed,
-                boostRoleRemovalDays,
-                boostRoleRemovalDmEnabled,
-                updatedAt: new Date()
-            }
+                boostEnabled: body.boostEnabled ?? false,
+                boostAnnouncementChannelId: body.boostAnnouncementChannelId || null,
+                boostRoleId: body.boostRoleId || null,
+                boostRoleName: body.boostRoleName || null,
+                boostRoleColorPrimary: body.boostRoleColorPrimary || null,
+                boostRoleColorSecondary: body.boostRoleColorSecondary || null,
+                boostClaimRequired: body.boostClaimRequired ?? true,
+                boostWelcomeMessage: body.boostWelcomeMessage || null,
+                boostWelcomeMessageEmbed: body.boostWelcomeMessageEmbed || null,
+                boostReBoostMessage: body.boostReBoostMessage || null,
+                boostReBoostMessageEmbed: body.boostReBoostMessageEmbed || null,
+                boostRoleRemovalDays: body.boostRoleRemovalDays ?? 30,
+                boostRoleRemovalDmEnabled: body.boostRoleRemovalDmEnabled ?? true,
+                updatedAt: new Date(),
+            },
         });
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("Error updating boost config:", error);
+        logger.error("Error updating boost config", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

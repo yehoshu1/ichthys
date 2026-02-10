@@ -1,39 +1,42 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
-
-async function checkAuth(req: NextRequest) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return null;
-    return session;
-}
+import { requireGuildManageAccess } from "@/lib/guild-auth";
+import logger from "@/lib/logger";
+import { getToken } from "next-auth/jwt";
 
 const CACHE_TTL = 300 * 1000; // 5 minutes
-const cache = new Map<string, { data: any, timestamp: number }>();
+const cache = new Map<string, { data: DiscordData, timestamp: number }>();
 
-export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
-    const params = await props.params;
-    const { guildId } = params;
+interface DiscordApiRole {
+    id: string;
+    name: string;
+    color: number;
+    position: number;
+}
 
-    const session = await checkAuth(req);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+interface DiscordApiChannel {
+    id: string;
+    name: string;
+    type: number;
+    position?: number;
+}
 
-    // Check cache
-    const cached = cache.get(guildId);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        return NextResponse.json(cached.data);
-    }
+interface DiscordData {
+    roles: Array<{
+        id: string;
+        name: string;
+        color: number;
+        position: number;
+    }>;
+    channels: Array<{
+        id: string;
+        name: string;
+        type: number;
+        position: number;
+    }>;
+}
 
+async function fetchWithBotToken(guildId: string, botToken: string): Promise<{ roles: DiscordApiRole[]; channels: DiscordApiChannel[] } | null> {
     try {
-        // Fetch guild data from Discord API
-        const botToken = process.env.DISCORD_TOKEN;
-
-        if (!botToken) {
-            console.error("Missing DISCORD_TOKEN in environment");
-            return NextResponse.json({ error: "Bot token not configured" }, { status: 500 });
-        }
-
-        // Fetch roles and channels concurrently
         const [rolesResponse, channelsResponse] = await Promise.all([
             fetch(`https://discord.com/api/v10/guilds/${guildId}/roles`, {
                 headers: { Authorization: `Bot ${botToken}` },
@@ -44,33 +47,138 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
         ]);
 
         if (!rolesResponse.ok || !channelsResponse.ok) {
-            console.error(`Discord API Error: Roles ${rolesResponse.status}, Channels ${channelsResponse.status}`);
-            return NextResponse.json({ error: "Failed to fetch Discord data" }, { status: 500 });
+            logger.warn("Bot token Discord API failed", {
+                rolesStatus: rolesResponse.status,
+                channelsStatus: channelsResponse.status,
+                guildId
+            });
+            return null;
         }
 
-        const roles = await rolesResponse.json();
-        const channels = await channelsResponse.json();
+        const roles = await rolesResponse.json() as DiscordApiRole[];
+        const channels = await channelsResponse.json() as DiscordApiChannel[];
+
+        return { roles, channels };
+    } catch (error) {
+        logger.error("Bot token fetch failed", { error, guildId });
+        return null;
+    }
+}
+
+async function fetchWithUserToken(guildId: string, userToken: string): Promise<{ roles: DiscordApiRole[]; channels: DiscordApiChannel[] } | null> {
+    try {
+        // Fetch guild info which includes roles for the user
+        const guildResponse = await fetch(`https://discord.com/api/v10/users/@me/guilds/${guildId}/member`, {
+            headers: { Authorization: `Bearer ${userToken}` },
+        });
+
+        if (!guildResponse.ok) {
+            logger.warn("User token guild member fetch failed", {
+                status: guildResponse.status,
+                guildId
+            });
+            return null;
+        }
+
+        // Also fetch channels via user token
+        const channelsResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
+            headers: { Authorization: `Bearer ${userToken}` },
+        });
+
+        // Fetch roles - we need to get them from the guild endpoint
+        const guildRolesResponse = await fetch(`https://discord.com/api/v10/guilds/${guildId}`, {
+            headers: { Authorization: `Bearer ${userToken}` },
+        });
+
+        let roles: DiscordApiRole[] = [];
+        let channels: DiscordApiChannel[] = [];
+
+        if (guildRolesResponse.ok) {
+            const guildData = await guildRolesResponse.json() as { roles?: DiscordApiRole[] };
+            roles = guildData.roles || [];
+        }
+
+        if (channelsResponse.ok) {
+            channels = await channelsResponse.json() as DiscordApiChannel[];
+        }
+
+        return { roles, channels };
+    } catch (error) {
+        logger.error("User token fetch failed", { error, guildId });
+        return null;
+    }
+}
+
+export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
+    const params = await props.params;
+    const { guildId } = params;
+
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) return auth.response;
+
+    // Check cache
+    const cached = cache.get(guildId);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        return NextResponse.json(cached.data);
+    }
+
+    try {
+        const botToken = process.env.DISCORD_TOKEN;
+        let result: { roles: DiscordApiRole[]; channels: DiscordApiChannel[] } | null = null;
+
+        // Try bot token first (preferred - has higher rate limits)
+        if (botToken) {
+            result = await fetchWithBotToken(guildId, botToken);
+        }
+
+        // If bot token failed or not configured, try user token as fallback
+        if (!result) {
+            const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+            const userToken = token?.accessToken as string | undefined;
+            
+            if (userToken) {
+                result = await fetchWithUserToken(guildId, userToken);
+            }
+        }
+
+        // If both failed, return error
+        if (!result) {
+            // If we have stale cache, serve it
+            if (cached) {
+                logger.warn("Serving stale discord-data cache", { guildId });
+                return NextResponse.json(cached.data);
+            }
+
+            logger.error("Failed to fetch Discord data - bot not in server or no access", { guildId });
+            return NextResponse.json({ 
+                error: "Bot is not in this server. Please invite the bot first.",
+                roles: [],
+                channels: []
+            }, { status: 404 });
+        }
 
         // Filter and format roles (exclude @everyone, sort by position)
-        const formattedRoles = roles
-            .filter((role: any) => role.name !== "@everyone")
-            .sort((a: any, b: any) => b.position - a.position)
-            .map((role: any) => ({
+        const formattedRoles = result.roles
+            .filter((role) => role.name !== "@everyone")
+            .sort((a, b) => b.position - a.position)
+            .map((role) => ({
                 id: role.id,
                 name: role.name,
                 color: role.color,
                 position: role.position
             }));
 
-        // Filter and format channels (only text channels, sort by position)
-        const formattedChannels = channels
-            .filter((channel: any) => channel.type === 0) // 0 = GUILD_TEXT
-            .sort((a: any, b: any) => (a.position || 0) - (b.position || 0))
-            .map((channel: any) => ({
+        // Filter and format channels (text, announcement, and thread channels, sort by position)
+        // Channel types: 0 = GUILD_TEXT, 5 = GUILD_ANNOUNCEMENT, 10 = ANNOUNCEMENT_THREAD, 11 = PUBLIC_THREAD, 12 = PRIVATE_THREAD
+        const allowedChannelTypes = [0, 5, 10, 11, 12];
+        const formattedChannels = result.channels
+            .filter((channel) => allowedChannelTypes.includes(channel.type))
+            .sort((a, b) => (a.position || 0) - (b.position || 0))
+            .map((channel) => ({
                 id: channel.id,
                 name: channel.name,
                 type: channel.type,
-                position: channel.position
+                position: channel.position || 0
             }));
 
         const responseData = {
@@ -84,7 +192,14 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
         return NextResponse.json(responseData);
 
     } catch (error) {
-        console.error("Error fetching Discord data:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        logger.error("Error fetching Discord data", { 
+            error: error instanceof Error ? error.message : String(error),
+            guildId 
+        });
+        return NextResponse.json({ 
+            error: "Internal Server Error",
+            roles: [],
+            channels: []
+        }, { status: 500 });
     }
 }

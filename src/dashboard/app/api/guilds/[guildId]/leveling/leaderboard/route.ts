@@ -1,35 +1,16 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { levelProfile } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
-
-async function fetchDiscordUser(userId: string, accessToken: string) {
-    try {
-        const res = await fetch(`https://discord.com/api/v10/users/${userId}`, {
-            headers: {
-                Authorization: `Bot ${process.env.DISCORD_TOKEN}`
-            }
-        });
-        if (res.ok) {
-            const user = await res.json();
-            return {
-                username: user.global_name || user.username,
-                avatar: user.avatar ? `https://cdn.discordapp.com/avatars/${userId}/${user.avatar}.png` : null
-            };
-        }
-    } catch (e) {
-        console.error(`Failed to fetch user ${userId}:`, e);
-    }
-    return { username: null, avatar: null };
-}
+import { requireGuildManageAccess } from "@/lib/guild-auth";
+import { getDiscordUsers } from "@/lib/discord-user-cache";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) return auth.response;
 
     try {
         const { searchParams } = new URL(req.url);
@@ -52,21 +33,19 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             .orderBy(orderBy)
             .limit(50);
 
-        // Fetch usernames from Discord API
-        const enrichedLeaderboard = await Promise.all(
-            leaderboard.map(async (entry) => {
-                const discordUser = await fetchDiscordUser(entry.userId, "");
-                return {
-                    ...entry,
-                    username: discordUser.username || `User ${entry.userId.slice(-4)}`,
-                    avatar: discordUser.avatar
-                };
-            })
-        );
+        const users = await getDiscordUsers(leaderboard.map((entry) => entry.userId));
+        const enrichedLeaderboard = leaderboard.map((entry) => {
+            const user = users.get(entry.userId);
+            return {
+                ...entry,
+                username: user?.globalName || user?.username || `User ${entry.userId.slice(-4)}`,
+                avatar: user?.avatarUrl || null,
+            };
+        });
 
         return NextResponse.json(enrichedLeaderboard);
     } catch (error) {
-        console.error("Error fetching leaderboard:", error);
+        logger.error("Error fetching leaderboard", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

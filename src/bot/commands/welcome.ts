@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { Command } from '../types/Command';
 import { db } from '../../shared/database/client';
-import { welcomeTrigger, messageTemplate, guildConfig } from '../../shared/database/schema';
+import { welcomeTrigger, messageTemplate } from '../../shared/database/schema';
 import { eq, and } from 'drizzle-orm';
 
 export const welcome: Command = {
@@ -25,6 +25,9 @@ export const welcome: Command = {
             const role = interaction.options.getRole('role', true);
             const guildId = interaction.guildId!;
 
+            // Defer reply for database operations
+            await interaction.deferReply({ ephemeral: true });
+
             try {
                 // Find trigger for this role
                 const triggers = await db.select({
@@ -39,9 +42,8 @@ export const welcome: Command = {
                     ));
 
                 if (triggers.length === 0) {
-                    return interaction.reply({
-                        content: `No welcome trigger found for role **${role.name}**. Create one in the dashboard first!`,
-                        ephemeral: true
+                    return interaction.editReply({
+                        content: `No welcome trigger found for role **${role.name}**. Create one in the dashboard first!`
                     });
                 }
 
@@ -77,12 +79,13 @@ export const welcome: Command = {
                     });
                 }
 
-                await interaction.reply({ embeds: [embed], ephemeral: true });
+                await interaction.editReply({ embeds: [embed] });
 
             } catch (error) {
                 console.error('Error testing welcome:', error);
-                await interaction.reply({ content: 'An error occurred while testing.', ephemeral: true });
+                await interaction.editReply({ content: 'An error occurred while testing.' });
             }
         }
+        return;
     }
 };

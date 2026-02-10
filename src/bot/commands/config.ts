@@ -3,6 +3,7 @@ import { Command } from '../types/Command';
 import { db } from '../../shared/database/client';
 import { guildConfig } from '../../shared/database/schema';
 import { eq } from 'drizzle-orm';
+import logger from '../utils/logger';
 
 export const config: Command = {
     data: new SlashCommandBuilder()
@@ -36,6 +37,9 @@ export const config: Command = {
     async execute(interaction) {
         const subcommand = interaction.options.getSubcommand();
         const guildId = interaction.guildId!;
+
+        // Defer reply for all subcommands (database operations)
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             let dbConfig = await db.query.guildConfig.findFirst({
@@ -87,7 +91,7 @@ export const config: Command = {
                     )
                     .setFooter({ text: 'Use /config toggle <feature> to change settings, or use the dashboard for full control.' });
 
-                await interaction.reply({ embeds: [embed], ephemeral: true });
+                await interaction.editReply({ embeds: [embed] });
 
             } else if (subcommand === 'toggle') {
                 const feature = interaction.options.getString('feature', true);
@@ -133,14 +137,11 @@ export const config: Command = {
                         break;
                 }
 
-                await interaction.reply({
-                    content: `${newValue ? '✅' : '❌'} **${fieldName}** has been ${newValue ? 'enabled' : 'disabled'}.`,
-                    ephemeral: true
+                await interaction.editReply({
+                    content: `${newValue ? '✅' : '❌'} **${fieldName}** has been ${newValue ? 'enabled' : 'disabled'}.`
                 });
 
             } else if (subcommand === 'sync') {
-                await interaction.deferReply({ ephemeral: true });
-
                 try {
                     const guild = interaction.guild;
                     if (!guild) {
@@ -187,18 +188,15 @@ export const config: Command = {
 
                     await interaction.editReply(`✅ Successfully synced **${syncedCount}** members to the database! Analytics should now be accurate.`);
                 } catch (error) {
-                    console.error('Sync error:', error);
+                    logger.error('Sync error:', error);
                     await interaction.editReply('❌ Failed to sync members. Ensure the bot has the "Server Members Intent" enabled in the Developer Portal.');
                 }
             }
 
         } catch (error) {
-            console.error('Error in config command:', error);
-            if (!interaction.deferred && !interaction.replied) {
-                await interaction.reply({ content: 'An error occurred while processing the command.', ephemeral: true });
-            } else {
-                await interaction.editReply('An error occurred while processing the command.');
-            }
+            logger.error('Error in config command:', error);
+            // Always deferred at the start, so always use editReply
+            await interaction.editReply('An error occurred while processing the command.');
         }
     }
 };

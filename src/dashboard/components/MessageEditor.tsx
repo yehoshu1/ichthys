@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { Card, CardContent } from "./ui/card";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Switch } from "./ui/switch";
-import { Button } from "./ui/button";
-import { Eye, Code, ImageIcon, Type, Link, User } from "lucide-react";
+import { Eye, Code } from "lucide-react";
+import { ColorPicker } from "./ui/color-picker";
 
 export interface EmbedData {
     title?: string;
@@ -101,21 +100,11 @@ export function MessageEditor({
                                         placeholder="Embed Title"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Color (Hex)</Label>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            value={embed.color || "#5865F2"}
-                                            onChange={(e) => updateEmbed("color", e.target.value)}
-                                            placeholder="#5865F2"
-                                            className="font-mono"
-                                        />
-                                        <div
-                                            className="w-10 h-10 rounded border shadow-sm flex-shrink-0"
-                                            style={{ backgroundColor: embed.color || "#5865F2" }}
-                                        />
-                                    </div>
-                                </div>
+                                <ColorPicker
+                                    label="Color"
+                                    value={embed.color || "#5865F2"}
+                                    onChange={(value) => updateEmbed("color", value)}
+                                />
                             </div>
 
                             <div className="space-y-2">
@@ -183,7 +172,6 @@ export function MessageEditor({
 function DiscordMessagePreview({ content, embed }: { content: string; embed?: EmbedData }) {
     // Mock user for preview
     const botName = "ΙΧΘΥΣ";
-    const botColor = "#5865F2"; // Discord blurple
     const today = new Date();
     const timeString = `Today at ${today.getHours()}:${today.getMinutes().toString().padStart(2, '0')} ${today.getHours() >= 12 ? 'PM' : 'AM'}`;
 

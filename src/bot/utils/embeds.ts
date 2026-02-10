@@ -1,5 +1,5 @@
 
-import { EmbedBuilder, MessageCreateOptions, MessagePayload } from "discord.js";
+import { EmbedBuilder } from "discord.js";
 
 interface EmbedConfig {
     title?: string;
@@ -14,11 +14,21 @@ interface EmbedConfig {
     enabled?: boolean; // From our frontend logic
 }
 
+/**
+ * Escape special regex characters in a string
+ * This prevents regex injection if variable keys contain special characters
+ */
+function escapeRegex(string: string): string {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function replaceVariables(text: string, variables: Record<string, string | number>): string {
     let result = text;
     for (const [key, value] of Object.entries(variables)) {
+        // Escape special regex characters in the key to prevent injection
+        const escapedKey = escapeRegex(key);
         // Replace {key} globally
-        const regex = new RegExp(`{${key}}`, 'g');
+        const regex = new RegExp(`{${escapedKey}}`, 'g');
         result = result.replace(regex, String(value));
     }
     return result;

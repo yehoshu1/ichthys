@@ -1,7 +1,34 @@
-# Base stage
-FROM node:20-slim AS base
-# Install OpenSSL (required for Drizzle/NextAuth)
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+# Base stage with Node.js
+FROM node:22-bookworm-slim AS base
+# Install OpenSSL and sqlite3 (required for NextAuth and backup scripts)
+RUN apt-get update -y && apt-get install -y openssl sqlite3 && rm -rf /var/lib/apt/lists/*
+# Use latest npm across all stages
+RUN npm install -g npm@11.9.0
+
+# Dev stage (for watch mode)
+FROM base AS dev
+WORKDIR /app
+# Install build tools
+RUN apt-get update -y && apt-get install -y python3 make g++ cron && rm -rf /var/lib/apt/lists/*
+
+# Copy package files
+COPY package.json package-lock.json ./
+# Install ALL dependencies (including devDeps)
+# Using npm install instead of npm ci to handle cases where package.json has newer packages
+RUN npm install || npm ci
+
+# Copy source
+COPY . .
+RUN chmod +x /app/scripts/dev-start.sh
+
+# Setup cron for daily backups at 1 AM
+RUN echo "0 1 * * * cd /app && npm run db:backup >> /var/log/cron.log 2>&1" > /etc/cron.d/ixoye-backup \
+    && chmod 0644 /etc/cron.d/ixoye-backup \
+    && crontab /etc/cron.d/ixoye-backup \
+    && touch /var/log/cron.log
+
+# Start cron and dev server
+CMD ["sh", "-c", "cron && sh /app/scripts/dev-start.sh"]
 
 # Builder stage
 FROM base AS builder
@@ -11,8 +38,10 @@ WORKDIR /app
 RUN apt-get update -y && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
-COPY package*.json ./
-RUN npm ci
+COPY package.json package-lock.json ./
+# Install ALL dependencies (including devDeps)
+# Using npm install instead of npm ci to handle cases where package.json has newer packages
+RUN npm install || npm ci
 
 # Copy source
 COPY . .
@@ -27,16 +56,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN touch .env && mkdir -p src/dashboard && touch src/dashboard/.env
 RUN npm run dashboard:build
 
-# Dev stage (for watch mode)
-FROM base AS dev
-WORKDIR /app
-# Install build tools
-RUN apt-get update -y && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
-COPY package*.json ./
-# Install ALL dependencies (including devDeps)
-RUN npm install
-CMD ["npm", "run", "dev:all"]
-
 # Runner stage
 FROM base AS runner
 WORKDIR /app
@@ -45,11 +64,12 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Install PM2 globally and procps for monitoring
-RUN npm install -g pm2 && apt-get update && apt-get install -y procps && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y procps && npm install -g pm2 && rm -rf /var/lib/apt/lists/*
 
 # Copy necessary files
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/package-lock.json ./
+RUN npm install || npm ci
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/dashboard/.next ./src/dashboard/.next
 COPY --from=builder /app/src/dashboard/next.config.js ./src/dashboard/next.config.js
@@ -58,16 +78,19 @@ COPY --from=builder /app/ecosystem.config.js ./
 # Copy database schema for drizzle-kit if needed
 COPY --from=builder /app/src/shared/database ./src/shared/database
 COPY --from=builder /app/drizzle.config.ts ./
+COPY --from=builder /app/scripts ./scripts
 
-# Create data and logs directories
-RUN mkdir -p /app/data /app/logs && chown -R node:node /app/data /app/logs && chmod 777 /app/data /app/logs
-
-# Switch to non-root user
-USER node
+# Create unprivileged runtime user and writable directories
+RUN groupadd -r appuser && useradd -r -g appuser appuser \
+    && mkdir -p /app/data /app/logs /app/backups \
+    && chown -R appuser:appuser /app \
+    && chmod 770 /app/data /app/logs /app/backups
 
 # Expose ports
 # Bot doesn't need exposed port, but Dashboard does (typically 3000)
 EXPOSE 3000
+
+USER appuser
 
 # Start PM2
 CMD ["pm2-runtime", "start", "ecosystem.config.js"]

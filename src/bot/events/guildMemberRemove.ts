@@ -1,13 +1,14 @@
 import { Events, GuildMember, PartialGuildMember, TextChannel } from 'discord.js';
-import client from '../client';
+import type { Event } from '../types/Event';
 import logger from '../utils/logger';
 import { db } from '../../shared/database/client';
 import { guildConfig, userJoin } from '../../shared/database/schema';
 import { eq, and } from 'drizzle-orm';
 import { buildMessage } from '../utils/embeds';
 
-export default function setupGuildMemberRemoveHandler() {
-    client.on(Events.GuildMemberRemove, async (member: GuildMember | PartialGuildMember) => {
+const event: Event<Events.GuildMemberRemove> = {
+    name: Events.GuildMemberRemove,
+    async execute(member: GuildMember | PartialGuildMember) {
         try {
             // 1. Update database to track leave
             await db.update(userJoin)
@@ -62,7 +63,7 @@ export default function setupGuildMemberRemoveHandler() {
         } catch (error) {
             logger.error(`Error processing guildMemberRemove:`, error);
         }
-    });
-}
+    }
+};
 
-
+export default event;

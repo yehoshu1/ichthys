@@ -13,8 +13,8 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 - **🤖 Role Actions**: Automate actions (DM, Kick, Log) when members gain or lose specific roles.
 
 ### Tech Stack
-- **Bot**: [Discord.js](https://discord.js.org/) v14, TypeScript
-- **Dashboard**: [Next.js](https://nextjs.org/) 15 (App Router), [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/)
+- **Bot**: [Discord.js](https://discord.js.org/) v14, TypeScript, Node.js
+- **Dashboard**: [Next.js](https://nextjs.org/) 16 (App Router), [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/)
 - **Database**: [SQLite](https://www.sqlite.org/) with [Drizzle ORM](https://orm.drizzle.team/)
 - **UI Components**: [shadcn/ui](https://ui.shadcn.com/), [Lucide Icons](https://lucide.dev/)
 - **Charts**: [Recharts](https://recharts.org/)
@@ -23,7 +23,8 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 
 - **[Setup Guide](docs/SETUP.md)**: How to install, configure, and run the bot locally or in production.
 - **[Dashboard Guide](docs/DASHBOARD.md)**: A walkthrough of the web dashboard features and configuration.
-- **[Commands Reference](docs/COMMANDS.md)**: a list of available slash commands and their permissions.
+- **[Commands Reference](docs/COMMANDS.md)**: complete npm and slash command catalog with options and examples.
+- **[Module Docs](docs/MODULES.md)**: deep-dive pages for each module and subsystem.
 
 ## 🛠️ Quick Start
 
@@ -35,7 +36,7 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 
 2.  **Install dependencies**
     ```bash
-    npm install
+    npm ci
     ```
 
 3.  **Setup Environment**
@@ -51,12 +52,42 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 
 5.  **Run Development**
     ```bash
-    # Run bot
-    npm run dev
+    # Run both bot and dashboard
+    npm run dev:all
 
-    # Run dashboard (in a separate terminal)
-    npm run dashboard:dev
+    # Or run separately:
+    # npm run dev            # Bot only
+    # npm run dashboard:dev  # Dashboard only (http://localhost:4000)
     ```
+
+## 🐳 Docker
+
+Run with Docker Compose (includes automatic daily backups at 1 AM):
+
+```bash
+# Development with hot reload
+docker-compose -f docker-compose.dev.yml up --watch
+
+# Production
+docker-compose up -d
+```
+
+## 💾 Database Backups
+
+The project includes automatic backup functionality:
+
+```bash
+# Manual backup
+npm run db:backup
+
+# List backups
+npm run db:backup:list
+
+# Restore from backup
+npm run db:restore
+```
+
+When running in Docker, backups are created automatically every day at 1:00 AM UTC.
 
 ## 🤝 Contributing
 

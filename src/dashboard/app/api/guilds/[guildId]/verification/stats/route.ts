@@ -1,21 +1,15 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userJoin } from "@/lib/db";
 import { eq, and, sql } from "drizzle-orm";
-
-async function checkAuth(req: NextRequest, guildId: string) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return null;
-    return session;
-}
+import { requireGuildManageAccess } from "@/lib/guild-auth";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) return auth.response;
 
     try {
         // Stats: Verified vs Unverified vs Kicked
@@ -54,7 +48,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
 
         return NextResponse.json(result);
     } catch (error) {
-        console.error("Error fetching verification stats:", error);
+        logger.error("Error fetching verification stats", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

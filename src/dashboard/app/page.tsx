@@ -6,7 +6,80 @@ import Link from "next/link";
 import { Button } from "../components/ui/button";
 import ThemeToggle from "../components/ThemeToggle";
 import { Card } from "../components/ui/card";
-import { ArrowRight, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import {
+    ArrowRight,
+    Bot,
+    Cake,
+    Hand,
+    MessageSquare,
+    Rocket,
+    ScrollText,
+    Settings,
+    Shield,
+    ShieldCheck,
+    Smile,
+    Sparkles,
+    Star,
+    Zap,
+} from "lucide-react";
+
+const moduleCards = [
+    {
+        title: "Welcome + Verification",
+        desc: "Role-based welcome flows, verification tracking, and unverified cleanup automation.",
+        icon: Hand,
+    },
+    {
+        title: "Leveling + Rewards",
+        desc: "Text and voice XP, rank commands, and automatic role rewards at configured levels.",
+        icon: Star,
+    },
+    {
+        title: "Boost Management",
+        desc: "Track booster lifecycle, claim flows, reward roles, and expiry handling.",
+        icon: Rocket,
+    },
+    {
+        title: "Moderation Suite",
+        desc: "Warnings, mutes, timeouts, bans, message clearing, move tools, and case tracking.",
+        icon: Shield,
+    },
+    {
+        title: "Birthdays + Reaction Roles",
+        desc: "Birthday reminders and role assignment plus message-based role selection systems.",
+        icon: Cake,
+    },
+    {
+        title: "Aliases + Role Actions",
+        desc: "Auto-responder aliases and role-triggered actions (DM, logs, kicks, scheduled automation).",
+        icon: MessageSquare,
+    },
+    {
+        title: "Analytics + Logs",
+        desc: "Guild growth, activity insights, and operational logs for audits and troubleshooting.",
+        icon: ScrollText,
+    },
+    {
+        title: "Settings + Backups",
+        desc: "Import/export configuration, dashboard controls, and database backup workflows.",
+        icon: Settings,
+    },
+];
+
+const commandCategories = [
+    {
+        title: "Public Commands",
+        examples: "/rank, /profile, /leaderboard, /top, /user, /server, /roles",
+    },
+    {
+        title: "Moderator Commands",
+        examples: "/warn, /kick, /ban, /timeout, /mute, /clear, /cases, /move, /lock",
+    },
+    {
+        title: "Admin Commands",
+        examples: "/setup, /config, /welcome, /verify, /boost, /reactionrole, /setxp, /setlevel",
+    },
+];
 
 export default function Home() {
     const { data: session } = useSession();
@@ -20,14 +93,14 @@ export default function Home() {
                 <div className="space-y-6">
                     <div className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-1 text-xs font-medium text-muted-foreground">
                         <Sparkles className="h-3.5 w-3.5 text-primary" />
-                        Modern Discord operations suite
+                        Full-stack Discord operations platform
                     </div>
                     <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">
-                        ΙΧΘΥΣ dashboard for high-signal communities
+                        ΙΧΘΥΣ for modern community infrastructure
                     </h1>
                     <p className="text-base text-muted-foreground md:text-lg">
-                        Configure welcomes, verification, boosts, and leveling from a single, focused control center.
-                        Built for speed, clarity, and automation-first workflows.
+                        Manage welcome and verification flows, moderation, leveling, boosts, birthdays, reaction roles,
+                        aliases, role automations, analytics, logs, and backups from one dashboard.
                     </p>
 
                     {!session ? (
@@ -82,14 +155,35 @@ export default function Home() {
                             </div>
                         ) : null}
 
+                        <div className="rounded-xl border bg-background p-4">
+                            <div className="flex items-center gap-2">
+                                <Bot className="h-4 w-4 text-primary" />
+                                <p className="text-sm font-semibold">Current Coverage</p>
+                            </div>
+                            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                                <div className="rounded-lg border p-2">
+                                    <p className="text-lg font-semibold">{moduleCards.length}</p>
+                                    <p className="text-[11px] text-muted-foreground">Modules</p>
+                                </div>
+                                <div className="rounded-lg border p-2">
+                                    <p className="text-lg font-semibold">30+</p>
+                                    <p className="text-[11px] text-muted-foreground">Commands</p>
+                                </div>
+                                <div className="rounded-lg border p-2">
+                                    <p className="text-lg font-semibold">9</p>
+                                    <p className="text-[11px] text-muted-foreground">Dashboard Areas</p>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="grid gap-3">
                             <div className="flex items-center gap-3 rounded-xl border bg-background p-4">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                     <ShieldCheck className="h-5 w-5" />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-semibold">Verification guardrails</p>
-                                    <p className="text-xs text-muted-foreground">Auto-kick unverified members on schedule.</p>
+                                    <p className="text-sm font-semibold">Verification + moderation guardrails</p>
+                                    <p className="text-xs text-muted-foreground">Role checks, unverified cleanup, cases, and enforcement tools.</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 rounded-xl border bg-background p-4">
@@ -97,8 +191,17 @@ export default function Home() {
                                     <Zap className="h-5 w-5" />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-semibold">Automation at scale</p>
-                                    <p className="text-xs text-muted-foreground">Role actions and boosters, fully automated.</p>
+                                    <p className="text-sm font-semibold">Automation across core workflows</p>
+                                    <p className="text-xs text-muted-foreground">Role actions, booster flows, aliases, and scheduled tasks.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 rounded-xl border bg-background p-4">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+                                    <Smile className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold">Engagement systems built in</p>
+                                    <p className="text-xs text-muted-foreground">Leveling, birthdays, reaction roles, and visibility through analytics.</p>
                                 </div>
                             </div>
                         </div>
@@ -108,42 +211,37 @@ export default function Home() {
 
             <section className="mx-auto mt-16 max-w-6xl space-y-6">
                 <div className="flex flex-col gap-2">
-                    <h2 className="text-2xl font-semibold tracking-tight">What the bot does for your server</h2>
+                    <h2 className="text-2xl font-semibold tracking-tight">Feature Modules</h2>
                     <p className="text-muted-foreground">
-                        Ixoye automates the repetitive work of community operations, so you can focus on culture.
+                        Everything currently available in Ixoye today, grouped by operational module.
                     </p>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {[
-                        {
-                            title: "Welcome orchestration",
-                            desc: "Design join/leave messages, embeds, and role-based triggers without touching code.",
-                        },
-                        {
-                            title: "Verification enforcement",
-                            desc: "Set grace periods, auto-kick rules, and role-specific verification messaging.",
-                        },
-                        {
-                            title: "Leveling + rewards",
-                            desc: "Track text and voice activity with configurable XP and auto-rewarded roles.",
-                        },
-                        {
-                            title: "Boost management",
-                            desc: "Automate booster thanks, role rewards, and graceful expiry handling.",
-                        },
-                        {
-                            title: "Role automations",
-                            desc: "Trigger DM, log, kick, or channel actions when roles change.",
-                        },
-                        {
-                            title: "Analytics and insights",
-                            desc: "See growth, activity heatmaps, and leaderboards in one place.",
-                        },
-                    ].map((item) => (
+                    {moduleCards.map((item) => (
                         <Card key={item.title} className="border bg-card/70 p-5">
-                            <h3 className="text-base font-semibold">{item.title}</h3>
+                            <div className="flex items-center gap-2">
+                                <item.icon className="h-4 w-4 text-primary" />
+                                <h3 className="text-base font-semibold">{item.title}</h3>
+                            </div>
                             <p className="mt-2 text-sm text-muted-foreground">{item.desc}</p>
+                        </Card>
+                    ))}
+                </div>
+            </section>
+
+            <section className="mx-auto mt-12 max-w-6xl space-y-6">
+                <div className="flex flex-col gap-2">
+                    <h2 className="text-2xl font-semibold tracking-tight">Command Surface</h2>
+                    <p className="text-muted-foreground">
+                        The bot ships with broad slash-command coverage for public, moderator, and admin use.
+                    </p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                    {commandCategories.map((category) => (
+                        <Card key={category.title} className="border bg-card/70 p-5">
+                            <h3 className="text-base font-semibold">{category.title}</h3>
+                            <p className="mt-2 text-sm text-muted-foreground">{category.examples}</p>
                         </Card>
                     ))}
                 </div>

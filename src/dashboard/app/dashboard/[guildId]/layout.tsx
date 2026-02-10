@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import { useSession, signOut } from "next-auth/react";
 import { useParams, usePathname, useRouter } from "next/navigation";
@@ -24,23 +24,38 @@ import {
     ChevronLeft,
     BookOpen,
     Bot,
-    Loader2
+    Loader2,
+    Smile,
+    Shield,
+    Cake,
+    MessageSquare,
+    TerminalSquare,
+    type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "../../../components/ui/sheet";
 import ThemeToggle from "../../../components/ThemeToggle";
+import { toast } from "sonner";
+import GlobalSearchModal from "../../../components/GlobalSearchModal";
+import { DASHBOARD_NAV_ITEMS, DashboardNavId } from "../../../lib/search/dashboard-nav";
+import type { SearchOpenMethod } from "../../../lib/search/telemetry";
 
-const navItems = [
-    { name: "Overview", href: "", icon: LayoutDashboard },
-    { name: "Welcome", href: "/welcome", icon: Hand },
-    { name: "Verification", href: "/verification", icon: ShieldCheck },
-    { name: "Leveling", href: "/leveling", icon: Star },
-    { name: "Boosts", href: "/boosts", icon: Rocket },
-    { name: "Role Actions", href: "/role-actions", icon: Zap },
-    { name: "Logs", href: "/logs", icon: ScrollText },
-    { name: "Settings", href: "/settings", icon: Settings },
-    { name: "Documentation", href: "/docs", icon: BookOpen },
-];
+const navIconById: Record<DashboardNavId, LucideIcon> = {
+    overview: LayoutDashboard,
+    welcome: Hand,
+    verification: ShieldCheck,
+    leveling: Star,
+    boosts: Rocket,
+    birthdays: Cake,
+    "reaction-roles": Smile,
+    "role-actions": Zap,
+    aliases: MessageSquare,
+    commands: TerminalSquare,
+    moderation: Shield,
+    logs: ScrollText,
+    settings: Settings,
+    docs: BookOpen,
+};
 
 export default function DashboardLayout({
     children,
@@ -56,36 +71,61 @@ export default function DashboardLayout({
     const [isBotMember, setIsBotMember] = useState<boolean | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchOpenMethod, setSearchOpenMethod] = useState<SearchOpenMethod>("unknown");
+    const fetchInProgress = useRef(false);
+
+    const openSearch = (method: SearchOpenMethod): void => {
+        setSearchOpenMethod(method);
+        setSearchOpen(true);
+    };
 
     const fetchGuildInfo = () => {
+        if (fetchInProgress.current) return;
+        fetchInProgress.current = true;
+        
         setIsLoading(true);
         setFetchError(null);
         fetch(`/api/guilds/${guildId}`)
             .then(async (res) => {
-                if (res.status === 404 || res.status === 403) {
-                    // API returned 404/403, likely because the bot isn't in the server
-                    // and the user token couldn't access guild details (not a member/scope issue).
-                    // Instead of redirecting, we assume the bot is not connected and show the invite screen.
-                    console.warn("Guild not found/access denied. Assuming bot is not present.");
+                if (res.status === 404) {
+                    // Bot not in server
+                    console.warn("Bot not in guild, showing invite screen");
                     setIsBotMember(false);
-                    // We might not have the name, so we use a fallback or keep empty
-                    // The UI handles missing name gracefully?
+                    return null;
+                }
+                if (res.status === 403) {
+                    // User has no access
+                    console.warn("User has no access to guild");
+                    setFetchError("You don't have permission to access this server.");
                     return null;
                 }
                 if (res.status === 401) {
-                    // Session exists but token is missing/invalid
-                    // Redirect to guilds instead of signing out to prevent infinite loop
-                    console.warn("Access token missing or invalid, redirecting to guilds");
+                    // Session expired
+                    console.warn("Session expired, redirecting to guilds");
                     router.push("/guilds");
                     return null;
                 }
+                if (res.status === 429) {
+                    // Rate limited
+                    const retryAfter = res.headers.get('Retry-After') || '5';
+                    console.warn("Rate limited, retry after:", retryAfter);
+                    setFetchError(`Rate limited. Please wait ${retryAfter} seconds.`);
+                    return null;
+                }
                 if (res.status === 503) {
-                    // Service unavailable - temporary issue
-                    setFetchError("Unable to connect to Discord. Please try again.");
+                    // Service unavailable - check error message
+                    const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+                    console.error("Service unavailable:", errorData);
+                    if (errorData.error?.includes("Bot may not be in server")) {
+                        // Bot not in server
+                        setIsBotMember(false);
+                        return null;
+                    }
+                    setFetchError(errorData.error || "Unable to connect to Discord. Please try again.");
                     return null;
                 }
                 if (!res.ok) {
-                    // Check for text payload
                     const text = await res.text();
                     console.error("API Error:", res.status, text);
                     setFetchError(text || "Failed to fetch guild information");
@@ -102,7 +142,10 @@ export default function DashboardLayout({
                 console.error("Failed to fetch guild info:", err);
                 setFetchError("Network error. Please check your connection.");
             })
-            .finally(() => setIsLoading(false));
+            .finally(() => {
+                setIsLoading(false);
+                fetchInProgress.current = false;
+            });
     };
 
     useEffect(() => {
@@ -145,7 +188,7 @@ export default function DashboardLayout({
                                 // Fallback or prompt if ID is missing, but typically it should be there.
                                 // Note: We need NEXT_PUBLIC_DISCORD_CLIENT_ID in .env
                                 if (!clientId) {
-                                    alert("Client ID not configured in environment variables.");
+                                    toast.error("Client ID not configured in environment variables.");
                                     return;
                                 }
                                 window.open(
@@ -203,7 +246,8 @@ export default function DashboardLayout({
                     <div className="px-3 mb-2 text-xs font-semibold uppercase text-muted-foreground">
                         Menu
                     </div>
-                    {navItems.map((item) => {
+                    {DASHBOARD_NAV_ITEMS.map((item) => {
+                        const ItemIcon = navIconById[item.id];
                         const href = `/dashboard/${guildId}${item.href}`;
                         const isActive = item.href === ""
                             ? pathname === href
@@ -218,7 +262,7 @@ export default function DashboardLayout({
                                     isActive ? "bg-secondary text-foreground" : "text-muted-foreground"
                                 )}
                             >
-                                <item.icon className="h-4 w-4" />
+                                <ItemIcon className="h-4 w-4" />
                                 {item.name}
                             </Link>
                         );
@@ -286,7 +330,8 @@ export default function DashboardLayout({
                                     </h1>
                                 </div>
                                 <nav className="space-y-1 px-4 py-6">
-                                    {navItems.map((item) => {
+                                    {DASHBOARD_NAV_ITEMS.map((item) => {
+                                        const ItemIcon = navIconById[item.id];
                                         const href = `/dashboard/${guildId}${item.href}`;
                                         const isActive = item.href === ""
                                             ? pathname === href
@@ -301,7 +346,7 @@ export default function DashboardLayout({
                                                         isActive ? "bg-secondary text-foreground" : "text-muted-foreground"
                                                     )}
                                                 >
-                                                    <item.icon className="h-4 w-4" />
+                                                    <ItemIcon className="h-4 w-4" />
                                                     {item.name}
                                                 </Link>
                                             </SheetClose>
@@ -367,13 +412,25 @@ export default function DashboardLayout({
                         <div className="relative hidden sm:block">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search..."
+                                placeholder="Search settings, features, docs..."
                                 aria-label="Search dashboard"
-                                className="w-[150px] md:w-[250px] pl-9"
+                                className="w-[180px] cursor-pointer pr-20 pl-9 md:w-[320px]"
+                                readOnly
+                                onClick={() => openSearch("click")}
+                                onFocus={() => openSearch("focus")}
                             />
+                            <span className="pointer-events-none absolute right-2.5 top-2.5 text-[11px] text-muted-foreground">
+                                Ctrl/Cmd+K
+                            </span>
                         </div>
                         {/* Mobile Search Icon (optional, just visual for now) */}
-                        <Button variant="ghost" size="icon" className="sm:hidden">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="sm:hidden"
+                            onClick={() => openSearch("mobile_button")}
+                            aria-label="Open global search"
+                        >
                             <Search className="h-5 w-5" />
                         </Button>
                         <ThemeToggle />
@@ -390,6 +447,19 @@ export default function DashboardLayout({
                     </div>
                 </main>
             </div>
+
+            <GlobalSearchModal
+                context={{ mode: "dashboard", guildId }}
+                open={searchOpen}
+                onOpenChange={(nextOpen) => {
+                    setSearchOpen(nextOpen);
+                    if (!nextOpen) {
+                        setSearchOpenMethod("unknown");
+                    }
+                }}
+                enableShortcut
+                openMethod={searchOpenMethod}
+            />
         </div>
     );
 }

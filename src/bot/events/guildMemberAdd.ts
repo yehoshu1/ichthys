@@ -1,13 +1,14 @@
 import { Events, GuildMember, TextChannel } from 'discord.js';
-import client from '../client';
+import type { Event } from '../types/Event';
 import logger from '../utils/logger';
 import { db } from '../../shared/database/client';
 import { userJoin, guildConfig } from '../../shared/database/schema';
 import { eq, and } from 'drizzle-orm';
 import { buildMessage } from '../utils/embeds';
 
-export default function setupGuildMemberAddHandler() {
-    client.on(Events.GuildMemberAdd, async (member: GuildMember) => {
+const event: Event<Events.GuildMemberAdd> = {
+    name: Events.GuildMemberAdd,
+    async execute(member: GuildMember) {
         try {
             // 1. Track join in database
             const existing = await db.select()
@@ -93,6 +94,7 @@ export default function setupGuildMemberAddHandler() {
         } catch (error) {
             logger.error(`Error processing guildMemberAdd for ${member.user.tag}:`, error);
         }
-    });
-}
+    }
+};
 
+export default event;

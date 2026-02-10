@@ -1,31 +1,36 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { welcomeTrigger, messageTemplate } from "@/lib/db";
+import { db, welcomeTrigger, messageTemplate } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
+import { z } from "zod";
+import { requireGuildManageAccess, requireGuildManageRolesAccess } from "@/lib/guild-auth";
+import { nullableDiscordIdSchema, discordIdSchema, parseJsonBody } from "@/lib/validation";
+import logger from "@/lib/logger";
 
-async function checkAuth(req: NextRequest, guildId: string) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return null;
-    return session;
-}
+const createTriggerSchema = z.object({
+    roleId: discordIdSchema,
+    templateId: z.string().trim().min(1),
+    channelId: nullableDiscordIdSchema,
+    enabled: z.boolean().optional(),
+}).strict();
+
+const updateTriggerSchema = createTriggerSchema.extend({
+    id: z.string().trim().min(1),
+}).strict();
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) return auth.response;
 
     try {
-        // Fetch triggers with their associated template names
         const triggers = await db.select({
             id: welcomeTrigger.id,
             roleId: welcomeTrigger.roleId,
             channelId: welcomeTrigger.channelId,
             templateId: welcomeTrigger.templateId,
             enabled: welcomeTrigger.enabled,
-            templateName: messageTemplate.name
+            templateName: messageTemplate.name,
         })
             .from(welcomeTrigger)
             .innerJoin(messageTemplate, eq(welcomeTrigger.templateId, messageTemplate.id))
@@ -33,7 +38,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
 
         return NextResponse.json(triggers);
     } catch (error) {
-        console.error("Error fetching triggers:", error);
+        logger.error("Error fetching triggers", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -41,28 +46,25 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
 export async function POST(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageRolesAccess(guildId, req);
+    if ("response" in auth) return auth.response;
+
+    const parsed = await parseJsonBody(req, createTriggerSchema);
+    if (!parsed.success) return parsed.response;
 
     try {
-        const body = await req.json();
-        const { roleId, templateId, channelId, enabled } = body;
-
-        if (!roleId || !templateId) {
-            return NextResponse.json({ error: "Role ID and Template ID are required" }, { status: 400 });
-        }
-
+        const body = parsed.data;
         const [newTrigger] = await db.insert(welcomeTrigger).values({
             guildId,
-            roleId,
-            templateId,
-            channelId: channelId || null,
-            enabled: enabled !== undefined ? enabled : true,
+            roleId: body.roleId,
+            templateId: body.templateId,
+            channelId: body.channelId || null,
+            enabled: body.enabled !== undefined ? body.enabled : true,
         }).returning();
 
         return NextResponse.json(newTrigger);
     } catch (error) {
-        console.error("Error creating trigger:", error);
+        logger.error("Error creating trigger", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -70,31 +72,29 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
 export async function PATCH(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageRolesAccess(guildId, req);
+    if ("response" in auth) return auth.response;
+
+    const parsed = await parseJsonBody(req, updateTriggerSchema);
+    if (!parsed.success) return parsed.response;
 
     try {
-        const body = await req.json();
-        const { id, roleId, templateId, channelId, enabled } = body;
-
-        if (!id) {
-            return NextResponse.json({ error: "ID is required" }, { status: 400 });
-        }
+        const body = parsed.data;
 
         const [updated] = await db.update(welcomeTrigger)
             .set({
-                roleId,
-                templateId,
-                channelId: channelId || null,
-                enabled: enabled ?? true,
+                roleId: body.roleId,
+                templateId: body.templateId,
+                channelId: body.channelId || null,
+                enabled: body.enabled ?? true,
                 updatedAt: new Date(),
             })
-            .where(and(eq(welcomeTrigger.id, id), eq(welcomeTrigger.guildId, guildId)))
+            .where(and(eq(welcomeTrigger.id, body.id), eq(welcomeTrigger.guildId, guildId)))
             .returning();
 
         return NextResponse.json(updated);
     } catch (error) {
-        console.error("Error updating trigger:", error);
+        logger.error("Error updating trigger", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -102,8 +102,8 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ guildId
 export async function DELETE(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageRolesAccess(guildId, req);
+    if ("response" in auth) return auth.response;
 
     try {
         const { searchParams } = new URL(req.url);
@@ -116,7 +116,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ guildI
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("Error deleting trigger:", error);
+        logger.error("Error deleting trigger", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

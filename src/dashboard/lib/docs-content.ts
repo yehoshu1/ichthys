@@ -1,0 +1,1249 @@
+export interface ScriptDoc {
+    name: string;
+    description: string;
+    typicalUse: string;
+}
+
+export interface CommandOptionDoc {
+    name: string;
+    type: string;
+    required: boolean;
+    description: string;
+    choices?: string[];
+}
+
+export interface SlashCommandDoc {
+    command: string;
+    category: "public" | "config" | "moderation" | "reaction-roles";
+    description: string;
+    permission: string;
+    options: CommandOptionDoc[];
+    examples: string[];
+    notes?: string[];
+}
+
+export interface ModuleDoc {
+    slug: string;
+    title: string;
+    summary: string;
+    dashboardRoute: string;
+    apiRoutes: string[];
+    tables: string[];
+    commandRefs: string[];
+    runtimeRefs: string[];
+    workflow: string[];
+    failureModes: string[];
+}
+
+export const scripts: ScriptDoc[] = [
+    { name: "build", description: "Compile bot TypeScript with tsconfig.bot.json into dist/.", typicalUse: "Production bot build" },
+    { name: "dev", description: "Run bot in watch mode via tsx.", typicalUse: "Bot local development" },
+    { name: "dev:all", description: "Run bot and dashboard together.", typicalUse: "Full-stack local development" },
+    { name: "dashboard:dev", description: "Run Next.js dashboard in development mode on port 4000 (webpack).", typicalUse: "Dashboard local development" },
+    { name: "dashboard:build", description: "Build dashboard for production.", typicalUse: "Release and CI builds" },
+    { name: "dashboard:start", description: "Run built dashboard in production mode.", typicalUse: "Production runtime" },
+    { name: "start", description: "Run compiled bot from dist.", typicalUse: "Production runtime" },
+    { name: "deploy", description: "Deploy slash commands to Discord.", typicalUse: "After command schema changes" },
+    { name: "db:generate", description: "Generate Drizzle migrations from schema changes.", typicalUse: "Migration authoring" },
+    { name: "db:push", description: "Push current schema to configured DB.", typicalUse: "Local schema sync" },
+    { name: "db:studio", description: "Open Drizzle Studio.", typicalUse: "Manual DB inspection" },
+    { name: "db:backup", description: "Create timestamped database backup.", typicalUse: "Pre-change safety" },
+    { name: "db:backup:list", description: "List available backups.", typicalUse: "Backup auditing" },
+    { name: "db:restore", description: "Restore database from backup.", typicalUse: "Recovery" },
+    { name: "db:restore:list", description: "List backups available for restore.", typicalUse: "Recovery planning" },
+    { name: "deploy:safe", description: "Run safe deployment flow with backup wrapper.", typicalUse: "Production deploy hardening" },
+];
+
+export const slashCommands: SlashCommandDoc[] = [
+    {
+        command: "/ping",
+        category: "public",
+        description: "Reply with bot latency and gateway latency.",
+        permission: "Public",
+        options: [],
+        examples: ["/ping"],
+    },
+    {
+        command: "/info",
+        category: "public",
+        description: "Show server analytics snapshot (members, verification, boosts, actions, voice, top XP).",
+        permission: "Public",
+        options: [],
+        examples: ["/info"],
+    },
+    {
+        command: "/rank",
+        category: "public",
+        description: "Show level, total XP, progress, and rank eligibility/position.",
+        permission: "Public",
+        options: [
+            { name: "user", type: "user", required: false, description: "Target user; defaults to caller." },
+        ],
+        examples: ["/rank", "/rank user:@Member"],
+        notes: [
+            "If leveling is disabled, the command returns a disabled notice.",
+            "Users below level-one XP threshold are shown as unranked.",
+        ],
+    },
+    {
+        command: "/profile",
+        category: "public",
+        description: "Display detailed profile with level, XP breakdown, and rank. Alias for /rank with more details.",
+        permission: "Public",
+        options: [
+            { name: "user", type: "user", required: false, description: "Target user; defaults to caller." },
+        ],
+        examples: ["/profile", "/profile user:@Member"],
+        notes: [
+            "Alias for /rank with extended information including text/voice XP breakdown.",
+            "Shows voice time in hours and minutes.",
+        ],
+    },
+    {
+        command: "/leaderboard",
+        category: "public",
+        description: "Show top 10 users by selected XP dimension.",
+        permission: "Public",
+        options: [
+            {
+                name: "type",
+                type: "string",
+                required: false,
+                description: "Leaderboard type.",
+                choices: ["total", "text", "voice"],
+            },
+        ],
+        examples: ["/leaderboard", "/leaderboard type:voice"],
+        notes: ["Requires leveling module to be enabled."],
+    },
+    {
+        command: "/top",
+        category: "public",
+        description: "Show leaderboard with time-based filtering.",
+        permission: "Public",
+        options: [
+            {
+                name: "period",
+                type: "string",
+                required: false,
+                description: "Time period filter.",
+                choices: ["all", "day", "week", "month"],
+            },
+        ],
+        examples: ["/top", "/top period:week"],
+        notes: [
+            "Shows users active during the specified period.",
+            "XP displayed is cumulative (total), not period-specific.",
+        ],
+    },
+    {
+        command: "/user",
+        category: "public",
+        description: "Display detailed information about a user.",
+        permission: "Public",
+        options: [
+            { name: "user", type: "user", required: false, description: "Target user; defaults to caller." },
+        ],
+        examples: ["/user", "/user user:@Member"],
+        notes: [
+            "Shows account creation date, join date, roles, and permissions.",
+            "Includes warning count and leveling stats if available.",
+        ],
+    },
+    {
+        command: "/avatar",
+        category: "public",
+        description: "Display a user's avatar or banner.",
+        permission: "Public",
+        options: [
+            { name: "user", type: "user", required: false, description: "Target user; defaults to caller." },
+            {
+                name: "type",
+                type: "string",
+                required: false,
+                description: "Image type to display.",
+                choices: ["server", "global", "banner"],
+            },
+        ],
+        examples: ["/avatar", "/avatar user:@Member type:banner", "/avatar user:@Member type:server"],
+        notes: [
+            "Server avatar shows guild-specific avatar if set, otherwise global.",
+            "Banner requires user to have a banner set on their profile.",
+        ],
+    },
+    {
+        command: "/server",
+        category: "public",
+        description: "Display detailed information about the server.",
+        permission: "Public",
+        options: [],
+        examples: ["/server"],
+        notes: [
+            "Shows member count, channel counts, roles, emojis, and server features.",
+            "Includes tracked stats from database if available.",
+        ],
+    },
+    {
+        command: "/roles",
+        category: "public",
+        description: "List all server roles or view detailed role information.",
+        permission: "Public",
+        options: [
+            { name: "role", type: "role", required: false, description: "Specific role to view details for." },
+        ],
+        examples: ["/roles", "/roles role:@Moderator"],
+        notes: [
+            "Without role option, shows a list of all roles.",
+            "With role option, shows detailed permissions and member count.",
+        ],
+    },
+    {
+        command: "/moveme",
+        category: "public",
+        description: "Move yourself to a voice channel or to another user's channel.",
+        permission: "Public",
+        options: [
+            { name: "channel", type: "channel", required: false, description: "Voice channel to move to." },
+            { name: "user", type: "user", required: false, description: "Move to the same channel as this user." },
+        ],
+        examples: ["/moveme channel:#General", "/moveme user:@Friend"],
+        notes: [
+            "You must already be in a voice channel to use this command.",
+            "Specify either channel OR user, not both.",
+        ],
+    },
+    {
+        command: "/boost status",
+        category: "public",
+        description: "Show caller boost status, reward status, and server boost metrics.",
+        permission: "Public",
+        options: [],
+        examples: ["/boost status"],
+    },
+    {
+        command: "/boost claim",
+        category: "public",
+        description: "Claim configured boost reward role if caller is actively boosting.",
+        permission: "Public (runtime checks apply)",
+        options: [],
+        examples: ["/boost claim"],
+        notes: ["Bot requires Manage Roles to assign reward role."],
+    },
+    {
+        command: "/setup",
+        category: "config",
+        description: "Open interactive setup panel for core guild settings.",
+        permission: "Manage Server",
+        options: [],
+        examples: ["/setup"],
+    },
+    {
+        command: "/config view",
+        category: "config",
+        description: "Display current high-level feature toggles.",
+        permission: "Manage Server",
+        options: [],
+        examples: ["/config view"],
+    },
+    {
+        command: "/config toggle",
+        category: "config",
+        description: "Toggle a feature on/off.",
+        permission: "Manage Server",
+        options: [
+            {
+                name: "feature",
+                type: "string",
+                required: true,
+                description: "Feature key to toggle.",
+                choices: ["welcome", "verification", "boost", "leveling", "levelup"],
+            },
+        ],
+        examples: ["/config toggle feature:verification"],
+    },
+    {
+        command: "/config sync",
+        category: "config",
+        description: "Sync current guild members into DB for analytics/verification consistency.",
+        permission: "Manage Server",
+        options: [],
+        examples: ["/config sync"],
+        notes: ["Requires Server Members intent and member fetch capability."],
+    },
+    {
+        command: "/setxp",
+        category: "config",
+        description: "Set a user's XP value (Admin only).",
+        permission: "Administrator",
+        options: [
+            { name: "user", type: "user", required: true, description: "User to set XP for." },
+            {
+                name: "type",
+                type: "string",
+                required: true,
+                description: "XP type to set.",
+                choices: ["total", "text", "voice"],
+            },
+            { name: "xp", type: "integer", required: true, description: "New XP value (must be >= 0)." },
+        ],
+        examples: ["/setxp user:@Member type:total xp:5000", "/setxp user:@Member type:text xp:2500"],
+        notes: [
+            "Automatically recalculates level based on new XP.",
+            "Assigns level rewards if level increased.",
+            "Requires leveling module to be enabled.",
+        ],
+    },
+    {
+        command: "/setlevel",
+        category: "config",
+        description: "Set a user's level (Admin only).",
+        permission: "Administrator",
+        options: [
+            { name: "user", type: "user", required: true, description: "User to set level for." },
+            {
+                name: "type",
+                type: "string",
+                required: true,
+                description: "Level type to set.",
+                choices: ["total", "text", "voice"],
+            },
+            { name: "level", type: "integer", required: true, description: "New level (must be >= 0)." },
+        ],
+        examples: ["/setlevel user:@Member type:total level:10", "/setlevel user:@Member type:voice level:5"],
+        notes: [
+            "Automatically calculates and sets the required XP for the target level.",
+            "Assigns level rewards if level increased.",
+            "Requires leveling module to be enabled.",
+        ],
+    },
+    {
+        command: "/role give",
+        category: "config",
+        description: "Give a role to a user.",
+        permission: "Manage Roles",
+        options: [
+            { name: "user", type: "user", required: true, description: "User to give the role to." },
+            { name: "role", type: "role", required: true, description: "Role to give." },
+            { name: "bulk", type: "boolean", required: false, description: "Apply to multiple users." },
+        ],
+        examples: ["/role give user:@Member role:@Verified"],
+        notes: [
+            "Cannot assign roles higher than bot's highest role.",
+            "Command user must have higher role than target role.",
+        ],
+    },
+    {
+        command: "/role remove",
+        category: "config",
+        description: "Remove a role from a user.",
+        permission: "Manage Roles",
+        options: [
+            { name: "user", type: "user", required: true, description: "User to remove the role from." },
+            { name: "role", type: "role", required: true, description: "Role to remove." },
+            { name: "bulk", type: "boolean", required: false, description: "Apply to multiple users." },
+        ],
+        examples: ["/role remove user:@Member role:@Muted"],
+        notes: [
+            "Cannot remove roles higher than bot's highest role.",
+            "Command user must have higher role than target role.",
+        ],
+    },
+    {
+        command: "/dashboard",
+        category: "public",
+        description: "Show the server dashboard link.",
+        permission: "Public",
+        options: [],
+        examples: ["/dashboard"],
+        notes: [
+            "Constructs URL as {DASHBOARD_URL}/dashboard/{guildId}.",
+            "DASHBOARD_URL is configured via environment variable by bot administrator.",
+            "If not configured, users see: 'Bot URL not set. Please contact an administrator to set up the URL.'",
+        ],
+    },
+    // Birthday Commands - User
+    {
+        command: "/birthday set",
+        category: "public",
+        description: "Set your birthday with interactive timezone selection.",
+        permission: "Public",
+        options: [
+            { name: "day", type: "integer", required: true, description: "Day of birth (1-31)." },
+            { name: "month", type: "integer", required: true, description: "Month of birth (1-12)." },
+            { name: "year", type: "integer", required: false, description: "Year of birth (for age calculation)." },
+        ],
+        examples: ["/birthday set day:15 month:6 year:1995"],
+        notes: [
+            "After entering date, bot shows interactive timezone dropdown menus in an ephemeral embed.",
+            "Timezone selection ensures birthday is celebrated at correct local time.",
+            "Available regions: UTC & North America, Europe/Africa/Middle East, Asia/Oceania.",
+            "Year is optional; if not provided, age won't be shown.",
+            "Use /birthday view to verify your settings."
+        ],
+    },
+    {
+        command: "/birthday remove",
+        category: "public",
+        description: "Remove your birthday from this server.",
+        permission: "Public",
+        options: [],
+        examples: ["/birthday remove"],
+    },
+    {
+        command: "/birthday view",
+        category: "public",
+        description: "View a user's birthday information.",
+        permission: "Public",
+        options: [
+            { name: "user", type: "user", required: false, description: "User to view (default: yourself)." },
+        ],
+        examples: ["/birthday view", "/birthday view user:@Member"],
+        notes: ["Shows days until next birthday.", "Shows age if year was provided."],
+    },
+    {
+        command: "/birthday list",
+        category: "public",
+        description: "List upcoming birthdays in the server.",
+        permission: "Public",
+        options: [
+            { name: "limit", type: "integer", required: false, description: "Number to show (default: 10, max: 50)." },
+        ],
+        examples: ["/birthday list", "/birthday list limit:20"],
+    },
+    {
+        command: "/birthday next",
+        category: "public",
+        description: "Show whose birthday is next.",
+        permission: "Public",
+        options: [],
+        examples: ["/birthday next"],
+    },
+    {
+        command: "/birthday stats",
+        category: "public",
+        description: "Show birthday statistics for the server.",
+        permission: "Public",
+        options: [],
+        examples: ["/birthday stats"],
+        notes: ["Shows total birthdays, most common month, average age."],
+    },
+    // Birthday Commands - Admin
+    {
+        command: "/birthday admin-set",
+        category: "moderation",
+        description: "Admin: Set a user's birthday.",
+        permission: "Moderate Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "User to set birthday for." },
+            { name: "day", type: "integer", required: true, description: "Day of birth (1-31)." },
+            { name: "month", type: "integer", required: true, description: "Month of birth (1-12)." },
+            { name: "year", type: "integer", required: false, description: "Year of birth." },
+        ],
+        examples: ["/birthday admin-set user:@Member day:15 month:6 year:1995"],
+    },
+    {
+        command: "/birthday admin-remove",
+        category: "moderation",
+        description: "Admin: Remove a user's birthday.",
+        permission: "Moderate Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "User to remove birthday for." },
+        ],
+        examples: ["/birthday admin-remove user:@Member"],
+    },
+    {
+        command: "/birthday test",
+        category: "moderation",
+        description: "Admin: Test birthday message in the configured channel.",
+        permission: "Manage Server",
+        options: [],
+        examples: ["/birthday test"],
+        notes: ["Sends a test message to verify configuration."],
+    },
+    {
+        command: "/welcome test",
+        category: "config",
+        description: "Preview role-triggered welcome template output.",
+        permission: "Manage Server",
+        options: [
+            { name: "role", type: "role", required: true, description: "Role trigger to test." },
+        ],
+        examples: ["/welcome test role:@Verified"],
+    },
+    {
+        command: "/verify",
+        category: "config",
+        description: "Manually verify user, optionally applying a named verification profile.",
+        permission: "Manage Roles",
+        options: [
+            { name: "user", type: "user", required: true, description: "User to verify." },
+            { name: "profile", type: "string", required: false, description: "Verification profile name or matching role name." },
+        ],
+        examples: ["/verify user:@Member", "/verify user:@Member profile:Streamer"],
+        notes: ["Bot must also have Manage Roles and role hierarchy over target roles."],
+    },
+    {
+        command: "/boost setup",
+        category: "config",
+        description: "Create/update boost reward role configuration.",
+        permission: "Manage Server (runtime-checked)",
+        options: [
+            { name: "role_name", type: "string", required: true, description: "Reward role name." },
+            { name: "primary_color", type: "string", required: true, description: "Primary hex color." },
+            { name: "secondary_color", type: "string", required: false, description: "Optional secondary hex color." },
+        ],
+        examples: ["/boost setup role_name:Booster primary_color:#2CB7C9 secondary_color:#F4B740"],
+        notes: ["Bot requires Manage Roles for role creation/editing."],
+    },
+    {
+        command: "/warn add",
+        category: "moderation",
+        description: "Create warning case and notify user.",
+        permission: "Moderate Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "Target user." },
+            { name: "reason", type: "string", required: false, description: "Reason for warning." },
+        ],
+        examples: ["/warn add user:@Member reason:Spamming"],
+    },
+    {
+        command: "/warn remove",
+        category: "moderation",
+        description: "Remove a warning or all warnings for a user.",
+        permission: "Moderate Members",
+        options: [
+            { name: "user", type: "user", required: false, description: "Remove all warnings for this user." },
+            { name: "warn_id", type: "string", required: false, description: "Specific warning case number to remove." },
+            {
+                name: "scope",
+                type: "string",
+                required: false,
+                description: "Remove all warnings for user.",
+                choices: ["all"],
+            },
+        ],
+        examples: [
+            "/warn remove user:@Member scope:all",
+            "/warn remove warn_id:42",
+        ],
+        notes: [
+            "Specify either user with scope:all OR warn_id, not both.",
+            "Removes warnings by marking them as inactive.",
+        ],
+    },
+    {
+        command: "/warn list",
+        category: "moderation",
+        description: "List all warnings for a user.",
+        permission: "Public (own) / Moderate Members (others)",
+        options: [
+            { name: "user", type: "user", required: false, description: "User to view warnings for; defaults to caller." },
+        ],
+        examples: ["/warn list", "/warn list user:@Member"],
+        notes: [
+            "Shows active and removed warnings with case numbers.",
+            "Regular users can only view their own warnings.",
+        ],
+    },
+    {
+        command: "/kick",
+        category: "moderation",
+        description: "Kick member and create moderation case.",
+        permission: "Kick Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "Target user." },
+            { name: "reason", type: "string", required: false, description: "Reason for kick." },
+        ],
+        examples: ["/kick user:@Member reason:Repeated abuse"],
+    },
+    {
+        command: "/ban",
+        category: "moderation",
+        description: "Ban user permanently or temporarily; optional delete-message window.",
+        permission: "Ban Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "Target user." },
+            { name: "reason", type: "string", required: false, description: "Reason for ban." },
+            { name: "duration", type: "string", required: false, description: "Temporary ban duration (10m, 1h, 7d)." },
+            { name: "delete_messages", type: "integer", required: false, description: "Delete recent messages (0-7 days)." },
+        ],
+        examples: ["/ban user:@Member reason:Raid duration:7d delete_messages:1"],
+    },
+    {
+        command: "/unban",
+        category: "moderation",
+        description: "Unban user by user ID and record case.",
+        permission: "Ban Members",
+        options: [
+            { name: "user_id", type: "string", required: true, description: "Target user ID." },
+            { name: "reason", type: "string", required: false, description: "Reason for unban." },
+        ],
+        examples: ["/unban user_id:123456789012345678 reason:Appeal accepted"],
+    },
+    {
+        command: "/mute text",
+        category: "moderation",
+        description: "Mute a user from text channels using the configured mute role.",
+        permission: "Moderate Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "Target user." },
+            { name: "duration", type: "string", required: false, description: "Mute duration (10m, 1h, 7d)." },
+            { name: "reason", type: "string", required: false, description: "Reason for mute." },
+        ],
+        examples: ["/mute text user:@Member duration:30m reason:Flooding"],
+        notes: ["Requires mute role configured in moderation settings."],
+    },
+    {
+        command: "/mute voice",
+        category: "moderation",
+        description: "Mute a user from speaking in voice channels (server mute).",
+        permission: "Moderate Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "Target user." },
+            { name: "duration", type: "string", required: false, description: "Mute duration (10m, 1h, 7d)." },
+            { name: "reason", type: "string", required: false, description: "Reason for mute." },
+        ],
+        examples: ["/mute voice user:@Member duration:30m reason:Mic spam"],
+        notes: ["User must be in a voice channel."],
+    },
+    {
+        command: "/unmute text",
+        category: "moderation",
+        description: "Remove configured mute role from user.",
+        permission: "Moderate Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "Target user." },
+            { name: "reason", type: "string", required: false, description: "Reason for unmute." },
+        ],
+        examples: ["/unmute text user:@Member reason:Time served"],
+    },
+    {
+        command: "/unmute voice",
+        category: "moderation",
+        description: "Remove voice mute from a user.",
+        permission: "Moderate Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "Target user." },
+            { name: "reason", type: "string", required: false, description: "Reason for unmute." },
+        ],
+        examples: ["/unmute voice user:@Member reason:Time served"],
+        notes: ["User must be in a voice channel."],
+    },
+    {
+        command: "/timeout",
+        category: "moderation",
+        description: "Apply Discord timeout with duration up to 28 days.",
+        permission: "Moderate Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "Target user." },
+            { name: "duration", type: "string", required: true, description: "Timeout duration (10m, 1h, 7d)." },
+            { name: "reason", type: "string", required: false, description: "Reason for timeout." },
+        ],
+        examples: ["/timeout user:@Member duration:2h reason:Cooldown"],
+    },
+    {
+        command: "/untimeout",
+        category: "moderation",
+        description: "Remove timeout from a user.",
+        permission: "Moderate Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "Target user." },
+            { name: "reason", type: "string", required: false, description: "Reason for removing timeout." },
+        ],
+        examples: ["/untimeout user:@Member reason:Apology accepted"],
+        notes: ["Also deactivates active timeout cases in the database."],
+    },
+    {
+        command: "/vkick",
+        category: "moderation",
+        description: "Disconnect a user from voice channel.",
+        permission: "Move Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "User to disconnect." },
+            { name: "reason", type: "string", required: false, description: "Reason for voice kick." },
+        ],
+        examples: ["/vkick user:@Member reason:AFK"],
+        notes: [
+            "User must be in a voice channel.",
+            "Creates a moderation case for logging.",
+        ],
+    },
+    {
+        command: "/move",
+        category: "moderation",
+        description: "Move a user to a voice channel.",
+        permission: "Move Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "User to move." },
+            { name: "channel", type: "channel", required: false, description: "Channel to move to." },
+            { name: "to_user", type: "user", required: false, description: "Move to same channel as this user." },
+        ],
+        examples: ["/move user:@Member channel:#General", "/move user:@Member to_user:@Friend"],
+        notes: [
+            "Specify either channel OR to_user, not both.",
+            "User must be in a voice channel.",
+        ],
+    },
+    {
+        command: "/lock",
+        category: "moderation",
+        description: "Lock a channel to prevent members from sending messages.",
+        permission: "Manage Channels",
+        options: [
+            { name: "channel", type: "channel", required: false, description: "Channel to lock (default: current)." },
+            { name: "reason", type: "string", required: false, description: "Reason for locking." },
+        ],
+        examples: ["/lock", "/lock channel:#general reason:Raid protection"],
+        notes: [
+            "Works on text, announcement, and voice channels.",
+            "For voice channels, prevents new connections.",
+        ],
+    },
+    {
+        command: "/unlock",
+        category: "moderation",
+        description: "Unlock a previously locked channel.",
+        permission: "Manage Channels",
+        options: [
+            { name: "channel", type: "channel", required: false, description: "Channel to unlock (default: current)." },
+        ],
+        examples: ["/unlock", "/unlock channel:#general"],
+    },
+    {
+        command: "/slowmode",
+        category: "moderation",
+        description: "Set slowmode for the current channel.",
+        permission: "Manage Channels",
+        options: [
+            { name: "time", type: "string", required: false, description: "Duration (e.g., 5s, 10m, 1h, or 0 to disable)." },
+            { name: "seconds", type: "integer", required: false, description: "Duration in seconds (0-21600)." },
+        ],
+        examples: ["/slowmode time:5s", "/slowmode seconds:0"],
+        notes: [
+            "Specify either time string OR seconds, not both.",
+            "Max slowmode is 6 hours (21600 seconds).",
+            "Use 0 or 0s to disable slowmode.",
+        ],
+    },
+    {
+        command: "/setnick",
+        category: "moderation",
+        description: "Change a user's nickname.",
+        permission: "Manage Nicknames",
+        options: [
+            { name: "user", type: "user", required: true, description: "User to change nickname for." },
+            { name: "nickname", type: "string", required: false, description: "New nickname (empty to remove)." },
+        ],
+        examples: ["/setnick user:@Member nickname:NewName", "/setnick user:@Member"],
+        notes: [
+            "Cannot change nickname of users with higher role than bot.",
+            "Command user must have higher role than target user.",
+        ],
+    },
+    {
+        command: "/clear",
+        category: "moderation",
+        description: "Bulk delete channel messages, optionally by target user.",
+        permission: "Manage Messages",
+        options: [
+            { name: "amount", type: "integer", required: true, description: "Number of messages (1-100)." },
+            { name: "user", type: "user", required: false, description: "Optional user filter." },
+            { name: "reason", type: "string", required: false, description: "Reason for clear action." },
+        ],
+        examples: ["/clear amount:50", "/clear amount:100 user:@Member reason:Cleanup"],
+        notes: ["Discord bulk delete cannot remove messages older than 14 days."],
+    },
+    {
+        command: "/cases",
+        category: "moderation",
+        description: "List moderation cases for a user with pagination.",
+        permission: "Moderate Members",
+        options: [
+            { name: "user", type: "user", required: true, description: "Target user." },
+            { name: "active_only", type: "boolean", required: false, description: "Limit to active cases." },
+            { name: "page", type: "integer", required: false, description: "Page number (min 1)." },
+        ],
+        examples: ["/cases user:@Member", "/cases user:@Member active_only:true page:2"],
+    },
+    {
+        command: "/reactionrole create",
+        category: "reaction-roles",
+        description: "Create reaction-role message embed in target channel.",
+        permission: "Manage Roles",
+        options: [
+            { name: "channel", type: "text channel", required: true, description: "Message destination channel." },
+            { name: "title", type: "string", required: true, description: "Panel title." },
+            { name: "description", type: "string", required: false, description: "Panel description." },
+        ],
+        examples: ["/reactionrole create channel:#roles title:Choose your roles"],
+    },
+    {
+        command: "/reactionrole add",
+        category: "reaction-roles",
+        description: "Attach one emoji->role mapping to an existing message.",
+        permission: "Manage Roles",
+        options: [
+            { name: "message_id", type: "string", required: true, description: "Message ID hosting reaction roles." },
+            { name: "channel", type: "text channel", required: true, description: "Channel containing the message." },
+            { name: "role", type: "role", required: true, description: "Role to assign." },
+            { name: "emoji", type: "string", required: true, description: "Unicode or custom emoji." },
+            {
+                name: "type",
+                type: "string",
+                required: false,
+                description: "Reaction behavior mode.",
+                choices: ["TOGGLE", "ADD_ONLY", "REMOVE_ONLY", "UNIQUE"],
+            },
+            { name: "description", type: "string", required: false, description: "Optional helper text for mapping." },
+        ],
+        examples: ["/reactionrole add message_id:... channel:#roles role:@Gamer emoji:🎮 type:TOGGLE"],
+    },
+    {
+        command: "/reactionrole remove",
+        category: "reaction-roles",
+        description: "Remove one reaction-role mapping by message and emoji.",
+        permission: "Manage Roles",
+        options: [
+            { name: "message_id", type: "string", required: true, description: "Message ID." },
+            { name: "emoji", type: "string", required: true, description: "Mapped emoji." },
+        ],
+        examples: ["/reactionrole remove message_id:... emoji:🎮"],
+    },
+    {
+        command: "/reactionrole list",
+        category: "reaction-roles",
+        description: "List active reaction role mappings for the guild.",
+        permission: "Manage Roles",
+        options: [],
+        examples: ["/reactionrole list"],
+    },
+    {
+        command: "/reactionrole delete",
+        category: "reaction-roles",
+        description: "Delete all reaction-role mappings tied to a message.",
+        permission: "Manage Roles",
+        options: [
+            { name: "message_id", type: "string", required: true, description: "Message ID." },
+            { name: "channel", type: "text channel", required: true, description: "Channel containing the message." },
+        ],
+        examples: ["/reactionrole delete message_id:... channel:#roles"],
+    },
+];
+
+export const modules: ModuleDoc[] = [
+    {
+        slug: "welcome",
+        title: "Welcome System",
+        summary: "Join/leave messaging, auto-role on join, and role-triggered template workflows.",
+        dashboardRoute: "/dashboard/[guildId]/welcome",
+        apiRoutes: [
+            "GET/POST /api/guilds/[guildId]/welcome/config",
+            "GET/POST /api/guilds/[guildId]/welcome/triggers",
+            "DELETE /api/guilds/[guildId]/welcome/triggers?id=<triggerId>",
+            "GET/POST /api/guilds/[guildId]/welcome/templates",
+            "DELETE /api/guilds/[guildId]/welcome/templates?id=<templateId>",
+        ],
+        tables: ["guild_config", "welcome_trigger", "message_template"],
+        commandRefs: ["/welcome test", "/config toggle welcome"],
+        runtimeRefs: ["events/guildMemberAdd.ts", "events/guildMemberRemove.ts", "events/guildMemberUpdate.ts"],
+        workflow: [
+            "Enable module in general config.",
+            "Set optional auto-role and join/leave channels/messages.",
+            "Create templates.",
+            "Create role triggers mapping role->template.",
+            "Validate output using /welcome test.",
+        ],
+        failureModes: [
+            "Trigger exists but message never sends due to missing channel permission.",
+            "Role IDs became stale after manual Discord role deletion.",
+            "Duplicate verification/welcome messaging if verification role trigger strategy is unclear.",
+        ],
+    },
+    {
+        slug: "verification",
+        title: "Verification System",
+        summary: "Track verification state, apply verification roles, and enforce grace-period cleanup.",
+        dashboardRoute: "/dashboard/[guildId]/verification",
+        apiRoutes: [
+            "GET/POST /api/guilds/[guildId]/verification/config",
+            "GET /api/guilds/[guildId]/verification/stats",
+            "GET /api/guilds/[guildId]/verification/kicked",
+            "GET /api/guilds/[guildId]/verification/unverified",
+            "GET/POST /api/guilds/[guildId]/verification/rules",
+            "PATCH/DELETE /api/guilds/[guildId]/verification/rules/[ruleId]",
+            "GET/POST /api/guilds/[guildId]/verification/role-messages",
+            "PATCH/DELETE /api/guilds/[guildId]/verification/role-messages/[messageId]",
+        ],
+        tables: ["guild_config", "user_join", "verification_message_rule", "verification_role_message", "action_log"],
+        commandRefs: ["/verify", "/config toggle verification"],
+        runtimeRefs: ["events/guildMemberAdd.ts", "events/guildMemberUpdate.ts", "jobs/cleanupUnverified.ts"],
+        workflow: [
+            "Enable verification and set grace days.",
+            "Configure verified/unverified role IDs.",
+            "Add optional profile rules and role-specific messages.",
+            "Use /verify for manual verification and profile assignment.",
+            "Monitor kicked/unverified lists and stats panel.",
+        ],
+        failureModes: [
+            "Bot cannot assign roles because Manage Roles or hierarchy is missing.",
+            "Users not auto-kicked because cleanup job is not running.",
+            "Profile lookup fails when profile/role names do not match provided value.",
+        ],
+    },
+    {
+        slug: "leveling",
+        title: "Leveling System",
+        summary: "Text and voice XP tracking, live VC processing, rank visibility, and reward role assignment.",
+        dashboardRoute: "/dashboard/[guildId]/leveling",
+        apiRoutes: [
+            "GET/POST /api/guilds/[guildId]/leveling/config",
+            "GET /api/guilds/[guildId]/leveling/leaderboard",
+            "GET/POST /api/guilds/[guildId]/leveling/rewards",
+            "DELETE /api/guilds/[guildId]/leveling/rewards?id=<rewardId>",
+        ],
+        tables: ["guild_config", "level_profile", "level_reward"],
+        commandRefs: [
+            "/rank",
+            "/profile",
+            "/leaderboard",
+            "/top",
+            "/setxp",
+            "/setlevel",
+            "/config toggle leveling",
+            "/config toggle levelup",
+        ],
+        runtimeRefs: [
+            "events/messageCreate.ts",
+            "events/voiceStateUpdate.ts",
+            "jobs/processVoiceXp.ts",
+            "services/voiceXpService.ts",
+            "utils/leveling.ts",
+        ],
+        workflow: [
+            "Enable leveling and tune text XP range/cooldown.",
+            "Set voice XP per minute and level-up notification preferences.",
+            "Create reward mappings by level.",
+            "Validate with /rank and /leaderboard while users are active.",
+            "Observe live VC XP accrual without requiring voice disconnect.",
+        ],
+        failureModes: [
+            "User appears unranked because level-one threshold not reached.",
+            "No voice XP in solo channels due to non-empty VC requirement.",
+            "Reward roles fail on level-up due to role hierarchy.",
+        ],
+    },
+    {
+        slug: "boosts",
+        title: "Boost Management",
+        summary: "Track boosters, manage reward role lifecycle, and automate boost messaging.",
+        dashboardRoute: "/dashboard/[guildId]/boosts",
+        apiRoutes: [
+            "GET/POST /api/guilds/[guildId]/boosts/config",
+            "GET /api/guilds/[guildId]/boosts/stats",
+            "GET /api/guilds/[guildId]/members?ids=...",
+        ],
+        tables: ["guild_config", "user_boost"],
+        commandRefs: ["/boost status", "/boost claim", "/boost setup"],
+        runtimeRefs: ["events/guildMemberUpdate.ts", "jobs/cleanupBoosts.ts"],
+        workflow: [
+            "Enable boost module and set reward role/announcement config.",
+            "Configure welcome and re-boost templates.",
+            "Set grace period for reward removal after boost loss.",
+            "Use /boost setup for role creation/update and /boost claim for assignment.",
+            "Monitor stats and current boosters in dashboard.",
+        ],
+        failureModes: [
+            "Claim fails because reward role is not configured.",
+            "Role assignment fails because bot cannot manage target role.",
+            "Removal timing appears off when grace-period config is misunderstood.",
+        ],
+    },
+    {
+        slug: "birthdays",
+        title: "Birthdays",
+        summary: "Automatically announce and celebrate member birthdays with customizable messages and roles.",
+        dashboardRoute: "/dashboard/[guildId]/birthdays",
+        apiRoutes: [
+            "GET/POST /api/guilds/[guildId]/birthdays/config",
+            "GET/POST /api/guilds/[guildId]/birthdays/entries",
+            "DELETE /api/guilds/[guildId]/birthdays/entries?id=<id>",
+        ],
+        tables: ["birthday_config", "birthday_entry", "birthday_log"],
+        commandRefs: [
+            "/birthday set", "/birthday remove", "/birthday view",
+            "/birthday list", "/birthday next", "/birthday stats",
+            "/birthday admin-set", "/birthday admin-remove", "/birthday test"
+        ],
+        runtimeRefs: ["jobs/checkBirthdays.ts"],
+        workflow: [
+            "Enable birthday module in dashboard.",
+            "Configure announcement channel and optional role.",
+            "Customize message template and set announcement time.",
+            "Members set their birthdays with /birthday set (interactive timezone selection).",
+            "Bot automatically announces birthdays at configured time in each user's timezone.",
+        ],
+        failureModes: [
+            "Birthday not announced when module not enabled or channel not set.",
+            "Role not assigned when bot lacks Manage Roles permission.",
+            "Wrong timezone causes birthday to be announced at wrong time.",
+        ],
+    },
+    {
+        slug: "aliases",
+        title: "Message Aliases",
+        summary: "Create custom trigger words that make the bot respond with predefined messages (auto-responder).",
+        dashboardRoute: "/dashboard/[guildId]/aliases",
+        apiRoutes: [
+            "GET/POST/PATCH/DELETE /api/guilds/[guildId]/aliases",
+        ],
+        tables: ["message_alias"],
+        commandRefs: [],
+        runtimeRefs: ["events/messageCreate.ts"],
+        workflow: [
+            "Create alias with trigger word and response message.",
+            "Optionally configure prefix, cooldown, and restrictions.",
+            "Users type trigger (e.g., !rules) to receive response.",
+            "Bot responds in same channel with configured message.",
+            "Usage stats tracked per alias.",
+        ],
+        failureModes: [
+            "Alias not triggered when disabled or user on cooldown.",
+            "Channel/role restrictions prevent alias usage.",
+            "Trigger deletion fails when bot lacks Manage Messages permission.",
+        ],
+    },
+    {
+        slug: "role-actions",
+        title: "Role Actions",
+        summary: "Automate DM/log/kick/message actions when roles are added/removed.",
+        dashboardRoute: "/dashboard/[guildId]/role-actions",
+        apiRoutes: [
+            "GET/POST /api/guilds/[guildId]/role-actions",
+            "DELETE /api/guilds/[guildId]/role-actions?id=<actionId>",
+        ],
+        tables: ["role_action", "scheduled_role_action", "action_log"],
+        commandRefs: [],
+        runtimeRefs: ["events/guildMemberUpdate.ts", "jobs/processScheduledRoleActions.ts"],
+        workflow: [
+            "Create rule with trigger type (ADD/REMOVE), action type, and optional delay.",
+            "For message actions, set destination channel.",
+            "For kick actions, set reason and optional DM text.",
+            "Enable rule and test by changing target role membership.",
+            "Inspect action outcome in logs module.",
+        ],
+        failureModes: [
+            "Delayed actions never execute when scheduled processor is down.",
+            "DM sends fail because target user blocks DMs.",
+            "Kick action fails due to missing permissions or role hierarchy.",
+        ],
+    },
+    {
+        slug: "moderation",
+        title: "Moderation",
+        summary: "Manual moderation commands plus automated spam/invite/word filtering.",
+        dashboardRoute: "/dashboard/[guildId]/moderation",
+        apiRoutes: ["GET/POST /api/guilds/[guildId]/moderation/config"],
+        tables: ["moderation_settings", "moderation_case", "action_log"],
+        commandRefs: [
+            "/warn add",
+            "/warn remove",
+            "/warn list",
+            "/kick",
+            "/ban",
+            "/unban",
+            "/mute text",
+            "/mute voice",
+            "/unmute text",
+            "/unmute voice",
+            "/timeout",
+            "/untimeout",
+            "/clear",
+            "/cases",
+            "/vkick",
+            "/move",
+            "/lock",
+            "/unlock",
+            "/slowmode",
+            "/setnick",
+            "/role give",
+            "/role remove",
+        ],
+        runtimeRefs: ["events/autoModeration.ts"],
+        workflow: [
+            "Configure mute role and log channel first.",
+            "Enable spam/invite/word filters and choose actions.",
+            "Maintain banned word list.",
+            "Use slash moderation commands for manual enforcement.",
+            "Review case history via /cases and logs module.",
+        ],
+        failureModes: [
+            "Mute/unmute fails when mute role is missing or unmanaged.",
+            "Auto-mod appears inactive when feature toggles are off.",
+            "Bulk clear cannot delete messages older than 14 days.",
+        ],
+    },
+    {
+        slug: "reaction-roles",
+        title: "Reaction Roles",
+        summary: "Self-assign roles from message reactions. Dashboard supports creating and sending messages directly to Discord.",
+        dashboardRoute: "/dashboard/[guildId]/reaction-roles",
+        apiRoutes: [
+            "GET/POST /api/guilds/[guildId]/reaction-roles/messages",
+            "PATCH /api/guilds/[guildId]/reaction-roles/messages (send to Discord)",
+            "DELETE /api/guilds/[guildId]/reaction-roles/messages?id=<id>",
+            "GET/POST /api/guilds/[guildId]/reaction-roles",
+            "DELETE /api/guilds/[guildId]/reaction-roles?id=<id>",
+        ],
+        tables: ["reaction_role_message", "reaction_role"],
+        commandRefs: [
+            "/reactionrole create",
+            "/reactionrole add",
+            "/reactionrole remove",
+            "/reactionrole list",
+            "/reactionrole delete",
+        ],
+        runtimeRefs: ["events/messageReactionAdd.ts", "events/messageReactionRemove.ts"],
+        workflow: [
+            "Create message content and embed in dashboard Messages tab.",
+            "Send message to Discord using 'Send to Discord' button.",
+            "Add reaction roles in Roles tab (emoji + role mappings).",
+            "Bot automatically adds emoji reactions to message.",
+            "Test with non-admin member account.",
+        ],
+        failureModes: [
+            "Role not applied when bot lacks Manage Roles.",
+            "Role above bot in hierarchy prevents assignment.",
+            "Duplicate mapping blocked for same message+emoji pair.",
+            "Message not sent when bot lacks Send Messages permission.",
+        ],
+    },
+    {
+        slug: "analytics",
+        title: "Analytics",
+        summary: "Server activity and growth insights: stats, heatmap, and leaderboard.",
+        dashboardRoute: "/dashboard/[guildId]/analytics",
+        apiRoutes: ["GET /api/guilds/[guildId]/analytics"],
+        tables: ["user_join", "message_activity", "guild_growth", "action_log", "level_profile", "user_boost"],
+        commandRefs: ["/info", "/config sync"],
+        runtimeRefs: ["jobs/trackGrowth.ts", "jobs/syncAnalytics.ts", "events/messageCreate.ts", "events/guildMemberAdd.ts", "events/guildMemberRemove.ts"],
+        workflow: [
+            "Use refresh after large import or member sync operations.",
+            "Track verification ratio and retention trends.",
+            "Use heatmap to optimize event timing windows.",
+            "Correlate action volume spikes with moderation and role-action changes.",
+        ],
+        failureModes: [
+            "Stats remain zero when historical data was never synced.",
+            "Heatmap gaps when message activity collector paths are interrupted.",
+            "Retention anomalies after downtime before member sync catch-up.",
+        ],
+    },
+    {
+        slug: "logs",
+        title: "Action Logs",
+        summary: "Operational visibility into automated action execution and failures.",
+        dashboardRoute: "/dashboard/[guildId]/logs",
+        apiRoutes: ["GET /api/guilds/[guildId]/logs?page=<n>&limit=<n>"],
+        tables: ["action_log"],
+        commandRefs: [],
+        runtimeRefs: ["Any producer that writes action_log entries"],
+        workflow: [
+            "Open logs module after reproducing an issue.",
+            "Inspect action type, target user, and timestamp.",
+            "Expand metadata and compare with process logs.",
+            "Iterate configuration and retest.",
+        ],
+        failureModes: [
+            "No entries when feature path does not emit action_log writes.",
+            "Metadata inspection breaks if malformed JSON is written.",
+        ],
+    },
+    {
+        slug: "settings-backups",
+        title: "Settings and Backups",
+        summary: "Export/import guild config and run DB backup/restore workflows.",
+        dashboardRoute: "/dashboard/[guildId]/settings",
+        apiRoutes: [
+            "GET /api/guilds/[guildId]/settings/export",
+            "POST /api/guilds/[guildId]/settings/import",
+        ],
+        tables: ["Configuration spans multiple tables depending on module scope"],
+        commandRefs: ["npm run db:backup", "npm run db:restore", "npm run deploy:safe"],
+        runtimeRefs: ["scripts/backup-db.ts", "scripts/restore-db.ts", "scripts/deploy-with-backup.sh"],
+        workflow: [
+            "Export before risky module or schema changes.",
+            "Perform change window and validate.",
+            "Import prior config or restore DB backup when rollback is required.",
+        ],
+        failureModes: [
+            "Import payload mismatch causes validation failure.",
+            "Filesystem permission issues block backup creation.",
+            "Assuming import is merge-based; current behavior is overwrite-oriented.",
+        ],
+    },
+];
+
+export const setupSections = [
+    {
+        title: "Runtime Baseline",
+        bullets: [
+            "Node.js 22.x recommended.",
+            "npm 11.9.0 (project package manager).",
+            "SQLite database via DATABASE_URL.",
+            "Discord.js bot + Next.js dashboard.",
+        ],
+    },
+    {
+        title: "Required Environment Variables",
+        bullets: [
+            "DISCORD_TOKEN",
+            "DISCORD_CLIENT_ID",
+            "DISCORD_CLIENT_SECRET",
+            "NEXTAUTH_SECRET",
+            "NEXTAUTH_URL (local: http://localhost:4000)",
+            "DATABASE_URL (default: file:./data/ixoye.db)",
+        ],
+    },
+    {
+        title: "Quick Local Start",
+        commands: [
+            "cp .env.example .env",
+            "npm ci",
+            "npm run db:push",
+            "npm run dev:all",
+        ],
+    },
+    {
+        title: "Docker Development",
+        commands: [
+            "docker compose -f docker-compose.dev.yml up -d --build",
+            "docker compose -f docker-compose.dev.yml logs -f ixoye-dev",
+            "docker compose -f docker-compose.dev.yml down",
+        ],
+        bullets: [
+            "Dev container auto-runs npm ci when package-lock hash changes.",
+            "Dashboard dev uses webpack mode and clears stale .next artifacts on startup.",
+        ],
+    },
+    {
+        title: "Production Build/Run",
+        commands: [
+            "npm run build",
+            "npm run dashboard:build",
+            "npm run start",
+            "npm run dashboard:start",
+            "docker compose up -d --build",
+        ],
+    },
+    {
+        title: "Deploy and Backup",
+        commands: [
+            "npm run deploy",
+            "npm run db:backup",
+            "npm run db:backup:list",
+            "npm run db:restore",
+            "npm run db:restore:list",
+            "npm run deploy:safe",
+        ],
+    },
+];

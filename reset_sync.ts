@@ -1,7 +1,6 @@
 
 import { db } from "./src/shared/database/client";
 import { guildConfig } from "./src/shared/database/schema";
-import { sql } from "drizzle-orm";
 
 async function resetSync() {
     try {

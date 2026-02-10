@@ -15,12 +15,31 @@ function getPreferredTheme(): Theme {
 
 export default function ThemeToggle() {
     const [theme, setTheme] = useState<Theme>(() => getPreferredTheme());
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     useEffect(() => {
         document.documentElement.classList.toggle("dark", theme === "dark");
         document.documentElement.dataset.theme = theme;
         window.localStorage.setItem("theme", theme);
     }, [theme]);
+
+    // Prevent hydration mismatch by rendering a placeholder until mounted
+    if (!mounted) {
+        return (
+            <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Toggle theme"
+                disabled
+            >
+                <Sun className="h-5 w-5 opacity-50" />
+            </Button>
+        );
+    }
 
     return (
         <Button

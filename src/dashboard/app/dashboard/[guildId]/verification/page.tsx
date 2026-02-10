@@ -11,6 +11,7 @@ import { Switch } from "../../../../components/ui/switch";
 import { Trash2, Plus, ShieldCheck, UserX, UserCheck } from "lucide-react";
 import Image from "next/image";
 import { useDiscordData } from "../../../../components/useDiscordData";
+import { toast } from "sonner";
 
 // Types
 interface VerificationConfig {
@@ -142,15 +143,19 @@ export default function VerificationPage() {
         e.preventDefault();
         setSaving(true);
         try {
-            await fetch(`/api/guilds/${guildId}/verification/config`, {
+            const res = await fetch(`/api/guilds/${guildId}/verification/config`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(config),
             });
-            alert("Settings saved!");
+            if (!res.ok) {
+                toast.error("Failed to save settings");
+                return;
+            }
+            toast.success("Settings saved");
         } catch (err) {
             console.error(err);
-            alert("Failed to save settings.");
+            toast.error("Failed to save settings");
         } finally {
             setSaving(false);
         }
@@ -417,6 +422,9 @@ export default function VerificationPage() {
 
                     <Card>
                         <CardHeader>
+                            <div className="mb-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
+                                <p className="text-sm text-blue-900 dark:text-blue-200"><strong>Example:</strong> If a user with the @Premium member role verifies, send them "Welcome to the premium community! Enjoy exclusive perks and early access." Regular members see "Welcome to our community!" instead.</p>
+                            </div>
                             <CardTitle>Role-Specific Messages</CardTitle>
                             <CardDescription>Send different messages based on the user's existing roles.</CardDescription>
                         </CardHeader>
@@ -487,8 +495,11 @@ export default function VerificationPage() {
 
                     <Card>
                         <CardHeader>
+                            <div className="mb-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
+                                <p className="text-sm text-blue-900 dark:text-blue-200"><strong>Example:</strong> Create an "Adult Verified" profile that gives users the @Adult role and notifies them in the #adults-only-restricted channel when applied.</p>
+                            </div>
                             <CardTitle>Additional Verification Profiles</CardTitle>
-                            <CardDescription>Assign separate verified roles and notify a channel when applied.</CardDescription>
+                            <CardDescription>Assign separate verified roles and notify a channel when applied. Verify users into specific roles such as Restricted Channels, Premium Access, or custom verification profiles.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="space-y-4">

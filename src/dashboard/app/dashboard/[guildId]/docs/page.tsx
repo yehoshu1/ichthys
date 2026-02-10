@@ -1,237 +1,95 @@
-"use client";
+import Link from "next/link";
+import { ArrowRight, BookOpen, Code, Command, FolderKanban, Wrench } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../components/ui/card";
+import { Button } from "../../../../components/ui/button";
+import { modules, scripts, slashCommands } from "../../../../lib/docs-content";
 
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "../../../../components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../components/ui/table";
-import { Badge } from "../../../../components/ui/badge";
-import { BookOpen, Command, Terminal, Shield, Zap, Star, Wrench, Sparkles, AlertTriangle } from "lucide-react";
-
-export default function DocsPage() {
+export default function GuildDocsPage() {
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-2">
+            <div className="space-y-2">
                 <h2 className="text-3xl font-bold tracking-tight">Documentation</h2>
                 <p className="text-muted-foreground">
-                    Learn how to use Ixoye features and commands.
+                    Ixoye docs are split into user guides at <code>/docs</code> and technical docs at <code>/docs/dev</code>.
                 </p>
             </div>
 
-            <Tabs defaultValue="commands" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 lg:w-[520px]">
-                    <TabsTrigger value="commands" className="gap-2">
-                        <Terminal className="h-4 w-4" />
-                        Command Reference
-                    </TabsTrigger>
-                    <TabsTrigger value="guide" className="gap-2">
-                        <BookOpen className="h-4 w-4" />
-                        Dashboard Guide
-                    </TabsTrigger>
-                    <TabsTrigger value="setup" className="gap-2">
-                        <Wrench className="h-4 w-4" />
-                        Setup & Tips
-                    </TabsTrigger>
-                </TabsList>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Documentation Coverage</CardTitle>
+                    <CardDescription>Live in-app docs synced with current code paths.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+                    <p>{slashCommands.length} slash command entries documented</p>
+                    <p>{modules.length} feature/module pages documented</p>
+                    <p>{scripts.length} npm script entries in developer docs</p>
+                </CardContent>
+            </Card>
 
-                <TabsContent value="commands" className="mt-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Slash Commands</CardTitle>
-                            <CardDescription>
-                                A complete list of available bot commands and their required permissions.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[200px]">Command</TableHead>
-                                        <TableHead>Description</TableHead>
-                                        <TableHead className="w-[150px]">Permission</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    <TableRow>
-                                        <TableCell className="font-mono font-medium">/info</TableCell>
-                                        <TableCell>View a quick analytics overview for the server.</TableCell>
-                                        <TableCell><Badge variant="secondary">Public</Badge></TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell className="font-mono font-medium">/setup</TableCell>
-                                        <TableCell>Interactive setup panel with toggles and role/channel selectors.</TableCell>
-                                        <TableCell><Badge variant="destructive">Manage Server</Badge></TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell className="font-mono font-medium">/rank</TableCell>
-                                        <TableCell>View your current experience, level, and rank card.</TableCell>
-                                        <TableCell><Badge variant="secondary">Public</Badge></TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell className="font-mono font-medium">/leaderboard</TableCell>
-                                        <TableCell>View the server's top 50 members sorted by XP.</TableCell>
-                                        <TableCell><Badge variant="secondary">Public</Badge></TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell className="font-mono font-medium">/ping</TableCell>
-                                        <TableCell>Check the bot system latency.</TableCell>
-                                        <TableCell><Badge variant="secondary">Public</Badge></TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell className="font-mono font-medium">/config sync</TableCell>
-                                        <TableCell>Sync database users with current server members.</TableCell>
-                                        <TableCell><Badge variant="destructive">Administrator</Badge></TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell className="font-mono font-medium">/welcome test</TableCell>
-                                        <TableCell>Test a welcome message trigger to preview it.</TableCell>
-                                        <TableCell><Badge variant="destructive">Administrator</Badge></TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell className="font-mono font-medium">/level set</TableCell>
-                                        <TableCell>Manually set a user's level or XP amount.</TableCell>
-                                        <TableCell><Badge variant="destructive">Administrator</Badge></TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="guide" className="mt-6 space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Command className="h-5 w-5 text-primary" />
-                                Welcome System
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <p className="text-sm text-muted-foreground">
-                                The Welcome module allows you to greet new members or send messages when they receive roles.
-                            </p>
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="rounded-lg border p-4 bg-muted/20">
-                                    <h4 className="font-medium mb-2">Triggers</h4>
-                                    <p className="text-sm text-muted-foreground">
-                                        Define <strong>when</strong> a message sends. You can trigger messages on specific role additions (e.g., "Member" role).
-                                    </p>
-                                </div>
-                                <div className="rounded-lg border p-4 bg-muted/20">
-                                    <h4 className="font-medium mb-2">Templates</h4>
-                                    <p className="text-sm text-muted-foreground">
-                                        Create rich embeds with title, color, and fields. Use placeholders like <code>{'{user}'}</code> to mention the member.
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Shield className="h-5 w-5 text-primary" />
-                                Verification
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <p className="text-sm text-muted-foreground">
-                                Protect your server by enforcing verification rules.
-                            </p>
-                            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-2">
-                                <li>Set a <strong>Grace Period</strong> (e.g., 3 days) for new members to verify.</li>
-                                <li>The bot tracks join dates and verification status automatically.</li>
-                                <li>Enable <strong>Auto-Kick</strong> to remove users who fail to verify in time.</li>
-                            </ul>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Star className="h-5 w-5 text-primary" />
-                                Leveling & XP
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <p className="text-sm text-muted-foreground">
-                                Gamify activity with a robust XP system.
-                            </p>
-                            <div className="grid gap-2 text-sm text-muted-foreground">
-                                <div className="flex justify-between border-b pb-2">
-                                    <span>Text XP</span>
-                                    <span className="font-mono">Configurable range per message</span>
-                                </div>
-                                <div className="flex justify-between border-b pb-2">
-                                    <span>Voice XP</span>
-                                    <span className="font-mono">Earned per minute in voice channels</span>
-                                </div>
-                                <div className="flex justify-between pt-1">
-                                    <span>Rewards</span>
-                                    <span className="font-mono">Auto-assign roles at specific levels</span>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Zap className="h-5 w-5 text-primary" />
-                                Role Actions
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-muted-foreground mb-4">
-                                Automate administrative tasks based on role changes.
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                For example, you can create a rule: <em>"When the 'Muted' role is ADDED, send a DM to the user explaining why."</em>
-                                Supported actions include <strong>DM</strong>, <strong>Kick</strong>, and <strong>Log</strong>.
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Sparkles className="h-5 w-5 text-primary" />
-                                Boosts
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2 text-sm text-muted-foreground">
-                            <p>Reward boosters automatically, manage role removal grace periods, and send custom thank-you messages.</p>
-                            <p>Use the Boosts dashboard page to view active boosters and recent changes.</p>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="setup" className="mt-6 space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Quick Setup</CardTitle>
-                            <CardDescription>Fastest path to a working configuration.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4 text-sm text-muted-foreground">
-                            <ol className="list-decimal space-y-2 pl-5">
-                                <li>Invite Ixoye with Manage Server + Manage Roles permissions.</li>
-                                <li>Run <span className="font-mono">/setup</span> to toggle modules and set roles/channels.</li>
-                                <li>Open the dashboard to configure templates, triggers, and analytics preferences.</li>
-                            </ol>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <AlertTriangle className="h-5 w-5 text-primary" />
-                                Troubleshooting
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2 text-sm text-muted-foreground">
-                            <p>Missing roles in dropdowns? Ensure the bot role is above the target roles.</p>
-                            <p>XP not updating? Confirm Leveling is enabled and the bot has message intent access.</p>
-                            <p>Welcome messages not sending? Check the Welcome System toggle and trigger status.</p>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
+            <div className="grid gap-4 md:grid-cols-2">
+                <NavCard
+                    href="/docs"
+                    title="User Docs"
+                    description="Guides for server owners, admins, and moderators using the bot."
+                    icon={<BookOpen className="h-5 w-5 text-primary" />}
+                />
+                <NavCard
+                    href="/docs/setup"
+                    title="Getting Started"
+                    description="Onboarding checklist for roles, permissions, and first-time configuration."
+                    icon={<Wrench className="h-5 w-5 text-primary" />}
+                />
+                <NavCard
+                    href="/docs/commands"
+                    title="Bot Commands"
+                    description="Slash command catalog with options and examples for staff workflows."
+                    icon={<Command className="h-5 w-5 text-primary" />}
+                />
+                <NavCard
+                    href="/docs/modules"
+                    title="Feature Guides"
+                    description="Module-level usage guides and operational workflows."
+                    icon={<FolderKanban className="h-5 w-5 text-primary" />}
+                />
+                <NavCard
+                    href="/docs/dev"
+                    title="Developer Docs"
+                    description="Self-hosting, environment setup, API/routes, and implementation references."
+                    icon={<Code className="h-5 w-5 text-primary" />}
+                />
+            </div>
         </div>
+    );
+}
+
+function NavCard({
+    href,
+    title,
+    description,
+    icon,
+}: {
+    href: string;
+    title: string;
+    description: string;
+    icon: React.ReactNode;
+}) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                    {icon}
+                    {title}
+                </CardTitle>
+                <CardDescription>{description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Link href={href}>
+                    <Button className="w-full gap-2">
+                        Open {title}
+                        <ArrowRight className="h-4 w-4" />
+                    </Button>
+                </Link>
+            </CardContent>
+        </Card>
     );
 }

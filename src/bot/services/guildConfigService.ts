@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../../shared/database/client';
-import { guildConfig, type GuildConfig, type NewGuildConfig } from '../../shared/database/schema';
+import { guildConfig, type GuildConfig } from '../../shared/database/schema';
 
 /**
  * Service for managing guild configurations

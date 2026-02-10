@@ -1,6 +1,7 @@
 import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import path from 'path';
+import fs from 'fs';
 
 // Define log levels
 const levels = {
@@ -39,39 +40,50 @@ const fileFormat = winston.format.combine(
 
 const logDir = 'logs';
 
-const transports = [
+const transports: winston.transport[] = [
     // Console transport
     new winston.transports.Console({
         format: consoleFormat,
     }),
-
-    // Error log rotation
-    new DailyRotateFile({
-        filename: path.join(logDir, 'error-%DATE%.log'),
-        datePattern: 'YYYY-MM-DD',
-        zippedArchive: true,
-        maxSize: '20m',
-        maxFiles: '14d',
-        level: 'error',
-        format: fileFormat,
-    }),
-
-    // Combined log rotation
-    new DailyRotateFile({
-        filename: path.join(logDir, 'combined-%DATE%.log'),
-        datePattern: 'YYYY-MM-DD',
-        zippedArchive: true,
-        maxSize: '20m',
-        maxFiles: '14d',
-        format: fileFormat,
-    }),
 ];
+
+try {
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.accessSync(logDir, fs.constants.W_OK);
+
+    transports.push(
+        // Error log rotation
+        new DailyRotateFile({
+            filename: path.join(logDir, 'error-%DATE%.log'),
+            datePattern: 'YYYY-MM-DD',
+            zippedArchive: true,
+            maxSize: '20m',
+            maxFiles: '14d',
+            level: 'error',
+            format: fileFormat,
+        }),
+
+        // Combined log rotation
+        new DailyRotateFile({
+            filename: path.join(logDir, 'combined-%DATE%.log'),
+            datePattern: 'YYYY-MM-DD',
+            zippedArchive: true,
+            maxSize: '20m',
+            maxFiles: '14d',
+            format: fileFormat,
+        })
+    );
+} catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`File logging disabled (cannot write to "${logDir}"): ${message}`);
+}
 
 // Create the logger
 const logger = winston.createLogger({
     level: process.env.LOG_LEVEL || 'info',
     levels,
     transports,
+    exitOnError: false,
 });
 
 export default logger;

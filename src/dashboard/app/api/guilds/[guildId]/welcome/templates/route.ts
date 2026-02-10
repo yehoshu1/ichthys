@@ -1,23 +1,37 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { messageTemplate } from "@/lib/db";
+import { db, messageTemplate } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
+import { z } from "zod";
+import { requireGuildManageAccess } from "@/lib/guild-auth";
+import { optionalEmbedSchema, optionalTextSchema, parseJsonBody } from "@/lib/validation";
+import logger from "@/lib/logger";
 
-// Helper to check permissions (basic check: user must be in the guild)
-// In a real app, we should verify MANAGE_GUILD permissions via Discord API
-async function checkAuth(req: NextRequest, guildId: string) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return null;
-    return session;
+const createTemplateSchema = z.object({
+    name: z.string().trim().min(1).max(100),
+    content: z.string().trim().min(1).max(2000),
+    embedEnabled: z.boolean().optional(),
+    embedTitle: optionalTextSchema,
+    embedDescription: optionalTextSchema,
+    embedColor: optionalTextSchema,
+    embedThumbnail: z.boolean().optional(),
+    embedData: optionalEmbedSchema,
+}).strict();
+
+const updateTemplateSchema = createTemplateSchema.extend({
+    id: z.string().trim().min(1),
+}).strict();
+
+function getIdParam(req: NextRequest): string | null {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    return id && id.trim().length > 0 ? id.trim() : null;
 }
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) return auth.response;
 
     try {
         const templates = await db.select()
@@ -25,7 +39,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             .where(eq(messageTemplate.guildId, guildId));
         return NextResponse.json(templates);
     } catch (error) {
-        console.error("Error fetching templates:", error);
+        logger.error("Error fetching templates", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -33,32 +47,30 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
 export async function POST(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) return auth.response;
+
+    const parsed = await parseJsonBody(req, createTemplateSchema);
+    if (!parsed.success) return parsed.response;
 
     try {
-        const body = await req.json();
-        const { name, content, embedEnabled, embedTitle, embedDescription, embedColor, embedThumbnail, embedData } = body;
-
-        if (!name || !content) {
-            return NextResponse.json({ error: "Name and Content are required" }, { status: 400 });
-        }
+        const body = parsed.data;
 
         const [newTemplate] = await db.insert(messageTemplate).values({
             guildId,
-            name,
-            content,
-            embedEnabled: embedEnabled || false,
-            embedTitle, // keeping for backward compat or we can migrate
-            embedDescription,
-            embedColor,
-            embedThumbnail: embedThumbnail || false,
-            embedData, // <--- Added
+            name: body.name,
+            content: body.content,
+            embedEnabled: body.embedEnabled || false,
+            embedTitle: body.embedTitle || null,
+            embedDescription: body.embedDescription || null,
+            embedColor: body.embedColor || null,
+            embedThumbnail: body.embedThumbnail || false,
+            embedData: body.embedData || null,
         }).returning();
 
         return NextResponse.json(newTemplate);
     } catch (error) {
-        console.error("Error creating template:", error);
+        logger.error("Error creating template", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -66,35 +78,33 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
 export async function PUT(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) return auth.response;
+
+    const parsed = await parseJsonBody(req, updateTemplateSchema);
+    if (!parsed.success) return parsed.response;
 
     try {
-        const body = await req.json();
-        const { id, name, content, embedEnabled, embedTitle, embedDescription, embedColor, embedThumbnail, embedData } = body;
-
-        if (!id || !name || !content) {
-            return NextResponse.json({ error: "ID, Name, and Content are required" }, { status: 400 });
-        }
+        const body = parsed.data;
 
         const [updated] = await db.update(messageTemplate)
             .set({
-                name,
-                content,
-                embedEnabled: embedEnabled || false,
-                embedTitle,
-                embedDescription,
-                embedColor,
-                embedThumbnail: embedThumbnail || false,
-                embedData,
+                name: body.name,
+                content: body.content,
+                embedEnabled: body.embedEnabled || false,
+                embedTitle: body.embedTitle || null,
+                embedDescription: body.embedDescription || null,
+                embedColor: body.embedColor || null,
+                embedThumbnail: body.embedThumbnail || false,
+                embedData: body.embedData || null,
                 updatedAt: new Date(),
             })
-            .where(and(eq(messageTemplate.id, id), eq(messageTemplate.guildId, guildId)))
+            .where(and(eq(messageTemplate.id, body.id), eq(messageTemplate.guildId, guildId)))
             .returning();
 
         return NextResponse.json(updated);
     } catch (error) {
-        console.error("Error updating template:", error);
+        logger.error("Error updating template", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -102,12 +112,11 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ guildId: 
 export async function DELETE(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) return auth.response;
 
     try {
-        const { searchParams } = new URL(req.url);
-        const id = searchParams.get("id");
+        const id = getIdParam(req);
 
         if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
@@ -116,7 +125,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ guildI
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("Error deleting template:", error);
+        logger.error("Error deleting template", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

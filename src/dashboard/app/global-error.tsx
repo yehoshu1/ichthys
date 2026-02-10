@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { Button } from '../components/ui/button';
-import { AlertCircle } from 'lucide-react';
+import { useEffect } from "react";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 
-// global-error must include html and body tags
 export default function GlobalError({
     error,
     reset,
@@ -13,26 +13,41 @@ export default function GlobalError({
     reset: () => void;
 }) {
     useEffect(() => {
-        console.error('Global Error:', error);
+        // Log to error monitoring service
+        console.error("Global error:", error);
     }, [error]);
 
     return (
-        <html>
+        <html lang="en">
             <body>
-                <div className="flex min-h-screen flex-col items-center justify-center bg-background text-foreground p-4">
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
-                        <AlertCircle className="h-8 w-8 text-destructive" />
-                    </div>
-                    <h2 className="mb-2 text-2xl font-bold">Critical System Error</h2>
-                    <p className="mb-8 text-muted-foreground text-center max-w-md">
-                        A critical error occurred that prevented the application from loading.
-                    </p>
-                    <p className="mb-8 p-4 bg-muted rounded font-mono text-sm max-w-md overflow-hidden text-ellipsis">
-                        {error.message}
-                    </p>
-                    <Button onClick={() => reset()} variant="default">
-                        Reload Application
-                    </Button>
+                <div className="flex min-h-screen items-center justify-center bg-background p-4">
+                    <Card className="w-full max-w-md">
+                        <CardHeader className="text-center">
+                            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+                                <AlertTriangle className="h-6 w-6 text-destructive" />
+                            </div>
+                            <CardTitle className="text-xl">Application Error</CardTitle>
+                            <CardDescription>
+                                A critical error occurred. Please try again or contact support if the problem persists.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {error.message && (
+                                <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+                                    <code className="break-all">{error.message}</code>
+                                </div>
+                            )}
+                            {error.digest && (
+                                <div className="text-center text-xs text-muted-foreground">
+                                    Error ID: {error.digest}
+                                </div>
+                            )}
+                            <Button onClick={reset} className="w-full">
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Try Again
+                            </Button>
+                        </CardContent>
+                    </Card>
                 </div>
             </body>
         </html>

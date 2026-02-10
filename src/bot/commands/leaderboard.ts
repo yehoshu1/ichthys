@@ -24,6 +24,9 @@ export const leaderboard: Command = {
         const guildId = interaction.guildId!;
         const type = interaction.options.getString('type') || 'total';
 
+        // Defer reply for database operations
+        await interaction.deferReply();
+
         try {
             // Check if leveling enabled
             const config = await db.query.guildConfig.findFirst({
@@ -31,7 +34,7 @@ export const leaderboard: Command = {
             });
 
             if (!config?.levelingEnabled) {
-                await interaction.reply({ content: 'Leveling is currently disabled in this server.', ephemeral: true });
+                await interaction.editReply({ content: 'Leveling is currently disabled in this server.' });
                 return;
             }
 
@@ -66,7 +69,7 @@ export const leaderboard: Command = {
                 .limit(10);
 
             if (topUsers.length === 0) {
-                await interaction.reply({ content: 'No one has earned any XP yet!', ephemeral: true });
+                await interaction.editReply({ content: 'No one has earned any XP yet!' });
                 return;
             }
 
@@ -85,11 +88,11 @@ export const leaderboard: Command = {
                     }).join('\n')
                 );
 
-            await interaction.reply({ embeds: [embed] });
+            await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
             console.error('Error fetching leaderboard:', error);
-            await interaction.reply({ content: 'There was an error fetching the leaderboard.', ephemeral: true });
+            await interaction.editReply({ content: 'There was an error fetching the leaderboard.' });
         }
     }
 };

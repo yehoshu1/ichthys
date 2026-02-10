@@ -1,30 +1,34 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { verificationMessageRule } from "@/lib/db";
+import { db, verificationMessageRule } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { requireGuildManageAccess, requireGuildManageRolesAccess } from "@/lib/guild-auth";
+import { discordIdSchema, optionalEmbedSchema, parseJsonBody } from "@/lib/validation";
+import logger from "@/lib/logger";
 
-async function checkAuth(req: NextRequest, guildId: string) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return null;
-    return session;
-}
+const createRuleSchema = z.object({
+    name: z.string().trim().min(1).max(100),
+    roleId: discordIdSchema,
+    notifyChannelId: discordIdSchema,
+    message: z.string().trim().min(1).max(2000),
+    messageEmbed: optionalEmbedSchema,
+    enabled: z.boolean().optional(),
+}).strict();
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) return auth.response;
 
     try {
         const rules = await db.query.verificationMessageRule.findMany({
-            where: eq(verificationMessageRule.guildId, guildId)
+            where: eq(verificationMessageRule.guildId, guildId),
         });
 
         return NextResponse.json(rules);
     } catch (error) {
-        console.error("Error fetching verification rules:", error);
+        logger.error("Error fetching verification rules", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -32,30 +36,28 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
 export async function POST(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req, guildId);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageRolesAccess(guildId, req);
+    if ("response" in auth) return auth.response;
+
+    const parsed = await parseJsonBody(req, createRuleSchema);
+    if (!parsed.success) return parsed.response;
 
     try {
-        const body = await req.json();
-        const { name, roleId, notifyChannelId, message, messageEmbed, enabled } = body;
-
-        if (!name || !roleId || !message || !notifyChannelId) {
-            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-        }
+        const body = parsed.data;
 
         const [newRule] = await db.insert(verificationMessageRule).values({
             guildId,
-            name,
-            roleId,
-            notifyChannelId,
-            message,
-            messageEmbed,
-            enabled: enabled ?? true
+            name: body.name,
+            roleId: body.roleId,
+            notifyChannelId: body.notifyChannelId,
+            message: body.message,
+            messageEmbed: body.messageEmbed || null,
+            enabled: body.enabled ?? true,
         }).returning();
 
         return NextResponse.json(newRule);
     } catch (error) {
-        console.error("Error creating verification rule:", error);
+        logger.error("Error creating verification rule", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

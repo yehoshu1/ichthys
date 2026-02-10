@@ -1,14 +1,33 @@
-import { Events, VoiceState, TextChannel } from 'discord.js';
-import client from '../client';
+import { Events, VoiceState } from 'discord.js';
+import type { Event } from '../types/Event';
 import logger from '../utils/logger';
 import { db } from '../../shared/database/client';
 import { guildConfig, levelProfile } from '../../shared/database/schema';
-import { eq, and, isNull } from 'drizzle-orm';
-import { calculateLevel, checkAndAssignLevelRewards } from '../utils/leveling';
-import { buildMessage } from '../utils/embeds';
+import { and, eq } from 'drizzle-orm';
+import { processVoiceXpForMember } from '../services/voiceXpService';
 
-export default function setupVoiceStateUpdateHandler() {
-    client.on(Events.VoiceStateUpdate, async (oldState: VoiceState, newState: VoiceState) => {
+function getHumanCountBeforeTransition(oldState: VoiceState, memberId: string): number {
+    const oldChannel = oldState.channel;
+    if (!oldChannel) return 0;
+
+    let humanCount = 0;
+    for (const channelMember of oldChannel.members.values()) {
+        if (!channelMember.user.bot) {
+            humanCount += 1;
+        }
+    }
+
+    // Depending on cache timing, the moving member may already be removed from oldChannel.
+    if (!oldChannel.members.has(memberId)) {
+        humanCount += 1;
+    }
+
+    return humanCount;
+}
+
+const event: Event<Events.VoiceStateUpdate> = {
+    name: Events.VoiceStateUpdate,
+    async execute(oldState: VoiceState, newState: VoiceState) {
         const guild = newState.guild;
         const member = newState.member;
 
@@ -19,32 +38,29 @@ export default function setupVoiceStateUpdateHandler() {
             const config = await db.query.guildConfig.findFirst({
                 where: eq(guildConfig.guildId, guild.id)
             });
-
-            if (!config?.levelingEnabled) return;
+            const isLevelingEnabled = Boolean(config?.levelingEnabled);
 
             // Handle Join (or switch channel)
             if (!oldState.channelId && newState.channelId) {
                 // User joined voice
                 logger.debug(`${member.user.tag} joined voice channel ${newState.channel?.name} `);
 
-                // Ensure profile exists or create it
-                let profile = await db.query.levelProfile.findFirst({
-                    where: and(eq(levelProfile.guildId, guild.id), eq(levelProfile.userId, member.id))
-                });
-
-                if (!profile) {
-                    await db.insert(levelProfile).values({
+                const now = new Date();
+                await db.insert(levelProfile)
+                    .values({
                         guildId: guild.id,
                         userId: member.id,
-                        voiceJoinedAt: new Date()
+                        voiceJoinedAt: now
+                    })
+                    .onConflictDoUpdate({
+                        target: [levelProfile.guildId, levelProfile.userId],
+                        set: {
+                            voiceJoinedAt: now,
+                            updatedAt: now
+                        }
                     });
-                    logger.debug(`Created new profile for ${member.user.tag} with voiceJoinedAt set`);
-                } else {
-                    await db.update(levelProfile)
-                        .set({ voiceJoinedAt: new Date(), updatedAt: new Date() })
-                        .where(eq(levelProfile.id, profile.id));
-                    logger.debug(`Updated voiceJoinedAt for ${member.user.tag}`);
-                }
+
+                logger.debug(`Set voice session anchor for ${member.user.tag}`);
             }
 
             // Handle Leave
@@ -52,94 +68,89 @@ export default function setupVoiceStateUpdateHandler() {
                 // User left voice
                 logger.debug(`${member.user.tag} left voice channel ${oldState.channel?.name} `);
 
-                const profile = await db.query.levelProfile.findFirst({
-                    where: and(eq(levelProfile.guildId, guild.id), eq(levelProfile.userId, member.id))
+                if (!isLevelingEnabled || !config) {
+                    await db.update(levelProfile)
+                        .set({ voiceJoinedAt: null, updatedAt: new Date() })
+                        .where(and(
+                            eq(levelProfile.guildId, guild.id),
+                            eq(levelProfile.userId, member.id)
+                        ));
+                    logger.debug(`Cleared voice session for ${member.user.tag} while leveling disabled`);
+                    return;
+                }
+
+                const humanCount = getHumanCountBeforeTransition(oldState, member.id);
+                const isEligibleForXp = humanCount >= 2;
+                const now = new Date();
+
+                let result = await processVoiceXpForMember({
+                    member,
+                    config,
+                    eligibleForXp: isEligibleForXp,
+                    finalizeSession: true,
+                    now
                 });
 
-                if (profile && profile.voiceJoinedAt) {
-                    const now = new Date();
-                    const durationMs = now.getTime() - profile.voiceJoinedAt.getTime();
-                    const minutes = Math.floor(durationMs / 60000);
-
-                    logger.debug(`${member.user.tag} was in voice for ${minutes} minutes(${durationMs}ms)`);
-
-                    if (minutes > 0) {
-                        const xpEarned = minutes * config.voiceXpPerMinute;
-
-                        const newTotalXp = profile.totalXp + xpEarned;
-                        const newVoiceXp = profile.voiceXp + xpEarned;
-                        const newTotalMinutes = profile.totalVoiceMinutes + minutes;
-                        const newLevel = calculateLevel(newTotalXp);
-
-                        await db.update(levelProfile)
-                            .set({
-                                totalXp: newTotalXp,
-                                voiceXp: newVoiceXp,
-                                totalVoiceMinutes: newTotalMinutes,
-                                level: newLevel,
-                                voiceJoinedAt: null, // Reset join time
-                                updatedAt: now
-                            })
-                            .where(eq(levelProfile.id, profile.id));
-
-                        logger.debug(`Awarded ${xpEarned} Voice XP to ${member.user.tag} for ${minutes} mins`);
-
-                        // Check and assign level rewards
-                        if (newLevel > profile.level) {
-                            await checkAndAssignLevelRewards(member, newLevel);
-                        }
-
-                        // Level Up Notification
-                        if (newLevel > profile.level && config.levelUpNotifEnabled) {
-                            const channelId = config.levelUpChannelId;
-                            // Notification for voice level up usually goes to a configured channel
-                            if (channelId) {
-                                const channel = guild.channels.cache.get(channelId) as TextChannel;
-                                if (channel && channel.isTextBased()) {
-                                    const variables = {
-                                        'user': member.toString(),
-                                        'level': newLevel.toString(),
-                                        'xp': newTotalXp.toString()
-                                    };
-
-                                    let content = config.levelUpMessage;
-                                    const embedConfig = config.levelUpMessageEmbed as any;
-                                    const isEmbedEnabled = embedConfig?.enabled || (embedConfig && (embedConfig.title || embedConfig.description));
-
-                                    if (!content && !isEmbedEnabled) {
-                                        content = `🎉 **Level Up!** {user} has reached level **{level}** via voice activity!`;
-                                    }
-
-                                    const messageData = buildMessage(
-                                        content,
-                                        config.levelUpMessageEmbed as any,
-                                        variables
-                                    );
-
-                                    if (messageData) {
-                                        await channel.send(messageData);
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // Reset join time even if no minutes (avoid stale state)
-                        await db.update(levelProfile)
-                            .set({ voiceJoinedAt: null })
-                            .where(eq(levelProfile.id, profile.id));
-                    }
+                // Retry once if a concurrent updater already moved the session anchor.
+                if (result.status === 'cas_conflict') {
+                    result = await processVoiceXpForMember({
+                        member,
+                        config,
+                        eligibleForXp: isEligibleForXp,
+                        finalizeSession: true,
+                        now: new Date()
+                    });
                 }
+
+                logger.debug(
+                    `Processed leave XP for ${member.user.tag}: status=${result.status}, `
+                    + `minutes=${result.minutesProcessed}, xp=${result.xpEarned}`
+                );
             }
-            // Handle Switch? 
-            // Ideally we treat switch as continuous or leave+join.
-            // Simplified: if channelId changes but both exist, do nothing? 
-            // Or updating timestamp?
-            // Current login: only handles distinct Join (null -> id) and Leave (id -> null).
-            // Switches (id -> id2) are ignored, so session continues accumulating time.
-            // This is acceptable for simple tracking.
+            // Handle Switch (channel change)
+            else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
+                const now = new Date();
+                let resultSummary = 'disabled';
+
+                if (isLevelingEnabled && config) {
+                    const humanCount = getHumanCountBeforeTransition(oldState, member.id);
+                    const isEligibleForXp = humanCount >= 2;
+
+                    const result = await processVoiceXpForMember({
+                        member,
+                        config,
+                        eligibleForXp: isEligibleForXp,
+                        finalizeSession: false,
+                        now
+                    });
+                    resultSummary = `status=${result.status}, minutes=${result.minutesProcessed}, xp=${result.xpEarned}`;
+                }
+
+                // Reset session anchor on new channel to avoid mixing channel eligibility windows.
+                await db.insert(levelProfile)
+                    .values({
+                        guildId: guild.id,
+                        userId: member.id,
+                        voiceJoinedAt: now
+                    })
+                    .onConflictDoUpdate({
+                        target: [levelProfile.guildId, levelProfile.userId],
+                        set: {
+                            voiceJoinedAt: now,
+                            updatedAt: now
+                        }
+                    });
+
+                logger.debug(
+                    `${member.user.tag} switched voice channels from ${oldState.channel?.name} `
+                    + `to ${newState.channel?.name} (${resultSummary})`
+                );
+            }
 
         } catch (error) {
             logger.error(`Error processing Voice XP for ${member.user.tag}: `, error);
         }
-    });
-}
+    }
+};
+
+export default event;

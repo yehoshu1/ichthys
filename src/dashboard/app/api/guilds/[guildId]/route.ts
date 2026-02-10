@@ -1,6 +1,7 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
+import { requireGuildManageAccess } from "@/lib/guild-auth";
+import logger from "../../../../lib/logger";
+import { discordCache, dedupeRequest } from "@/lib/discord-cache";
 
 interface DiscordGuild {
     id: string;
@@ -8,78 +9,143 @@ interface DiscordGuild {
     icon: string | null;
 }
 
+interface GuildResult {
+    id: string;
+    name: string;
+    icon: string | null;
+    iconUrl: string | null;
+    isBotMember: boolean;
+}
+
+async function fetchGuildData(guildId: string, auth: { accessToken: string }): Promise<GuildResult> {
+    const cacheKey = `guild:${guildId}`;
+    
+    // Check cache first
+    const cached = discordCache.get<GuildResult>(cacheKey);
+    if (cached) {
+        logger.info(`Cache hit for guild ${guildId}`);
+        return cached;
+    }
+
+    return dedupeRequest(cacheKey, async () => {
+        let guild: DiscordGuild | null = null;
+        let isBotMember = false;
+
+        // Try bot token first (higher rate limits)
+        const botToken = process.env.DISCORD_TOKEN;
+        if (botToken) {
+            try {
+                logger.info(`Trying bot token for guild ${guildId}`);
+                const botRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}`, {
+                    headers: { Authorization: `Bot ${botToken}` },
+                });
+                
+                if (botRes.ok) {
+                    guild = await botRes.json();
+                    isBotMember = true;
+                    logger.info(`Bot token succeeded for guild ${guildId}`);
+                } else {
+                    logger.warn(`Bot token failed: ${botRes.status}`, { guildId });
+                }
+            } catch (error) {
+                logger.error("Bot guild fetch failed", { error, guildId });
+            }
+        }
+
+        // Fallback to user token
+        if (!guild) {
+            try {
+                logger.info(`Trying user token for guild ${guildId}`);
+                const userRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}`, {
+                    headers: { Authorization: `Bearer ${auth.accessToken}` },
+                });
+
+                if (!userRes.ok) {
+                    if (userRes.status === 429) {
+                        const retryAfter = userRes.headers.get('retry-after');
+                        logger.warn("Rate limited", { guildId, retryAfter });
+                        throw new Error(`RATE_LIMIT:${retryAfter || '5'}`);
+                    }
+                    if (userRes.status === 403) {
+                        throw new Error("FORBIDDEN");
+                    }
+                    throw new Error(`HTTP_${userRes.status}`);
+                }
+
+                guild = await userRes.json();
+            } catch (error) {
+                if (error instanceof Error && error.message.startsWith("RATE_LIMIT:")) {
+                    throw error;
+                }
+                if (error instanceof Error && error.message === "FORBIDDEN") {
+                    throw error;
+                }
+                logger.error("User guild fetch failed", { error, guildId });
+                throw new Error("FETCH_FAILED");
+            }
+        }
+
+        if (!guild) {
+            throw new Error("NO_GUILD");
+        }
+
+        const result: GuildResult = {
+            id: guild.id,
+            name: guild.name,
+            icon: guild.icon,
+            iconUrl: guild.icon
+                ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png`
+                : null,
+            isBotMember,
+        };
+
+        // Cache for 30 seconds
+        discordCache.set(cacheKey, result, 30_000);
+        return result;
+    });
+}
+
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const guildId = params.guildId;
-    let guild: DiscordGuild | null = null;
-    let isBotMember = false;
+    
+    logger.info(`Fetching guild info for ${guildId}`);
+    
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) {
+        return auth.response;
+    }
 
-    // 1. Try fetching with Bot Token (Checks if Bot is in guild)
     try {
-        const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}`, {
-            headers: {
-                Authorization: `Bot ${process.env.DISCORD_TOKEN}`
-            }
-        });
-
-        if (res.ok) {
-            guild = await res.json();
-            isBotMember = true;
-        }
+        const result = await fetchGuildData(guildId, { accessToken: auth.accessToken });
+        return NextResponse.json(result);
     } catch (error) {
-        console.error("Bot guild fetch failed:", error);
-    }
-
-    // 2. If Bot check failed, try fetching with User Token (Checks if User is in guild)
-    if (!guild && (session as any).accessToken) {
-        try {
-            const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}`, {
-                headers: {
-                    Authorization: `Bearer ${(session as any).accessToken}`
-                }
-            });
-
-            if (res.ok) {
-                guild = await res.json();
-                isBotMember = false;
-            } else {
-                console.warn(`User guild fetch failed with status: ${res.status}`);
-                if (res.status === 404 || res.status === 403 || res.status === 401) {
-                    // User is not in the server or doesn't have access
-                    // We treat 401 as 404 here because accessing /guilds/{id} with a token for a user NOT in the guild
-                    // sometimes returns 401 instead of 404/403.
-                    return NextResponse.json({ error: "Guild not found or access denied" }, { status: 404 });
-                }
-                // For other errors (429, 500, etc.), we'll fall through to the final check
+        if (error instanceof Error) {
+            if (error.message.startsWith("RATE_LIMIT:")) {
+                const retryAfter = error.message.split(":")[1];
+                return NextResponse.json(
+                    { error: "Rate limited. Please try again." },
+                    { status: 429, headers: { 'Retry-After': retryAfter } }
+                );
             }
-        } catch (error) {
-            console.error("User guild fetch failed:", error);
-            // Network error - fall through to final check
+            if (error.message === "FORBIDDEN") {
+                return NextResponse.json(
+                    { error: "No access to this server" },
+                    { status: 403 }
+                );
+            }
+            if (error.message === "NO_GUILD" || error.message === "FETCH_FAILED") {
+                return NextResponse.json(
+                    { error: "Bot not in server" },
+                    { status: 404 }
+                );
+            }
         }
-    } else if (!guild && !(session as any).accessToken) {
-        console.warn("No access token in session for guild check");
-        return NextResponse.json({ error: "Unauthorized (No Token)" }, { status: 401 });
+        
+        logger.error("Failed to fetch guild", { error, guildId });
+        return NextResponse.json(
+            { error: "Failed to fetch guild information" },
+            { status: 503 }
+        );
     }
-
-    if (!guild) {
-        // If we reached here, it means we couldn't get guild info from Bot OR User
-        // This could be due to network errors or rate limiting
-        // Return 503 (Service Unavailable) instead of 500 to indicate temporary issue
-        return NextResponse.json({
-            error: "Unable to fetch guild information. Please try again later."
-        }, { status: 503 });
-    }
-
-    return NextResponse.json({
-        id: guild.id,
-        name: guild.name,
-        icon: guild.icon,
-        iconUrl: guild.icon
-            ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png`
-            : null,
-        isBotMember
-    });
 }

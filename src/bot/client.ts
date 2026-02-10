@@ -1,6 +1,7 @@
-import { Client, GatewayIntentBits, Events, Collection } from 'discord.js';
+import { Client, GatewayIntentBits, Events, Collection, Partials } from 'discord.js';
 import logger from './utils/logger';
 import { guildConfigService } from './services/guildConfigService';
+import { setBotClient } from '../dashboard/lib/bot-client';
 
 // Create Discord client with required intents
 export const client = new Client({
@@ -8,9 +9,16 @@ export const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildPresences,
+    ],
+    partials: [
+        Partials.Message,
+        Partials.Channel,
+        Partials.Reaction,
+        Partials.User,
     ],
 });
 
@@ -21,6 +29,9 @@ client.commands = new Collection();
 client.once(Events.ClientReady, async (readyClient) => {
     logger.info(`✅ Bot is ready! Logged in as ${readyClient.user.tag}`);
     logger.info(`📊 Serving ${readyClient.guilds.cache.size} guilds`);
+
+    // Set bot client reference for dashboard API access
+    setBotClient(readyClient);
 
     // Set bot status
     readyClient.user.setPresence({
@@ -37,6 +48,7 @@ client.once(Events.ClientReady, async (readyClient) => {
             logger.error(`Failed to initialize config for guild ${guild.id}:`, error);
         }
     }
+
 });
 
 // Guild Create event - bot joins a server

@@ -1,18 +1,19 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { actionLog } from "@/lib/db";
 import { and, desc, eq, sql } from "drizzle-orm";
+import { requireGuildManageAccess } from "@/lib/guild-auth";
+import { clampLimit } from "@/lib/validation";
+import { getDiscordUsers } from "@/lib/discord-user-cache";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageAccess(params.guildId, req);
+    if ("response" in auth) return auth.response;
 
     const { searchParams } = new URL(req.url);
-    const limitParam = Number(searchParams.get("limit") || 10);
-    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 10;
+    const limit = clampLimit(searchParams.get("limit"), 10, 1, 50);
 
     try {
         const kicks = await db
@@ -30,39 +31,20 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             .orderBy(desc(actionLog.executedAt))
             .limit(limit);
 
-        const token = process.env.DISCORD_TOKEN;
-        const members = await Promise.all(kicks.map(async (kick) => {
-            let username = `User ${kick.targetUserId.slice(0, 4)}...`;
-            let avatar: string | null = null;
-
-            if (token) {
-                try {
-                    const res = await fetch(`https://discord.com/api/v10/users/${kick.targetUserId}`, {
-                        headers: { Authorization: `Bot ${token}` }
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        username = data.username || username;
-                        avatar = data.avatar
-                            ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png`
-                            : null;
-                    }
-                } catch (error) {
-                    // Ignore lookup errors and fall back to ID.
-                }
-            }
-
+        const usersMap = await getDiscordUsers(kicks.map((kick) => kick.targetUserId));
+        const members = kicks.map((kick) => {
+            const user = usersMap.get(kick.targetUserId);
             return {
                 userId: kick.targetUserId,
-                username,
-                avatar,
-                executedAt: kick.executedAt
+                username: user?.globalName || user?.username || `User ${kick.targetUserId.slice(0, 4)}...`,
+                avatar: user?.avatarUrl || null,
+                executedAt: kick.executedAt,
             };
-        }));
+        });
 
         return NextResponse.json(members);
     } catch (error) {
-        console.error("Error fetching auto-kicked users:", error);
+        logger.error("Error fetching auto-kicked users", { error: error instanceof Error ? error.message : String(error), guildId: params.guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

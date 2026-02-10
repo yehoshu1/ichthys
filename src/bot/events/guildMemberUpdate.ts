@@ -1,18 +1,21 @@
-import { Events, GuildMember, PartialGuildMember, TextChannel, EmbedBuilder } from 'discord.js';
-import client from '../client';
+import { Events, GuildMember, PartialGuildMember, TextChannel } from 'discord.js';
+import type { Event } from '../types/Event';
 import logger from '../utils/logger';
 import { db } from '../../shared/database/client';
-import { welcomeTrigger, messageTemplate, userJoin, guildConfig, userBoost, roleAction, actionLog, verificationMessageRule } from '../../shared/database/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { welcomeTrigger, messageTemplate, userJoin, guildConfig, userBoost, roleAction, actionLog, verificationMessageRule, scheduledRoleAction } from '../../shared/database/schema';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import { buildMessage } from '../utils/embeds';
 
-export default function setupGuildMemberUpdateHandler() {
-    client.on(Events.GuildMemberUpdate, async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember) => {
+const event: Event<Events.GuildMemberUpdate> = {
+    name: Events.GuildMemberUpdate,
+    async execute(oldMember: GuildMember | PartialGuildMember, newMember: GuildMember) {
         // Find added and removed roles
         const oldRoles = oldMember.roles.cache;
         const newRoles = newMember.roles.cache;
         const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
         const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
+        const addedRoleIds = Array.from(addedRoles.keys());
+        const removedRoleIds = Array.from(removedRoles.keys());
         let verificationConfig = null;
         let verificationProfiles: Array<typeof verificationMessageRule.$inferSelect> = [];
 
@@ -57,22 +60,37 @@ export default function setupGuildMemberUpdateHandler() {
             }
 
             // Check for Role Actions (REMOVE)
-            for (const [roleId, role] of removedRoles) {
+            if (removedRoleIds.length > 0) {
                 try {
-                    const actions = await db.query.roleAction.findMany({
+                    const removeActions = await db.query.roleAction.findMany({
                         where: and(
                             eq(roleAction.guildId, newMember.guild.id),
-                            eq(roleAction.roleId, roleId),
+                            inArray(roleAction.roleId, removedRoleIds),
                             eq(roleAction.enabled, true),
                             eq(roleAction.triggerType, 'REMOVE')
                         )
                     });
 
-                    for (const action of actions) {
-                        await executeRoleAction(newMember, action);
+                    const removeActionsByRole = new Map<string, Array<typeof roleAction.$inferSelect>>();
+                    for (const action of removeActions) {
+                        const current = removeActionsByRole.get(action.roleId) || [];
+                        current.push(action);
+                        removeActionsByRole.set(action.roleId, current);
+                    }
+
+                    for (const roleId of removedRoleIds) {
+                        const role = removedRoles.get(roleId);
+                        const actions = removeActionsByRole.get(roleId) || [];
+                        for (const action of actions) {
+                            await executeRoleAction(newMember, action);
+                        }
+
+                        if (actions.length > 0 && role) {
+                            logger.debug(`Processed ${actions.length} remove action(s) for role ${role.name} in ${newMember.guild.name}`);
+                        }
                     }
                 } catch (error) {
-                    logger.error(`Error processing role action (remove) for role ${role.name}:`, error);
+                    logger.error('Error processing role actions (remove batch):', error);
                 }
             }
         }
@@ -130,10 +148,12 @@ export default function setupGuildMemberUpdateHandler() {
                 }
             }
 
-            for (const [roleId, role] of addedRoles) {
+            if (addedRoleIds.length > 0) {
+                let triggersByRole = new Map<string, Array<{ trigger: typeof welcomeTrigger.$inferSelect; template: typeof messageTemplate.$inferSelect }>>();
+                let addActionsByRole = new Map<string, Array<typeof roleAction.$inferSelect>>();
+
                 try {
-                    // Check for triggers for this role in this guild (Welcome System)
-                    const triggers = await db.select({
+                    const triggerRows = await db.select({
                         trigger: welcomeTrigger,
                         template: messageTemplate
                     })
@@ -141,36 +161,61 @@ export default function setupGuildMemberUpdateHandler() {
                         .innerJoin(messageTemplate, eq(welcomeTrigger.templateId, messageTemplate.id))
                         .where(and(
                             eq(welcomeTrigger.guildId, newMember.guild.id),
-                            eq(welcomeTrigger.roleId, roleId),
+                            inArray(welcomeTrigger.roleId, addedRoleIds),
                             eq(welcomeTrigger.enabled, true)
                         ));
 
-                    if (triggers.length > 0) {
-                        logger.info(`Found ${triggers.length} welcome trigger(s) for role ${role.name} in guild ${newMember.guild.name}`);
-                        for (const { trigger, template } of triggers) {
-                            await sendWelcomeMessage(newMember, trigger, template);
-                        }
+                    for (const row of triggerRows) {
+                        const current = triggersByRole.get(row.trigger.roleId) || [];
+                        current.push(row);
+                        triggersByRole.set(row.trigger.roleId, current);
                     }
                 } catch (error) {
-                    logger.error(`Error processing welcome trigger for role ${role.name}:`, error);
+                    logger.error('Error loading welcome triggers for added roles:', error);
                 }
 
-                // Check for Role Actions (ADD)
                 try {
-                    const actions = await db.query.roleAction.findMany({
+                    const addActions = await db.query.roleAction.findMany({
                         where: and(
                             eq(roleAction.guildId, newMember.guild.id),
-                            eq(roleAction.roleId, roleId),
+                            inArray(roleAction.roleId, addedRoleIds),
                             eq(roleAction.enabled, true),
                             eq(roleAction.triggerType, 'ADD')
                         )
                     });
 
-                    for (const action of actions) {
-                        await executeRoleAction(newMember, action);
+                    for (const action of addActions) {
+                        const current = addActionsByRole.get(action.roleId) || [];
+                        current.push(action);
+                        addActionsByRole.set(action.roleId, current);
                     }
                 } catch (error) {
-                    logger.error(`Error processing role action (add) for role ${role.name}:`, error);
+                    logger.error('Error loading role actions for added roles:', error);
+                }
+
+                for (const roleId of addedRoleIds) {
+                    const role = addedRoles.get(roleId);
+                    const triggers = triggersByRole.get(roleId) || [];
+                    const actions = addActionsByRole.get(roleId) || [];
+
+                    try {
+                        for (const { trigger, template } of triggers) {
+                            await sendWelcomeMessage(newMember, trigger, template);
+                        }
+                        if (triggers.length > 0 && role) {
+                            logger.info(`Processed ${triggers.length} welcome trigger(s) for role ${role.name} in guild ${newMember.guild.name}`);
+                        }
+                    } catch (error) {
+                        logger.error(`Error processing welcome triggers for role ${role?.name || roleId}:`, error);
+                    }
+
+                    try {
+                        for (const action of actions) {
+                            await executeRoleAction(newMember, action);
+                        }
+                    } catch (error) {
+                        logger.error(`Error processing role actions (add) for role ${role?.name || roleId}:`, error);
+                    }
                 }
             }
         }
@@ -203,8 +248,8 @@ export default function setupGuildMemberUpdateHandler() {
                 logger.error('Error updating user boost on removal:', error);
             }
         }
-    });
-}
+    }
+};
 
 async function handleBoost(member: GuildMember, boostDate: Date, type: 'new' | 'reboost') {
     try {
@@ -281,15 +326,6 @@ async function executeRoleAction(member: GuildMember, action: typeof roleAction.
 
     const runAction = async () => {
         try {
-            // Verify member still has the role (if it's a delay)
-            if (delayMs > 0) {
-                const refreshedMember = await member.guild.members.fetch(member.id).catch(() => null);
-                if (!refreshedMember || !refreshedMember.roles.cache.has(action.roleId)) {
-                    logger.info(`Skipping role action ${action.id} for ${member.user.tag} - role removed before delay.`);
-                    return;
-                }
-            }
-
             let success = true;
             let errorMessage = null;
 
@@ -376,11 +412,20 @@ async function executeRoleAction(member: GuildMember, action: typeof roleAction.
     };
 
     if (delayMs > 0) {
-        setTimeout(runAction, delayMs);
-        logger.info(`Scheduled ${action.actionType} action for ${member.user.tag} in ${delayMs}ms`);
-    } else {
-        await runAction();
+        const executeAt = new Date(Date.now() + delayMs);
+        await db.insert(scheduledRoleAction).values({
+            guildId: member.guild.id,
+            actionId: action.id,
+            userId: member.id,
+            executeAt,
+            status: 'PENDING',
+            updatedAt: new Date()
+        });
+        logger.info(`Queued ${action.actionType} action for ${member.user.tag} at ${executeAt.toISOString()}`);
+        return;
     }
+
+    await runAction();
 }
 
 async function sendWelcomeMessage(
@@ -398,13 +443,6 @@ async function sendWelcomeMessage(
             'time': new Date().toLocaleTimeString(),
         };
 
-        // Prefer embedData, fallback to legacy columns if embedData is empty but legacy columns exist (optional migration step, but keeping it simple for now)
-        // Actually, let's just use what's available. If embedData is present, use it.
-        // If not, maybe constructing a temporary EmbedConfig from legacy columns?
-        // Given the task is about standardizing, and I haven't migrated data, I should probably check if embedData is populated.
-        // If the user hasn't saved the form yet with the new editor, embedData might be null.
-        // If template.embedData is null, attempt to construct from legacy columns.
-
         let embedData: any = template.embedData;
 
         if (!embedData && template.embedEnabled) {
@@ -413,16 +451,8 @@ async function sendWelcomeMessage(
                 title: template.embedTitle,
                 description: template.embedDescription,
                 color: template.embedColor,
-                thumbnail: template.embedThumbnail ? { url: '{user_avatar}' } : undefined, // Just a flag
-                // Note: The logic for thumbnail was explicitly member.user.displayAvatarURL() in old code.
-                // My buildMessage uses string urls.
+                thumbnail: template.embedThumbnail ? { url: '{user_avatar}' } : undefined,
             };
-            // This fallback is tricky because buildMessage expects strings for urls.
-            // I'll stick to using the new system and assume users update their templates or new templates use the new system.
-            // OR I can map legacy fields correctly.
-            // Actually, `messageTemplate` table schema showed `embedData` added.
-            // I'll use `template.embedData` directly. If it's missing, no embed (unless I want to support legacy).
-            // Supporting legacy is safer.
         }
 
         const messageData = buildMessage(template.content, embedData, variables);
@@ -451,3 +481,5 @@ async function sendWelcomeMessage(
         logger.error(`Failed to send welcome message to ${member.user.tag}:`, error);
     }
 }
+
+export default event;

@@ -1,7 +1,7 @@
 
 import { db } from "./src/shared/database/client";
 import { guildConfig, userJoin } from "./src/shared/database/schema";
-import { eq, count } from "drizzle-orm";
+import { count } from "drizzle-orm";
 
 async function run() {
     try {

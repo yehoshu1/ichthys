@@ -1,21 +1,31 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { roleAction } from "@/lib/db";
+import { db, roleAction } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
+import { z } from "zod";
+import { requireGuildManageAccess, requireGuildManageRolesAccess } from "@/lib/guild-auth";
+import { discordIdSchema, nullableDiscordIdSchema, optionalEmbedSchema, optionalTextSchema, parseJsonBody } from "@/lib/validation";
+import logger from "@/lib/logger";
 
-async function checkAuth(req: NextRequest) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return null;
-    return session;
-}
+const roleActionSchema = z.object({
+    id: z.string().trim().min(1).optional(),
+    roleId: discordIdSchema,
+    triggerType: z.enum(["ADD", "REMOVE"]).optional(),
+    actionType: z.enum(["DM", "KICK", "LOG", "MSG", "MESSAGE"]),
+    actionGroup: z.union([z.string().trim().min(1).max(100), z.null()]).optional(),
+    actionDelay: z.number().int().min(0).max(10080).optional(),
+    dmMessage: optionalTextSchema,
+    dmMessageEmbed: optionalEmbedSchema,
+    channelId: nullableDiscordIdSchema,
+    kickReason: optionalTextSchema,
+    logChannelId: nullableDiscordIdSchema,
+    enabled: z.boolean().optional(),
+}).strict();
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) return auth.response;
 
     try {
         const actions = await db.select()
@@ -23,7 +33,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             .where(eq(roleAction.guildId, guildId));
         return NextResponse.json(actions);
     } catch (error) {
-        console.error("Error fetching role actions:", error);
+        logger.error("Error fetching role actions", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -31,57 +41,53 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
 export async function POST(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageRolesAccess(guildId, req);
+    if ("response" in auth) return auth.response;
+
+    const parsed = await parseJsonBody(req, roleActionSchema);
+    if (!parsed.success) return parsed.response;
 
     try {
-        const body = await req.json();
-        const { id, roleId, triggerType, actionType, actionGroup, actionDelay, dmMessage, dmMessageEmbed, channelId, kickReason, logChannelId, enabled } = body;
+        const body = parsed.data;
 
-        if (!roleId || !actionType) {
-            return NextResponse.json({ error: "Role and Action Type are required" }, { status: 400 });
-        }
-
-        if (id) {
-            // Update
+        if (body.id) {
             const updated = await db.update(roleAction)
                 .set({
-                    roleId,
-                    triggerType: triggerType || 'ADD',
-                    actionType,
-                    actionGroup: actionGroup || null,
-                    actionDelay: actionDelay || 0,
-                    dmMessage,
-                    dmMessageEmbed, // <--- Added
-                    channelId,
-                    kickReason,
-                    logChannelId,
-                    enabled: enabled ?? true,
-                    updatedAt: new Date()
+                    roleId: body.roleId,
+                    triggerType: body.triggerType || "ADD",
+                    actionType: body.actionType,
+                    actionGroup: body.actionGroup || null,
+                    actionDelay: body.actionDelay || 0,
+                    dmMessage: body.dmMessage || null,
+                    dmMessageEmbed: body.dmMessageEmbed || null,
+                    channelId: body.channelId || null,
+                    kickReason: body.kickReason || null,
+                    logChannelId: body.logChannelId || null,
+                    enabled: body.enabled ?? true,
+                    updatedAt: new Date(),
                 })
-                .where(and(eq(roleAction.id, id), eq(roleAction.guildId, guildId)))
+                .where(and(eq(roleAction.id, body.id), eq(roleAction.guildId, guildId)))
                 .returning();
             return NextResponse.json(updated[0]);
-        } else {
-            // Create
-            const inserted = await db.insert(roleAction).values({
-                guildId,
-                roleId,
-                triggerType: triggerType || 'ADD',
-                actionType,
-                actionGroup: actionGroup || null,
-                actionDelay: actionDelay || 0,
-                dmMessage,
-                dmMessageEmbed, // <--- Added
-                channelId,
-                kickReason,
-                logChannelId,
-                enabled: enabled ?? true,
-            }).returning();
-            return NextResponse.json(inserted[0]);
         }
+
+        const inserted = await db.insert(roleAction).values({
+            guildId,
+            roleId: body.roleId,
+            triggerType: body.triggerType || "ADD",
+            actionType: body.actionType,
+            actionGroup: body.actionGroup || null,
+            actionDelay: body.actionDelay || 0,
+            dmMessage: body.dmMessage || null,
+            dmMessageEmbed: body.dmMessageEmbed || null,
+            channelId: body.channelId || null,
+            kickReason: body.kickReason || null,
+            logChannelId: body.logChannelId || null,
+            enabled: body.enabled ?? true,
+        }).returning();
+        return NextResponse.json(inserted[0]);
     } catch (error) {
-        console.error("Error saving role action:", error);
+        logger.error("Error saving role action", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -89,8 +95,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
 export async function DELETE(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    const session = await checkAuth(req);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageRolesAccess(guildId, req);
+    if ("response" in auth) return auth.response;
 
     try {
         const { searchParams } = new URL(req.url);
@@ -103,7 +109,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ guildI
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("Error deleting role action:", error);
+        logger.error("Error deleting role action", { error: error instanceof Error ? error.message : String(error), guildId });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

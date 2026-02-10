@@ -6,16 +6,58 @@ services:
     container_name: ixoye-dev
     restart: no
     ports:
-      - "3000:3000"
+      - "4000:4000"
     volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/src/dashboard/.next
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./tsconfig.bot.json:/app/tsconfig.bot.json
+      - ./next.config.js:/app/next.config.js
+      - ./tailwind.config.ts:/app/tailwind.config.ts
+      - ./postcss.config.js:/app/postcss.config.js
+      - ixoye_node_modules:/app/node_modules
+      - ixoye_backups:/app/backups
     env_file:
       - .env
     environment:
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
       - DATABASE_URL=file:/app/data/ixoye.db
-    # Ensure data directory exists
-    command: sh -c "mkdir -p /app/data && npm run dev:all"
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+          ignore:
+            - node_modules
+            - .next
+            - dist
+        - action: sync
+          path: ./scripts
+          target: /app/scripts
+        - action: sync
+          path: ./tsconfig.json
+          target: /app/tsconfig.json
+        - action: sync
+          path: ./tsconfig.bot.json
+          target: /app/tsconfig.bot.json
+        - action: rebuild
+          path: ./next.config.js
+        - action: rebuild
+          path: ./tailwind.config.ts
+        - action: rebuild
+          path: ./postcss.config.js
+        - action: rebuild
+          path: ./package.json
+        - action: rebuild
+          path: ./package-lock.json
+        - action: rebuild
+          path: ./Dockerfile
+
+volumes:
+  ixoye_node_modules:
+  ixoye_backups:

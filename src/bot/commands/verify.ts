@@ -27,6 +27,15 @@ export const verify: Command = {
     async execute(interaction) {
         await interaction.deferReply({ ephemeral: true });
 
+        // Check bot permissions
+        const botMember = interaction.guild?.members.me;
+        if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+            await interaction.editReply({
+                content: '❌ I need **Manage Roles** permission to verify users. Please check my permissions.'
+            });
+            return;
+        }
+
         try {
             const member = interaction.options.getMember('user') as GuildMember;
             const profileNameInput = interaction.options.getString('profile');

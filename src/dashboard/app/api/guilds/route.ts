@@ -1,6 +1,10 @@
-import { getServerSession } from "next-auth";
-import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@shared/database/client";
+import { guildConfig } from "@shared/database/schema";
+import { inArray } from "drizzle-orm";
+import { requireSession } from "@/lib/guild-auth";
+import logger from "@/lib/logger";
+import { discordCache, dedupeRequest } from "@/lib/discord-cache";
 
 // Discord API permissions
 const MANAGE_GUILD = 0x20;
@@ -22,48 +26,93 @@ export interface Guild {
     botPresent: boolean;
 }
 
-export async function GET() {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.accessToken) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+async function fetchUserGuilds(accessToken: string, userId: string): Promise<Guild[]> {
+    const cacheKey = `guilds:${userId}`;
+    
+    // Check cache first
+    const cached = discordCache.get<Guild[]>(cacheKey);
+    if (cached) {
+        logger.info(`Cache hit for user guilds ${userId}`);
+        return cached;
     }
 
-    try {
-        // Fetch user's guilds from Discord API
+    return dedupeRequest(cacheKey, async () => {
         const response = await fetch("https://discord.com/api/v10/users/@me/guilds", {
-            headers: {
-                Authorization: `Bearer ${session.accessToken}`,
-            },
+            headers: { Authorization: `Bearer ${accessToken}` },
         });
 
         if (!response.ok) {
-            console.error("Discord API error:", response.status, await response.text());
-            return NextResponse.json({ error: "Failed to fetch guilds" }, { status: 500 });
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('retry-after');
+                logger.warn("Rate limited on guilds list", { retryAfter });
+                throw new Error(`RATE_LIMIT:${retryAfter || '5'}`);
+            }
+            const errorText = await response.text();
+            logger.error("Discord API error", { status: response.status, error: errorText });
+            throw new Error(`DISCORD_API_${response.status}`);
         }
 
         const discordGuilds: DiscordGuild[] = await response.json();
 
-        // Filter and transform guilds
-        const guilds: Guild[] = discordGuilds
-            .filter((guild) => {
-                const permissions = BigInt(guild.permissions);
-                return guild.owner || (permissions & BigInt(MANAGE_GUILD)) !== BigInt(0);
-            })
-            .map((guild) => ({
-                id: guild.id,
-                name: guild.name,
-                icon: guild.icon,
-                iconUrl: guild.icon
-                    ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.${guild.icon.startsWith("a_") ? "gif" : "png"}`
-                    : null,
-                hasManagePermission: true,
-                botPresent: false, // TODO: Check if bot is in guild via database
-            }));
+        // Filter guilds where user has manage permission
+        const manageableGuilds = discordGuilds.filter((guild) => {
+            const permissions = BigInt(guild.permissions);
+            return guild.owner || (permissions & BigInt(MANAGE_GUILD)) !== BigInt(0);
+        });
 
+        // Get guild IDs to check which ones have the bot
+        const guildIds = manageableGuilds.map((g) => g.id);
+
+        // Check database for guild configs (indicates bot is present)
+        const botGuildConfigs = guildIds.length > 0
+            ? await db
+                .select({ guildId: guildConfig.guildId })
+                .from(guildConfig)
+                .where(inArray(guildConfig.guildId, guildIds))
+            : [];
+
+        const botGuildIds = new Set(botGuildConfigs.map((g) => g.guildId));
+
+        // Transform guilds with bot presence info
+        const guilds: Guild[] = manageableGuilds.map((guild) => ({
+            id: guild.id,
+            name: guild.name,
+            icon: guild.icon,
+            iconUrl: guild.icon
+                ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.${guild.icon.startsWith("a_") ? "gif" : "png"}`
+                : null,
+            hasManagePermission: true,
+            botPresent: botGuildIds.has(guild.id),
+        }));
+
+        // Cache for 30 seconds
+        discordCache.set(cacheKey, guilds, 30_000);
+        return guilds;
+    });
+}
+
+export async function GET(req: NextRequest) {
+    const sessionResult = await requireSession(req);
+    if ("response" in sessionResult) return sessionResult.response;
+
+    try {
+        const guilds = await fetchUserGuilds(sessionResult.accessToken, sessionResult.userId);
         return NextResponse.json(guilds);
     } catch (error) {
-        console.error("Error fetching guilds:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        if (error instanceof Error) {
+            if (error.message.startsWith("RATE_LIMIT:")) {
+                const retryAfter = error.message.split(":")[1];
+                return NextResponse.json(
+                    { error: "Rate limited by Discord. Please try again." },
+                    { status: 429, headers: { 'Retry-After': retryAfter } }
+                );
+            }
+        }
+        
+        logger.error("Error fetching guilds", { error });
+        return NextResponse.json(
+            { error: "Failed to fetch guilds from Discord" },
+            { status: 500 }
+        );
     }
 }

@@ -1,25 +1,32 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { db, guildConfig } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { requireGuildManageAccess, requireGuildManageRolesAccess } from "@/lib/guild-auth";
+import { nullableDiscordIdSchema, optionalEmbedSchema, optionalTextSchema, parseJsonBody } from "@/lib/validation";
+import { sanitizeMessageContent, sanitizeEmbedData } from "@/lib/sanitize";
 
-async function checkAuth(req: NextRequest) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return null;
-    return session;
-}
+const welcomeConfigSchema = z.object({
+    welcomeEnabled: z.boolean().optional(),
+    autoRoleId: nullableDiscordIdSchema,
+    joinMessageChannelId: nullableDiscordIdSchema,
+    joinMessage: optionalTextSchema,
+    joinMessageEmbed: optionalEmbedSchema,
+    leaveMessageChannelId: nullableDiscordIdSchema,
+    leaveMessage: optionalTextSchema,
+    leaveMessageEmbed: optionalEmbedSchema,
+}).strict();
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const { guildId } = params;
 
-    const session = await checkAuth(req);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageAccess(guildId, req);
+    if ("response" in auth) return auth.response;
 
     try {
         const config = await db.query.guildConfig.findFirst({
-            where: eq(guildConfig.guildId, guildId)
+            where: eq(guildConfig.guildId, guildId),
         });
 
         if (!config) {
@@ -29,7 +36,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
                 joinMessageChannelId: null,
                 joinMessage: null,
                 leaveMessageChannelId: null,
-                leaveMessage: null
+                leaveMessage: null,
             });
         }
 
@@ -38,12 +45,11 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             autoRoleId: config.autoRoleId,
             joinMessageChannelId: config.joinMessageChannelId,
             joinMessage: config.joinMessage,
-            joinMessageEmbed: config.joinMessageEmbed,     // <--- Added
+            joinMessageEmbed: config.joinMessageEmbed,
             leaveMessageChannelId: config.leaveMessageChannelId,
             leaveMessage: config.leaveMessage,
-            leaveMessageEmbed: config.leaveMessageEmbed    // <--- Added
+            leaveMessageEmbed: config.leaveMessageEmbed,
         });
-
     } catch (error) {
         console.error("Error fetching welcome config:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -54,52 +60,49 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
     const params = await props.params;
     const { guildId } = params;
 
-    const session = await checkAuth(req);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireGuildManageRolesAccess(guildId, req);
+    if ("response" in auth) return auth.response;
+
+    const parsed = await parseJsonBody(req, welcomeConfigSchema);
+    if (!parsed.success) return parsed.response;
 
     try {
-        const body = await req.json();
-        const {
-            welcomeEnabled,
-            autoRoleId,
-            joinMessageChannelId,
-            joinMessage,
-            joinMessageEmbed,     // <--- Added
-            leaveMessageChannelId,
-            leaveMessage,
-            leaveMessageEmbed     // <--- Added
-        } = body;
+        const body = parsed.data;
 
-        // Upsert configuration
+        // Sanitize message content and embeds
+        const sanitizedJoinMessage = body.joinMessage ? sanitizeMessageContent(body.joinMessage) : null;
+        const sanitizedLeaveMessage = body.leaveMessage ? sanitizeMessageContent(body.leaveMessage) : null;
+        const sanitizedJoinEmbed = body.joinMessageEmbed ? sanitizeEmbedData(body.joinMessageEmbed) : null;
+        const sanitizedLeaveEmbed = body.leaveMessageEmbed ? sanitizeEmbedData(body.leaveMessageEmbed) : null;
+
         await db.insert(guildConfig)
             .values({
                 guildId,
-                welcomeEnabled: welcomeEnabled ?? false,
-                autoRoleId: autoRoleId || null,
-                joinMessageChannelId: joinMessageChannelId || null,
-                joinMessage: joinMessage || null,
-                joinMessageEmbed: joinMessageEmbed || null,     // <--- Added
-                leaveMessageChannelId: leaveMessageChannelId || null,
-                leaveMessage: leaveMessage || null,
-                leaveMessageEmbed: leaveMessageEmbed || null    // <--- Added
+                welcomeEnabled: body.welcomeEnabled ?? false,
+                autoRoleId: body.autoRoleId || null,
+                joinMessageChannelId: body.joinMessageChannelId || null,
+                joinMessage: sanitizedJoinMessage,
+                joinMessageEmbed: sanitizedJoinEmbed,
+                leaveMessageChannelId: body.leaveMessageChannelId || null,
+                leaveMessage: sanitizedLeaveMessage,
+                leaveMessageEmbed: sanitizedLeaveEmbed,
             })
             .onConflictDoUpdate({
                 target: guildConfig.guildId,
                 set: {
-                    welcomeEnabled: welcomeEnabled ?? false,
-                    autoRoleId: autoRoleId || null,
-                    joinMessageChannelId: joinMessageChannelId || null,
-                    joinMessage: joinMessage || null,
-                    joinMessageEmbed: joinMessageEmbed || null,     // <--- Added
-                    leaveMessageChannelId: leaveMessageChannelId || null,
-                    leaveMessage: leaveMessage || null,
-                    leaveMessageEmbed: leaveMessageEmbed || null,    // <--- Added
-                    updatedAt: new Date()
-                }
+                    welcomeEnabled: body.welcomeEnabled ?? false,
+                    autoRoleId: body.autoRoleId || null,
+                    joinMessageChannelId: body.joinMessageChannelId || null,
+                    joinMessage: sanitizedJoinMessage,
+                    joinMessageEmbed: sanitizedJoinEmbed,
+                    leaveMessageChannelId: body.leaveMessageChannelId || null,
+                    leaveMessage: sanitizedLeaveMessage,
+                    leaveMessageEmbed: sanitizedLeaveEmbed,
+                    updatedAt: new Date(),
+                },
             });
 
         return NextResponse.json({ success: true });
-
     } catch (error) {
         console.error("Error updating welcome config:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

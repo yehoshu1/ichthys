@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { DM_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "../components/AuthProvider";
+import { ErrorBoundary } from "../components/ErrorBoundary";
+import { Toaster } from "sonner";
 
 const dmSans = DM_Sans({
     subsets: ["latin"],
@@ -40,7 +42,12 @@ export default function RootLayout({
                 <script dangerouslySetInnerHTML={{ __html: themeScript }} />
             </head>
             <body className={`${dmSans.variable} ${spaceGrotesk.variable}`}>
-                <AuthProvider>{children}</AuthProvider>
+                <AuthProvider>
+                    <ErrorBoundary>
+                        {children}
+                        <Toaster richColors theme="system" />
+                    </ErrorBoundary>
+                </AuthProvider>
             </body>
         </html>
     );

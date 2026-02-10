@@ -1,4 +1,4 @@
-import { GuildMember, TextChannel } from 'discord.js';
+import { GuildMember } from 'discord.js';
 import { db } from '../../shared/database/client';
 import { levelReward } from '../../shared/database/schema';
 import { eq, and, lte } from 'drizzle-orm';

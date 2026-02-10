@@ -41,6 +41,14 @@ export const boost: Command = {
 
         if (subcommand === 'setup') {
             await interaction.deferReply({ ephemeral: true });
+
+            // Check bot permissions
+            const botMember = interaction.guild?.members.me;
+            if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+                await interaction.editReply('❌ I need **Manage Roles** permission to create and manage boost reward roles.');
+                return;
+            }
+
             const guildId = interaction.guildId!;
             const roleName = interaction.options.getString('role_name', true);
             const primaryColor = interaction.options.getString('primary_color', true);
@@ -120,6 +128,14 @@ export const boost: Command = {
 
         if (subcommand === 'claim') {
             await interaction.deferReply({ ephemeral: true });
+
+            // Check bot permissions
+            const botMember = interaction.guild?.members.me;
+            if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+                await interaction.editReply('❌ I need **Manage Roles** permission to assign boost reward roles.');
+                return;
+            }
+
             const guildId = interaction.guildId!;
             const member = interaction.member as any;
             const guild = interaction.guild!;
@@ -176,6 +192,9 @@ export const boost: Command = {
             const guildId = interaction.guildId!;
             const userId = interaction.user.id;
             const member = interaction.member as any;
+
+            // Defer reply for database operations
+            await interaction.deferReply({ ephemeral: true });
 
             try {
                 const config = await db.query.guildConfig.findFirst({
@@ -247,11 +266,11 @@ export const boost: Command = {
                     inline: false
                 });
 
-                await interaction.reply({ embeds: [embed], ephemeral: true });
+                await interaction.editReply({ embeds: [embed] });
 
             } catch (error) {
                 console.error('Error checking boost status:', error);
-                await interaction.reply({ content: 'An error occurred while checking your boost status.', ephemeral: true });
+                await interaction.editReply({ content: 'An error occurred while checking your boost status.' });
             }
         }
     }

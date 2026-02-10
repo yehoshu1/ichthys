@@ -15,12 +15,16 @@ export const setup: Command = {
             return;
         }
 
-        const config = await guildConfigService.getGuildConfig(interaction.guild.id);
-        const panel = buildSetupPanel(interaction.guild, config, 'toggles');
+        // Defer reply for database operation
+        await interaction.deferReply({ ephemeral: true });
 
-        await interaction.reply({
-            ...panel,
-            ephemeral: true,
-        });
+        try {
+            const config = await guildConfigService.getGuildConfig(interaction.guild.id);
+            const panel = buildSetupPanel(interaction.guild, config, 'toggles');
+
+            await interaction.editReply(panel);
+        } catch (error) {
+            await interaction.editReply('An error occurred while loading the setup panel.');
+        }
     }
 };
