@@ -34,7 +34,7 @@ export async function cleanupExpiredBoosts() {
                 const guild = await client.guilds.fetch(boost.guildId);
                 if (!guild) continue;
 
-                const member = await guild.members.fetch(boost.userId).catch(() => null);
+                const member = await guild.members.fetch(boost.userId).catch((error) => { logger.warn(`Failed to fetch member ${boost.userId} during boost cleanup:`, error); return null; });
                 const config = await db.query.guildConfig.findFirst({
                     where: eq(guildConfig.guildId, boost.guildId)
                 });

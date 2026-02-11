@@ -460,7 +460,7 @@ async function executeRoleAction(member: GuildMember, action: typeof roleAction.
                 case 'KICK':
                     try {
                         if (messageData) {
-                            await member.send(messageData).catch(() => null);
+                            await member.send(messageData).catch((error) => { logger.warn(`Failed to send DM to ${member.user.tag} for KICK action:`, error); return null; });
                         }
                         await member.kick(action.kickReason || 'Automated role action');
                     } catch (err) {

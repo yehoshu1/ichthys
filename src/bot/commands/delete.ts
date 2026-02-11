@@ -1,0 +1,168 @@
+import {
+    SlashCommandBuilder,
+    ChatInputCommandInteraction,
+    PermissionFlagsBits,
+    GuildMember,
+} from 'discord.js';
+import { Command } from '../types/Command';
+import { eventService } from '../services/event-service';
+import { pollService } from '../services/poll-service';
+import logger from '../utils/logger';
+
+export const data = new SlashCommandBuilder()
+    .setName('delete')
+    .setDescription('Delete an event or poll')
+    .addStringOption(option =>
+        option
+            .setName('type')
+            .setDescription('What to delete')
+            .setRequired(true)
+            .addChoices(
+                { name: 'Event', value: 'event' },
+                { name: 'Poll', value: 'poll' }
+            )
+    )
+    .addStringOption(option =>
+        option
+            .setName('id')
+            .setDescription('ID of the event or poll (use /list to find IDs)')
+            .setRequired(true)
+    )
+    .addStringOption(option =>
+        option
+            .setName('reason')
+            .setDescription('Reason for deletion')
+    );
+
+export async function execute(interaction: ChatInputCommandInteraction) {
+    try {
+        await interaction.deferReply({ ephemeral: true });
+
+        const guild = interaction.guild;
+        if (!guild) {
+            await interaction.editReply('This command can only be used in a server.');
+            return;
+        }
+
+        const member = interaction.member as GuildMember;
+        const type = interaction.options.getString('type', true);
+        const id = interaction.options.getString('id', true);
+        const reason = interaction.options.getString('reason');
+
+        if (type === 'event') {
+            await deleteEvent(interaction, id, member, reason);
+        } else {
+            await deletePoll(interaction, id, member, reason);
+        }
+
+    } catch (error) {
+        logger.error('Error deleting item:', error);
+        await interaction.editReply('An error occurred while deleting. Please try again.');
+    }
+}
+
+async function deleteEvent(
+    interaction: ChatInputCommandInteraction,
+    eventId: string,
+    member: GuildMember,
+    reason: string | null
+) {
+    const evt = await eventService.getEventById(eventId);
+
+    if (!evt) {
+        await interaction.editReply('Event not found. Use `/list type:events` to see available events.');
+        return;
+    }
+
+    if (evt.guildId !== interaction.guildId) {
+        await interaction.editReply('This event is not in this server.');
+        return;
+    }
+
+    // Check permissions
+    const isCreator = evt.creatorId === member.id;
+    const isAdmin = member.permissions.has(PermissionFlagsBits.ManageEvents) ||
+                    member.permissions.has(PermissionFlagsBits.Administrator);
+
+    if (!isCreator && !isAdmin) {
+        await interaction.editReply('You can only delete events you created or if you have Manage Events permission.');
+        return;
+    }
+
+    // Try to delete the message if possible
+    if (evt.messageId && evt.channelId) {
+        try {
+            const channel = await interaction.guild?.channels.fetch(evt.channelId);
+            if (channel?.isTextBased()) {
+                const message = await channel.messages.fetch(evt.messageId).catch((error) => { logger.warn(`Failed to fetch event message ${evt.messageId} for deletion:`, error); return null; });
+                if (message) {
+                    await message.delete();
+                }
+            }
+        } catch (error) {
+            logger.warn(`Could not delete event message ${evt.messageId}:`, error);
+        }
+    }
+
+    // Delete from database
+    await eventService.deleteEvent(eventId);
+
+    const reasonText = reason ? `\nReason: ${reason}` : '';
+    await interaction.editReply(`✅ Event "${evt.title}" has been deleted.${reasonText}`);
+
+    logger.info(`Event ${eventId} deleted by ${interaction.user.tag}${reason ? ` (reason: ${reason})` : ''}`);
+}
+
+async function deletePoll(
+    interaction: ChatInputCommandInteraction,
+    pollId: string,
+    member: GuildMember,
+    reason: string | null
+) {
+    const poll = await pollService.getPollById(pollId);
+
+    if (!poll) {
+        await interaction.editReply('Poll not found. Use `/list type:polls` to see available polls.');
+        return;
+    }
+
+    if (poll.guildId !== interaction.guildId) {
+        await interaction.editReply('This poll is not in this server.');
+        return;
+    }
+
+    // Check permissions
+    const isCreator = poll.creatorId === member.id;
+    const isAdmin = member.permissions.has(PermissionFlagsBits.ManageGuild) ||
+                    member.permissions.has(PermissionFlagsBits.Administrator);
+
+    if (!isCreator && !isAdmin) {
+        await interaction.editReply('You can only delete polls you created or if you have Administrator permission.');
+        return;
+    }
+
+    // Try to delete the message if possible
+    if (poll.messageId && poll.channelId) {
+        try {
+            const channel = await interaction.guild?.channels.fetch(poll.channelId);
+            if (channel?.isTextBased()) {
+                const message = await channel.messages.fetch(poll.messageId).catch((error) => { logger.warn(`Failed to fetch poll message ${poll.messageId} for deletion:`, error); return null; });
+                if (message) {
+                    await message.delete();
+                }
+            }
+        } catch (error) {
+            logger.warn(`Could not delete poll message ${poll.messageId}:`, error);
+        }
+    }
+
+    // Delete from database
+    await pollService.deletePoll(pollId);
+
+    const reasonText = reason ? `\nReason: ${reason}` : '';
+    await interaction.editReply(`✅ Poll "${poll.question}" has been deleted.${reasonText}`);
+
+    logger.info(`Poll ${pollId} deleted by ${interaction.user.tag}${reason ? ` (reason: ${reason})` : ''}`);
+}
+
+export default { data, execute } as Command;

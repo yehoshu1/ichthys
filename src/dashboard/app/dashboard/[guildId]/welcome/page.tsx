@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import logger from '../../../../lib/logger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -181,7 +182,7 @@ export default function WelcomePage() {
                     setChannels(data.channels || []);
                 }
             } catch (error) {
-                console.error('Failed to fetch data:', error);
+                logger.error('Failed to fetch data:', error);
                 toast.error('Failed to load welcome configuration');
             } finally {
                 setLoading(false);
@@ -293,7 +294,7 @@ export default function WelcomePage() {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-                console.error('Save failed:', errorData);
+                logger.error('Save failed:', errorData);
                 const userMessage = errorData.field === 'channelId' 
                     ? 'Please select a text channel for welcome messages'
                     : errorData.error || 'Failed to save configuration';

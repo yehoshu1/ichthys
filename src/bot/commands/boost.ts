@@ -3,6 +3,7 @@ import { Command } from '../types/Command';
 import { db } from '../../shared/database/client';
 import { userBoost, guildConfig } from '../../shared/database/schema';
 import { eq, and } from 'drizzle-orm';
+import logger from '../utils/logger';
 
 export const boost: Command = {
     data: new SlashCommandBuilder()
@@ -81,7 +82,7 @@ export const boost: Command = {
                 }
 
                 let roleId = existingConfig?.boostRoleId || null;
-                let role = roleId ? await guild.roles.fetch(roleId).catch(() => null) : null;
+                let role = roleId ? await guild.roles.fetch(roleId).catch((error) => { logger.warn(`Failed to fetch boost role ${roleId}:`, error); return null; }) : null;
 
                 if (!role) {
                     role = await guild.roles.create({

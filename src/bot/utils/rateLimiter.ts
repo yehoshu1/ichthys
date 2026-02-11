@@ -45,8 +45,14 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
 // Key: "userId:guildId" or "userId:dm"
 const rateLimitMap = new Map<string, RateLimitEntry>();
 
+// Maximum number of entries to prevent unbounded growth
+const MAX_ENTRIES = 10000;
+
 // Cleanup interval (every 5 minutes)
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
+// Store interval ID for cleanup
+let cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Clean up expired rate limit entries
@@ -66,7 +72,31 @@ function cleanupExpiredEntries(): void {
 }
 
 // Start cleanup interval
-setInterval(cleanupExpiredEntries, CLEANUP_INTERVAL_MS);
+function startCleanupInterval(): void {
+    if (cleanupIntervalId) return; // Already started
+    cleanupIntervalId = setInterval(cleanupExpiredEntries, CLEANUP_INTERVAL_MS);
+}
+
+/**
+ * Stop the cleanup interval (for graceful shutdown)
+ */
+export function stopCleanupInterval(): void {
+    if (cleanupIntervalId) {
+        clearInterval(cleanupIntervalId);
+        cleanupIntervalId = null;
+        logger.info('Rate limiter cleanup interval stopped');
+    }
+}
+
+/**
+ * Get current map size for monitoring
+ */
+export function getRateLimitMapSize(): number {
+    return rateLimitMap.size;
+}
+
+// Start the interval
+startCleanupInterval();
 
 export interface RateLimitResult {
     allowed: boolean;
@@ -103,6 +133,21 @@ export function checkRateLimit(
     }
 
     const entry = rateLimitMap.get(key);
+
+    // Check if map is at capacity and cleanup if needed
+    if (rateLimitMap.size >= MAX_ENTRIES) {
+        cleanupExpiredEntries();
+        // If still at capacity, remove oldest entries
+        if (rateLimitMap.size >= MAX_ENTRIES) {
+            const sortedEntries = Array.from(rateLimitMap.entries())
+                .sort((a, b) => a[1].resetAt - b[1].resetAt);
+            const entriesToRemove = Math.ceil(MAX_ENTRIES * 0.1); // Remove 10%
+            for (let i = 0; i < entriesToRemove && i < sortedEntries.length; i++) {
+                rateLimitMap.delete(sortedEntries[i][0]);
+            }
+            logger.warn(`Rate limit map reached capacity, removed ${entriesToRemove} oldest entries`);
+        }
+    }
 
     // No entry exists - create new one
     if (!entry) {

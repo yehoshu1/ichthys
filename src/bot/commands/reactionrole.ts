@@ -198,7 +198,7 @@ async function handleAdd(interaction: ChatInputCommandInteraction) {
             return;
         }
 
-        const message = await textChannel.messages.fetch(messageId).catch(() => null);
+        const message = await textChannel.messages.fetch(messageId).catch((error) => { logger.warn(`Failed to fetch message ${messageId} for reaction role:`, error); return null; });
         if (!message) {
             await interaction.reply({ content: 'Message not found. Make sure the message ID and channel are correct.', ephemeral: true });
             return;
@@ -362,7 +362,7 @@ async function handleDelete(interaction: ChatInputCommandInteraction) {
         // Try to delete the message
         const textChannel = await interaction.guild!.channels.fetch(channel.id);
         if (textChannel?.isTextBased()) {
-            const message = await textChannel.messages.fetch(messageId).catch(() => null);
+            const message = await textChannel.messages.fetch(messageId).catch((error) => { logger.warn(`Failed to fetch message ${messageId} for deletion:`, error); return null; });
             if (message) {
                 await message.delete();
             }

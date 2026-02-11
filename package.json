@@ -69,6 +69,7 @@
     "drizzle-orm": "^0.45.1",
     "lru-cache": "^11.2.6",
     "lucide-react": "^0.563.0",
+    "luxon": "^3.7.2",
     "next": "^16.1.6",
     "next-auth": "^4.24.13",
     "node-cron": "^4.2.1",
@@ -86,6 +87,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/luxon": "^3.7.1",
     "@types/node": "^22.15.14",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.15.5",

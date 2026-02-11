@@ -7,6 +7,7 @@ import { getServerSession } from "next-auth";
 import { getToken } from "next-auth/jwt";
 import { NextRequest } from "next/server";
 import { authOptions } from "./auth";
+import logger from "./logger";
 
 const MANAGE_GUILD = 0x20; // Discord permission flag for Manage Server
 
@@ -63,7 +64,7 @@ export async function validateGuildAccess(
             if (response.status === 401) {
                 return { valid: false, error: "Session expired", status: 401 };
             }
-            console.error("Discord API error:", response.status, await response.text());
+            logger.error("Discord API error", { status: response.status, error: await response.text() });
             return { valid: false, error: "Failed to fetch guilds", status: 500 };
         }
 
@@ -88,7 +89,7 @@ export async function validateGuildAccess(
             accessToken,
         };
     } catch (error) {
-        console.error("Error validating guild access:", error);
+        logger.error("Error validating guild access", { error });
         return { valid: false, error: "Internal error", status: 500 };
     }
 }
@@ -150,7 +151,7 @@ export async function checkUserGuildAccess(
         const permissions = BigInt(guild.permissions);
         return guild.owner || (permissions & BigInt(MANAGE_GUILD)) !== BigInt(0);
     } catch (error) {
-        console.error("Error checking user guild access:", error);
+        logger.error("Error checking user guild access", { error });
         return false;
     }
 }

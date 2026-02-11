@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
+import logger from '../../bot/utils/logger';
 
 const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://ixoye:ixoye@localhost:5432/ixoye';
 
@@ -16,7 +17,6 @@ export const pool = new Pool({
     max: getNumericEnv('PG_POOL_MAX', 8),
     idleTimeoutMillis: getNumericEnv('PG_IDLE_TIMEOUT_MS', 30_000),
     connectionTimeoutMillis: getNumericEnv('PG_CONNECT_TIMEOUT_MS', 10_000),
-    // 🎯 PERFORMANCE FIX: Add query and statement timeouts to prevent hanging queries
     query_timeout: getNumericEnv('PG_QUERY_TIMEOUT_MS', 30_000),
     statement_timeout: getNumericEnv('PG_STATEMENT_TIMEOUT_MS', 30_000),
     ssl: process.env.NODE_ENV === 'production'
@@ -26,28 +26,25 @@ export const pool = new Pool({
             : false,
 });
 
-// 🎯 PERFORMANCE FIX: Add connection validation and error handling
 pool.on('error', (error) => {
-    console.error('Unexpected PostgreSQL pool error:', error);
+    logger.error('Unexpected PostgreSQL pool error:', error);
 });
 
 pool.on('connect', (client) => {
     client.on('error', (err) => {
-        console.error('PostgreSQL client error:', err);
+        logger.error('PostgreSQL client error:', err);
     });
 });
 
 pool.on('acquire', () => {
-    // Track connection acquisition for monitoring
     if (process.env.NODE_ENV === 'development') {
         const metrics = {
             total: pool.totalCount,
             idle: pool.idleCount,
             waiting: pool.waitingCount
         };
-        // Log if pool is under pressure
         if (metrics.waiting > 0) {
-            console.warn('PostgreSQL pool contention:', metrics);
+            logger.warn('PostgreSQL pool contention:', metrics);
         }
     }
 });
@@ -62,7 +59,7 @@ function registerShutdownHook(): void {
 
     const shutdown = async () => {
         await pool.end().catch((error) => {
-            console.error('Error closing PostgreSQL pool:', error);
+            logger.error('Error closing PostgreSQL pool:', error);
         });
     };
 
@@ -77,7 +74,12 @@ function registerShutdownHook(): void {
 
 registerShutdownHook();
 
-// 🎯 PERFORMANCE FIX: Pool health check function
+export interface PoolMetrics {
+    total: number;
+    idle: number;
+    waiting: number;
+}
+
 export async function checkPoolHealth(): Promise<{ healthy: boolean; metrics: PoolMetrics }> {
     try {
         const client = await pool.connect();
@@ -89,19 +91,12 @@ export async function checkPoolHealth(): Promise<{ healthy: boolean; metrics: Po
             metrics: getPoolMetrics()
         };
     } catch (error) {
-        console.error('Pool health check failed:', error);
+        logger.error('Pool health check failed:', error);
         return {
             healthy: false,
             metrics: getPoolMetrics()
         };
     }
-}
-
-// 🎯 PERFORMANCE FIX: Pool metrics for monitoring
-export interface PoolMetrics {
-    total: number;
-    idle: number;
-    waiting: number;
 }
 
 export function getPoolMetrics(): PoolMetrics {
@@ -112,7 +107,6 @@ export function getPoolMetrics(): PoolMetrics {
     };
 }
 
-// 🎯 PERFORMANCE FIX: Query wrapper with timeout and logging
 export async function executeWithTimeout<T>(
     queryFn: () => Promise<T>,
     timeoutMs: number = 30000,

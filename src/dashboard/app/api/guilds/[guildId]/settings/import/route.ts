@@ -713,7 +713,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
             actorUserId: auth.userId,
             dedupeKey: `dashboard-settings-import-failed:${guildId}`,
             dedupeWindowSeconds: 120,
-        }).catch(() => null);
+        }).catch((error) => { logger.warn(`Failed to emit guild notification for settings import failure:`, error); return null; });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

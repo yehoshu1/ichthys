@@ -119,12 +119,12 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ guildI
         const botClient = getBotClient();
         if (message.messageId && botClient) {
             try {
-                const guild = await botClient.guilds.fetch(guildId).catch(() => null);
+                const guild = await botClient.guilds.fetch(guildId).catch((error: Error) => { logger.warn(`Failed to fetch guild ${guildId} for reaction role message deletion:`, error); return null; });
                 if (guild) {
-                    const channel = await guild.channels.fetch(message.channelId).catch(() => null);
+                    const channel = await guild.channels.fetch(message.channelId).catch((error: Error) => { logger.warn(`Failed to fetch channel ${message.channelId} for reaction role message deletion:`, error); return null; });
                     if (channel?.isTextBased()) {
                         const textChannel = channel as any;
-                        const discordMessage = await textChannel.messages.fetch(message.messageId).catch(() => null);
+                        const discordMessage = await textChannel.messages.fetch(message.messageId).catch((error: Error) => { logger.warn(`Failed to fetch message ${message.messageId} for reaction role deletion:`, error); return null; });
                         if (discordMessage) {
                             await discordMessage.delete();
                         }
@@ -173,12 +173,12 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ guildId
         }
 
         // Get guild and channel
-        const guild = await botClient.guilds.fetch(guildId).catch(() => null);
+        const guild = await botClient.guilds.fetch(guildId).catch((error) => { logger.warn(`Failed to fetch guild ${guildId} for sending reaction role message:`, error); return null; });
         if (!guild) {
             return NextResponse.json({ error: "Guild not found" }, { status: 404 });
         }
 
-        const channel = await guild.channels.fetch(message.channelId).catch(() => null);
+        const channel = await guild.channels.fetch(message.channelId).catch((error) => { logger.warn(`Failed to fetch channel ${message.channelId} for sending reaction role message:`, error); return null; });
         if (!channel || !channel.isTextBased()) {
             return NextResponse.json({ error: "Channel not found or not a text channel" }, { status: 404 });
         }

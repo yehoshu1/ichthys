@@ -1,6 +1,6 @@
 import { GuildMember, TextChannel, AttachmentBuilder } from 'discord.js';
 import { db } from '../../shared/database/client';
-import { welcomeConfig } from '../../shared/database/schema';
+import { welcomeConfig, WelcomeConfig } from '../../shared/database/schema';
 import { eq } from 'drizzle-orm';
 import { generateWelcomeImage, processWelcomeTemplate } from './welcomeImageGenerator';
 import logger from '../utils/logger';
@@ -12,7 +12,7 @@ const welcomeCooldowns = new Map<string, number>();
 /**
  * Get welcome configuration for a guild
  */
-export async function getWelcomeConfig(guildId: string) {
+export async function getWelcomeConfig(guildId: string): Promise<WelcomeConfig | null> {
     const config = await db.query.welcomeConfig.findFirst({
         where: eq(welcomeConfig.guildId, guildId)
     });

@@ -88,13 +88,13 @@ export class CommandReplyCleanupService {
     private async deleteLinkedReply(reference: ReplyReference): Promise<void> {
         try {
             const channel = client.channels.cache.get(reference.channelId)
-                ?? await client.channels.fetch(reference.channelId).catch(() => null);
+                ?? await client.channels.fetch(reference.channelId).catch((error) => { logger.warn(`Failed to fetch channel ${reference.channelId} for reply cleanup:`, error); return null; });
             if (!channel || !channel.isTextBased()) {
                 return;
             }
 
             const textChannel = channel as TextBasedChannel;
-            const message = await textChannel.messages.fetch(reference.messageId).catch(() => null);
+            const message = await textChannel.messages.fetch(reference.messageId).catch((error) => { logger.warn(`Failed to fetch message ${reference.messageId} for reply cleanup:`, error); return null; });
             if (!message) {
                 return;
             }

@@ -1,5 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import DiscordProvider from "next-auth/providers/discord";
+import logger from "./logger";
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -15,10 +16,10 @@ export const authOptions: NextAuthOptions = {
     logger: process.env.NODE_ENV === "development"
         ? {
             error(code, ...message) {
-                console.error(code, ...message);
+                logger.error(code, ...message);
             },
             warn(code, ...message) {
-                console.warn(code, ...message);
+                logger.warn(code, ...message);
             },
         }
         : undefined,

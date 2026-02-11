@@ -267,14 +267,14 @@ async function handleBannedWord(message: Message, settings: typeof moderationSet
 
         switch (action) {
             case 'WARN':
-                await message.author.send(`⚠️ Your message in **${message.guild!.name}** was deleted for containing banned words.`).catch(() => null);
+                await message.author.send(`⚠️ Your message in **${message.guild!.name}** was deleted for containing banned words.`).catch((error) => { logger.warn(`Failed to send AutoMod DM to user ${message.author.tag}:`, error); return null; });
                 await createAutoModCase(message.guild!.id, message.author.id, 'WARN', 'Used banned words');
                 break;
             case 'MUTE':
                 await applyMute(message, settings, 'Used banned words');
                 break;
             case 'KICK':
-                await message.author.send(`👢 You have been kicked from **${message.guild!.name}** for using banned words.`).catch(() => null);
+                await message.author.send(`👢 You have been kicked from **${message.guild!.name}** for using banned words.`).catch((error) => { logger.warn(`Failed to send AutoMod DM to user ${message.author.tag}:`, error); return null; });
                 await message.member!.kick('Used banned words');
                 await createAutoModCase(message.guild!.id, message.author.id, 'KICK', 'Used banned words');
                 break;
@@ -321,7 +321,7 @@ async function handleInviteLink(message: Message, settings: typeof moderationSet
         const action = settings.inviteFilterAction || 'DELETE';
 
         if (action === 'WARN') {
-            await message.author.send(`⚠️ Your message in **${message.guild!.name}** was deleted for containing invite links.`).catch(() => null);
+            await message.author.send(`⚠️ Your message in **${message.guild!.name}** was deleted for containing invite links.`).catch((error) => { logger.warn(`Failed to send AutoMod DM to user ${message.author.tag}:`, error); return null; });
             await createAutoModCase(message.guild!.id, message.author.id, 'WARN', 'Posted invite link');
         }
 
@@ -365,14 +365,14 @@ async function handleSpam(message: Message, settings: typeof moderationSettings.
 
         switch (action) {
             case 'WARN':
-                await message.author.send(`⚠️ Please slow down in **${message.guild!.name}**. Spamming is not allowed.`).catch(() => null);
+                await message.author.send(`⚠️ Please slow down in **${message.guild!.name}**. Spamming is not allowed.`).catch((error) => { logger.warn(`Failed to send AutoMod DM to user ${message.author.tag}:`, error); return null; });
                 await createAutoModCase(message.guild!.id, message.author.id, 'WARN', 'Spamming');
                 break;
             case 'MUTE':
                 await applyMute(message, settings, 'Spamming');
                 break;
             case 'KICK':
-                await message.author.send(`👢 You have been kicked from **${message.guild!.name}** for spamming.`).catch(() => null);
+                await message.author.send(`👢 You have been kicked from **${message.guild!.name}** for spamming.`).catch((error) => { logger.warn(`Failed to send AutoMod DM to user ${message.author.tag}:`, error); return null; });
                 await message.member!.kick('Spamming');
                 await createAutoModCase(message.guild!.id, message.author.id, 'KICK', 'Spamming');
                 break;
@@ -422,7 +422,7 @@ async function applyMute(message: Message, settings: typeof moderationSettings.$
     const expiresAt = new Date(Date.now() + duration * 60 * 1000);
 
     await message.member!.roles.add(muteRole);
-    await message.author.send(`🔇 You have been muted in **${message.guild!.name}** for ${duration} minutes${reason ? `: ${reason}` : ''}.`).catch(() => null);
+    await message.author.send(`🔇 You have been muted in **${message.guild!.name}** for ${duration} minutes${reason ? `: ${reason}` : ''}.`).catch((error) => { logger.warn(`Failed to send AutoMod DM to user ${message.author.tag}:`, error); return null; });
 
     await createAutoModCase(
         message.guild!.id,

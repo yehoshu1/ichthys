@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState, useMemo, useCallback } from "react";
+import logger from "../../../../lib/logger";
 import { Button } from "../../../../components/ui/button";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "../../../../components/ui/card";
 import { Users, ShieldCheck, Rocket, Zap, Mic, Clock, Trophy } from "lucide-react";
@@ -58,7 +59,7 @@ export default function AnalyticsPage() {
                 if (data.leaderboard) setLeaderboard(data.leaderboard);
             }
         } catch (error) {
-            console.error("Failed to fetch analytics:", error);
+            logger.error("Failed to fetch analytics:", error);
         } finally {
             setLoading(false);
         }

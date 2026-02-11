@@ -89,7 +89,7 @@ const command: Command = {
             for (const c of pageCases) {
                 const actionLabel = ACTION_LABELS[c.action] || c.action;
                 const status = c.active ? '🟢 Active' : '⚫ Inactive';
-                const moderator = await interaction.client.users.fetch(c.moderatorId).catch(() => null);
+                const moderator = await interaction.client.users.fetch(c.moderatorId).catch((error) => { logger.warn(`Failed to fetch moderator ${c.moderatorId} for case display:`, error); return null; });
 
                 let value = `**Case #${c.caseNumber}** | ${status}\n`;
                 value += `**Action:** ${actionLabel}\n`;

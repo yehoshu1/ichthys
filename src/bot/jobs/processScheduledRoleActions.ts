@@ -43,7 +43,7 @@ async function executeScheduledAction(entry: typeof scheduledRoleAction.$inferSe
         return;
     }
 
-    const guild = await client.guilds.fetch(entry.guildId).catch(() => null);
+    const guild = await client.guilds.fetch(entry.guildId).catch((error) => { logger.warn(`Failed to fetch guild ${entry.guildId} for scheduled role action:`, error); return null; });
     if (!guild) {
         await db.update(scheduledRoleAction)
             .set({
@@ -70,7 +70,7 @@ async function executeScheduledAction(entry: typeof scheduledRoleAction.$inferSe
         return;
     }
 
-    const member = await guild.members.fetch(entry.userId).catch(() => null);
+    const member = await guild.members.fetch(entry.userId).catch((error) => { logger.warn(`Failed to fetch member ${entry.userId} for scheduled role action:`, error); return null; });
     if (!member) {
         await db.update(scheduledRoleAction)
             .set({
@@ -159,7 +159,7 @@ async function executeScheduledAction(entry: typeof scheduledRoleAction.$inferSe
 
             case "KICK":
                 if (messageData) {
-                    await member.send(messageData).catch(() => null);
+                    await member.send(messageData).catch((error) => { logger.warn(`Failed to send DM to ${member.user.tag} for scheduled KICK action:`, error); return null; });
                 }
                 await member.kick(action.kickReason || "Automated role action");
                 break;

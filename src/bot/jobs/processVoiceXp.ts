@@ -138,10 +138,10 @@ export async function processVoiceXpOnce(): Promise<void> {
                     stats.skippedDisabled += 1;
 
                     const guild = client.guilds.cache.get(activeProfile.guildId)
-                        ?? await client.guilds.fetch(activeProfile.guildId).catch(() => null);
+                        ?? await client.guilds.fetch(activeProfile.guildId).catch((error) => { logger.warn(`Failed to fetch guild ${activeProfile.guildId} for voice XP processing:`, error); return null; });
                     const member = guild
                         ? guild.members.cache.get(activeProfile.userId)
-                        ?? await guild.members.fetch(activeProfile.userId).catch(() => null)
+                        ?? await guild.members.fetch(activeProfile.userId).catch((error) => { logger.warn(`Failed to fetch member ${activeProfile.userId} for voice XP processing:`, error); return null; })
                         : null;
 
                     const nextAnchor = member && !member.user.bot && member.voice.channelId ? now : null;
@@ -159,7 +159,7 @@ export async function processVoiceXpOnce(): Promise<void> {
                 }
 
                 const guild = client.guilds.cache.get(activeProfile.guildId)
-                    ?? await client.guilds.fetch(activeProfile.guildId).catch(() => null);
+                    ?? await client.guilds.fetch(activeProfile.guildId).catch((error) => { logger.warn(`Failed to fetch guild ${activeProfile.guildId} for voice XP processing:`, error); return null; });
 
                 if (!guild) {
                     stats.skippedUnavailable += 1;
@@ -167,7 +167,7 @@ export async function processVoiceXpOnce(): Promise<void> {
                 }
 
                 const member = guild.members.cache.get(activeProfile.userId)
-                    ?? await guild.members.fetch(activeProfile.userId).catch(() => null);
+                    ?? await guild.members.fetch(activeProfile.userId).catch((error) => { logger.warn(`Failed to fetch member ${activeProfile.userId} for voice XP processing:`, error); return null; });
 
                 if (!member || member.user.bot) {
                     stats.skippedUnavailable += 1;

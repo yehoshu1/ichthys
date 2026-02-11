@@ -157,7 +157,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
                     actorUserId: auth.userId,
                     dedupeKey: `guild-bot-missing:${guildId}`,
                     dedupeWindowSeconds: 600,
-                }).catch(() => null);
+                }).catch((error) => { logger.warn(`Failed to emit guild notification for missing bot:`, error); return null; });
                 return NextResponse.json(
                     { error: "Bot not in server" },
                     { status: 404 }

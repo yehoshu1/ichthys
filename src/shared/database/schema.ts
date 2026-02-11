@@ -21,6 +21,10 @@ export const welcomeTargetTypeEnum = pgEnum('welcome_target_type', ['CHANNEL', '
 export const welcomeBackgroundTypeEnum = pgEnum('welcome_background_type', ['COLOR', 'GRADIENT', 'IMAGE']);
 export const welcomeAvatarShapeEnum = pgEnum('welcome_avatar_shape', ['CIRCLE', 'SQUARE', 'ROUNDED']);
 export const welcomeImagePositionEnum = pgEnum('welcome_image_position', ['ABOVE', 'BELOW', 'ONLY']);
+export const eventStatusEnum = pgEnum('event_status', ['SCHEDULED', 'ACTIVE', 'COMPLETED', 'CANCELLED']);
+export const rsvpStatusEnum = pgEnum('rsvp_status', ['YES', 'NO', 'MAYBE', 'WAITLIST']);
+export const pollTypeEnum = pgEnum('poll_type', ['STANDARD', 'TIME', 'ANONYMOUS']);
+export const repeatFrequencyEnum = pgEnum('repeat_frequency', ['NONE', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'YEARLY']);
 export const scheduledRoleActionStatusEnum = pgEnum('scheduled_role_action_status', [
     'PENDING',
     'PROCESSING',
@@ -771,3 +775,313 @@ export type NewReactionRole = typeof reactionRole.$inferInsert;
 
 export type WelcomeConfig = typeof welcomeConfig.$inferSelect;
 export type NewWelcomeConfig = typeof welcomeConfig.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EVENT MANAGEMENT TABLES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const event = pgTable('event', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    creatorId: text('creator_id').notNull(),
+    messageId: text('message_id'),
+    channelId: text('channel_id').notNull(),
+    
+    // Event details
+    title: text('title').notNull(),
+    description: text('description'),
+    location: text('location'),
+    imageUrl: text('image_url'),
+    
+    // Timing
+    startTime: timestamp('start_time', { withTimezone: true, mode: 'date' }).notNull(),
+    endTime: timestamp('end_time', { withTimezone: true, mode: 'date' }),
+    durationMinutes: integer('duration_minutes'),
+    
+    // Status and visibility
+    status: eventStatusEnum('status').default('SCHEDULED').notNull(),
+    
+    // RSVP settings
+    maxAttendees: integer('max_attendees'),
+    enableWaitlist: boolean('enable_waitlist').default(false).notNull(),
+    closeRsvpBeforeStartMinutes: integer('close_rsvp_before_start_minutes'),
+    
+    // Mentions
+    mentionRoleIds: text('mention_role_ids').array(),
+    mentionOnCreate: boolean('mention_on_create').default(false).notNull(),
+    mentionOnStart: boolean('mention_on_start').default(false).notNull(),
+    
+    // Role restrictions
+    requiredRoleIds: text('required_role_ids').array(),
+    blockedRoleIds: text('blocked_role_ids').array(),
+    
+    // Auto-assign roles
+    attendeeRoleId: text('attendee_role_id'),
+    
+    // Repeating events
+    repeatFrequency: repeatFrequencyEnum('repeat_frequency').default('NONE').notNull(),
+    repeatUntil: timestamp('repeat_until', { withTimezone: true, mode: 'date' }),
+    parentEventId: uuid('parent_event_id'),
+    
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildIdIdx: index('event_guild_id_idx').on(table.guildId),
+    guildStartTimeIdx: index('event_guild_start_time_idx').on(table.guildId, table.startTime),
+    guildStatusIdx: index('event_guild_status_idx').on(table.guildId, table.status),
+    startTimeIdx: index('event_start_time_idx').on(table.startTime),
+    statusStartTimeIdx: index('event_status_start_time_idx').on(table.status, table.startTime),
+}));
+
+export const eventRsvp = pgTable('event_rsvp', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    eventId: uuid('event_id').notNull().references(() => event.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    status: rsvpStatusEnum('status').default('YES').notNull(),
+    respondedAt: timestamp('responded_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    eventUserUnique: uniqueIndex('event_rsvp_event_user_unique').on(table.eventId, table.userId),
+    eventIdIdx: index('event_rsvp_event_id_idx').on(table.eventId),
+    userIdIdx: index('event_rsvp_user_id_idx').on(table.userId),
+    statusIdx: index('event_rsvp_status_idx').on(table.status),
+}));
+
+export const eventReminder = pgTable('event_reminder', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    eventId: uuid('event_id').notNull().references(() => event.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    minutesBefore: integer('minutes_before').notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true, mode: 'date' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    eventUserMinutesUnique: uniqueIndex('event_reminder_event_user_minutes_unique').on(table.eventId, table.userId, table.minutesBefore),
+    eventIdIdx: index('event_reminder_event_id_idx').on(table.eventId),
+    userIdIdx: index('event_reminder_user_id_idx').on(table.userId),
+    sentAtIdx: index('event_reminder_sent_at_idx').on(table.sentAt),
+}));
+
+export const eventTemplate = pgTable('event_template', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    creatorId: text('creator_id').notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    title: text('title'),
+    location: text('location'),
+    durationMinutes: integer('duration_minutes'),
+    maxAttendees: integer('max_attendees'),
+    enableWaitlist: boolean('enable_waitlist').default(false).notNull(),
+    mentionRoleIds: text('mention_role_ids').array(),
+    requiredRoleIds: text('required_role_ids').array(),
+    blockedRoleIds: text('blocked_role_ids').array(),
+    attendeeRoleId: text('attendee_role_id'),
+    imageUrl: text('image_url'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildNameUnique: uniqueIndex('event_template_guild_name_unique').on(table.guildId, table.name),
+    guildIdIdx: index('event_template_guild_id_idx').on(table.guildId),
+}));
+
+export const userTimezone = pgTable('user_timezone', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').unique().notNull(),
+    timezone: text('timezone').default('UTC').notNull(),
+    detectedAutomatically: boolean('detected_automatically').default(false).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    userIdIdx: index('user_timezone_user_id_idx').on(table.userId),
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// POLLING TABLES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const poll = pgTable('poll', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    creatorId: text('creator_id').notNull(),
+    messageId: text('message_id'),
+    channelId: text('channel_id').notNull(),
+    
+    // Poll details
+    question: text('question').notNull(),
+    description: text('description'),
+    
+    // Poll type and settings
+    type: pollTypeEnum('type').default('STANDARD').notNull(),
+    allowMultipleVotes: boolean('allow_multiple_votes').default(false).notNull(),
+    maxVotesPerUser: integer('max_votes_per_user'),
+    allowCustomOptions: boolean('allow_custom_options').default(false).notNull(),
+    
+    // Role restrictions
+    allowedRoleIds: text('allowed_role_ids').array(),
+    
+    // End settings
+    endTime: timestamp('end_time', { withTimezone: true, mode: 'date' }),
+    closed: boolean('closed').default(false).notNull(),
+    closedAt: timestamp('closed_at', { withTimezone: true, mode: 'date' }),
+    
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildIdIdx: index('poll_guild_id_idx').on(table.guildId),
+    guildClosedIdx: index('poll_guild_closed_idx').on(table.guildId, table.closed),
+    endTimeIdx: index('poll_end_time_idx').on(table.endTime),
+}));
+
+export const pollOption = pgTable('poll_option', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    pollId: uuid('poll_id').notNull().references(() => poll.id, { onDelete: 'cascade' }),
+    optionIndex: integer('option_index').notNull(),
+    text: text('text').notNull(),
+    emoji: text('emoji'),
+    
+    // For time polls - store the actual date/time
+    dateTimeValue: timestamp('date_time_value', { withTimezone: true, mode: 'date' }),
+    
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    pollIndexUnique: uniqueIndex('poll_option_poll_index_unique').on(table.pollId, table.optionIndex),
+    pollIdIdx: index('poll_option_poll_id_idx').on(table.pollId),
+}));
+
+export const pollVote = pgTable('poll_vote', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    pollId: uuid('poll_id').notNull().references(() => poll.id, { onDelete: 'cascade' }),
+    optionId: uuid('option_id').notNull().references(() => pollOption.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    votedAt: timestamp('voted_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    pollUserOptionUnique: uniqueIndex('poll_vote_poll_user_option_unique').on(table.pollId, table.userId, table.optionId),
+    pollIdIdx: index('poll_vote_poll_id_idx').on(table.pollId),
+    optionIdIdx: index('poll_vote_option_id_idx').on(table.optionId),
+    userIdIdx: index('poll_vote_user_id_idx').on(table.userId),
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AVAILABILITY FINDER TABLES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const availabilityFinder = pgTable('availability_finder', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    creatorId: text('creator_id').notNull(),
+    messageId: text('message_id'),
+    channelId: text('channel_id').notNull(),
+    
+    title: text('title').notNull(),
+    description: text('description'),
+    
+    // Date range for availability
+    startDate: timestamp('start_date', { withTimezone: true, mode: 'date' }).notNull(),
+    endDate: timestamp('end_date', { withTimezone: true, mode: 'date' }).notNull(),
+    
+    // Time range each day
+    dailyStartHour: integer('daily_start_hour').default(9).notNull(),
+    dailyEndHour: integer('daily_end_hour').default(17).notNull(),
+    
+    // Settings
+    isPublic: boolean('is_public').default(true).notNull(),
+    closed: boolean('closed').default(false).notNull(),
+    
+    // Convert to event on completion
+    convertToEvent: boolean('convert_to_event').default(false).notNull(),
+    createdEventId: uuid('created_event_id').references(() => event.id),
+    
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildIdIdx: index('availability_finder_guild_id_idx').on(table.guildId),
+    guildClosedIdx: index('availability_finder_guild_closed_idx').on(table.guildId, table.closed),
+}));
+
+export const availabilityResponse = pgTable('availability_response', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    finderId: uuid('finder_id').notNull().references(() => availabilityFinder.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    
+    // Store available slots as array of timestamps
+    availableSlots: timestamp('available_slots', { withTimezone: true, mode: 'date' }).array(),
+    
+    respondedAt: timestamp('responded_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    finderUserUnique: uniqueIndex('availability_response_finder_user_unique').on(table.finderId, table.userId),
+    finderIdIdx: index('availability_response_finder_id_idx').on(table.finderId),
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EVENT/POLL SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const eventPollSettings = pgTable('event_poll_settings', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    
+    // Default channels
+    defaultEventChannelId: text('default_event_channel_id'),
+    defaultPollChannelId: text('default_poll_channel_id'),
+    
+    // Default behaviors
+    defaultMentionOnCreate: boolean('default_mention_on_create').default(false).notNull(),
+    defaultMentionOnStart: boolean('default_mention_on_start').default(false).notNull(),
+    
+    // Permissions
+    allowedEventCreators: text('allowed_event_creators').array(), // Role IDs
+    allowedPollCreators: text('allowed_poll_creators').array(), // Role IDs
+    
+    // Timezone
+    serverTimezone: text('server_timezone').default('UTC').notNull(),
+    
+    // AI Settings
+    aiEnabled: boolean('ai_enabled').default(true).notNull(),
+    aiRateLimitPerHour: integer('ai_rate_limit_per_hour').default(10).notNull(),
+    
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildIdUnique: uniqueIndex('event_poll_settings_guild_unique').on(table.guildId),
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TYPE EXPORTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export type Event = typeof event.$inferSelect;
+export type NewEvent = typeof event.$inferInsert;
+
+export type EventRsvp = typeof eventRsvp.$inferSelect;
+export type NewEventRsvp = typeof eventRsvp.$inferInsert;
+
+export type EventReminder = typeof eventReminder.$inferSelect;
+export type NewEventReminder = typeof eventReminder.$inferInsert;
+
+export type EventTemplate = typeof eventTemplate.$inferSelect;
+export type NewEventTemplate = typeof eventTemplate.$inferInsert;
+
+export type UserTimezone = typeof userTimezone.$inferSelect;
+export type NewUserTimezone = typeof userTimezone.$inferInsert;
+
+export type Poll = typeof poll.$inferSelect;
+export type NewPoll = typeof poll.$inferInsert;
+
+export type PollOption = typeof pollOption.$inferSelect;
+export type NewPollOption = typeof pollOption.$inferInsert;
+
+export type PollVote = typeof pollVote.$inferSelect;
+export type NewPollVote = typeof pollVote.$inferInsert;
+
+export type AvailabilityFinder = typeof availabilityFinder.$inferSelect;
+export type NewAvailabilityFinder = typeof availabilityFinder.$inferInsert;
+
+export type AvailabilityResponse = typeof availabilityResponse.$inferSelect;
+export type NewAvailabilityResponse = typeof availabilityResponse.$inferInsert;
+
+export type EventPollSettings = typeof eventPollSettings.$inferSelect;
+export type NewEventPollSettings = typeof eventPollSettings.$inferInsert;

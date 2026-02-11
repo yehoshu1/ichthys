@@ -20,7 +20,7 @@ async function isGuildMember(guildId: string, userId: string, botToken: string):
             Authorization: `Bot ${botToken}`,
         },
         cache: "no-store",
-    }).catch(() => null);
+    }).catch((error) => { logger.warn(`Failed to check guild membership for user ${userId}:`, error); return null; });
 
     if (!response) {
         return false;

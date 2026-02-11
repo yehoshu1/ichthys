@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, Space_Grotesk } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import AuthProvider from "../components/AuthProvider";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -28,7 +29,10 @@ const themeScript = `
     const theme = stored || (prefersDark ? "dark" : "light");
     document.documentElement.classList.toggle("dark", theme === "dark");
     document.documentElement.dataset.theme = theme;
-  } catch (e) {}
+  } catch (e) {
+    // Theme initialization failed, fall back to system preference
+    console.warn('Theme initialization failed:', e);
+}
 })();
 `;
 
@@ -40,7 +44,7 @@ export default function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
             <head>
-                <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+                <Script id="theme-script" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeScript }} />
             </head>
             <body className={`${dmSans.variable} ${spaceGrotesk.variable}`}>
                 <AuthProvider>

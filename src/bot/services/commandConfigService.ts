@@ -130,7 +130,7 @@ export class CommandConfigService {
                 return true;
             }
 
-            const member = guild.members.cache.get(userId) ?? await guild.members.fetch(userId).catch(() => null);
+            const member = guild.members.cache.get(userId) ?? await guild.members.fetch(userId).catch((error) => { logger.warn(`Failed to fetch member ${userId} for command permission check:`, error); return null; });
             if (!member) {
                 return true;
             }

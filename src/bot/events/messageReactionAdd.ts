@@ -126,7 +126,7 @@ const event: Event<Events.MessageReactionAdd> = {
             if (!config) return; // No reaction role configured for this emoji
 
             const member = reaction.message.guild.members.cache.get(user.id)
-                ?? await reaction.message.guild.members.fetch(user.id).catch(() => null);
+                ?? await reaction.message.guild.members.fetch(user.id).catch((error) => { logger.warn(`Failed to fetch member ${user.id} for reaction role:`, error); return null; });
             if (!member) {
                 logger.warn(`Member ${user.id} not found in guild ${guildId} for reaction role`);
                 await emitGuildNotificationSafe({
@@ -149,7 +149,7 @@ const event: Event<Events.MessageReactionAdd> = {
             }
 
             const role = reaction.message.guild.roles.cache.get(config.roleId)
-                ?? await reaction.message.guild.roles.fetch(config.roleId).catch(() => null);
+                ?? await reaction.message.guild.roles.fetch(config.roleId).catch((error) => { logger.warn(`Failed to fetch role ${config.roleId} for reaction role:`, error); return null; });
             if (!role) {
                 logger.warn(`Role ${config.roleId} not found for reaction role in guild ${guildId}`);
                 await emitGuildNotificationSafe({
@@ -222,7 +222,7 @@ async function handleToggle(
     // If user already has the role, remove it
     if (member.roles.cache.has(role.id)) {
         await member.roles.remove(role.id);
-        await reaction.users.remove(member.id).catch(() => null);
+        await reaction.users.remove(member.id).catch((error) => { logger.warn(`Failed to remove reaction from user ${member.id}:`, error); return null; });
     } else {
         // Add the role
         await member.roles.add(role.id);
@@ -232,7 +232,7 @@ async function handleToggle(
             const rolesToRemove = exclusiveRoleIds.filter((id) => id !== role.id);
             for (const roleId of rolesToRemove) {
                 if (member.roles.cache.has(roleId)) {
-                    await member.roles.remove(roleId).catch(() => null);
+                    await member.roles.remove(roleId).catch((error) => { logger.warn(`Failed to remove exclusive role ${roleId} from user ${member.id}:`, error); return null; });
                 }
             }
         }
@@ -268,7 +268,7 @@ async function handleUnique(
     // Remove all exclusive roles
     for (const roleId of allExclusiveIds) {
         if (member.roles.cache.has(roleId)) {
-            await member.roles.remove(roleId).catch(() => null);
+            await member.roles.remove(roleId).catch((error) => { logger.warn(`Failed to remove exclusive role ${roleId} from user ${member.id} in UNIQUE handler:`, error); return null; });
         }
     }
 

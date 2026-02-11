@@ -2,6 +2,7 @@ import { getServerSession, type Session } from "next-auth";
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
+import logger from "./logger";
 
 const MANAGE_GUILD = 0x20n;
 const MANAGE_ROLES = 0x10000000n;
@@ -132,13 +133,13 @@ async function getGuildPermissions(
             cache: "no-store",
         });
     } catch (error) {
-        console.error("Failed to fetch guilds from Discord:", error);
+        logger.error("Failed to fetch guilds from Discord:", error);
         return jsonError(503, "Failed to validate guild permissions - network error");
     }
 
     if (!response.ok) {
         const errorText = await response.text().catch(() => "unknown");
-        console.error("Discord API error:", { status: response.status, error: errorText });
+        logger.error("Discord API error:", { status: response.status, error: errorText });
         if (response.status === 401 || response.status === 403) {
             return jsonError(401, "Unauthorized - Discord token invalid");
         }
@@ -205,7 +206,7 @@ async function requireGuildAccess(
     const guildPermissionsResult = await getGuildPermissions(sessionResult.userId, sessionResult.accessToken);
     if (guildPermissionsResult instanceof Map) {
         const guild = guildPermissionsResult.get(guildId);
-        console.log("Guild permissions check:", { 
+        logger.info("Guild permissions check", { 
             guildId, 
             userId: sessionResult.userId,
             hasGuild: !!guild,
@@ -213,7 +214,7 @@ async function requireGuildAccess(
             permissions: guild?.permissions
         });
         if (!hasRequiredPermissions(guild, requiredPermissions)) {
-            console.error("Permission denied:", { guildId, userId: sessionResult.userId });
+            logger.error("Permission denied", { guildId, userId: sessionResult.userId });
             return jsonError(403, "Forbidden - You don't have MANAGE_GUILD permission");
         }
         return sessionResult;

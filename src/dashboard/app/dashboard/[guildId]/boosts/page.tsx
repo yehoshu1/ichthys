@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import logger from "../../../../lib/logger";
 import { RoleSelect, ChannelSelect } from "../../../../components/DiscordSelectors";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
@@ -77,7 +78,7 @@ export default function BoostsPage() {
                 setStats(statsData.stats);
             }
         } catch (err) {
-            console.error(err);
+            logger.error(err);
         } finally {
             setLoading(false);
         }
@@ -95,7 +96,7 @@ export default function BoostsPage() {
                 });
                 setMemberMap(map);
             })
-            .catch((err) => console.error(err));
+            .catch((err) => logger.error(err));
     }, [boosters, guildId]);
 
     async function handleSubmit(e: React.FormEvent) {

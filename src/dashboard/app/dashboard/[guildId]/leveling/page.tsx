@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import logger from "../../../../lib/logger";
 import { ChannelSelect, RoleSelect } from "../../../../components/DiscordSelectors";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
@@ -117,7 +118,7 @@ function SettingsTab({ guildId }: { guildId: string }) {
                     levelUpMessageEmbed: data.levelUpMessageEmbed || {}
                 });
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { logger.error(e); }
         finally { setLoading(false); }
     }
 
@@ -136,7 +137,7 @@ function SettingsTab({ guildId }: { guildId: string }) {
             }
             toast.success("Settings saved");
         } catch (e) {
-            console.error(e);
+            logger.error(e);
             toast.error("Failed to save settings");
         }
         finally { setSaving(false); }
@@ -314,7 +315,7 @@ function LevelRewardsManager({ guildId }: { guildId: string }) {
             const res = await fetch(`/api/guilds/${guildId}/leveling/rewards`);
             if (res.ok) setRewards(await res.json());
         } catch (error) {
-            console.error("Error fetching rewards:", error);
+            logger.error("Error fetching rewards:", error);
         } finally {
             setLoading(false);
         }
@@ -337,7 +338,7 @@ function LevelRewardsManager({ guildId }: { guildId: string }) {
                 setNewLevel(1);
             }
         } catch (error) {
-            console.error("Error adding reward:", error);
+            logger.error("Error adding reward:", error);
         }
     };
 
@@ -346,7 +347,7 @@ function LevelRewardsManager({ guildId }: { guildId: string }) {
             await fetch(`/api/guilds/${guildId}/leveling/rewards?id=${id}`, { method: "DELETE" });
             setRewards(rewards.filter(r => r.id !== id));
         } catch (error) {
-            console.error("Error deleting reward:", error);
+            logger.error("Error deleting reward:", error);
         }
     };
 
@@ -430,7 +431,7 @@ function LeaderboardTab({ guildId }: { guildId: string }) {
         try {
             const res = await fetch(`/api/guilds/${guildId}/leveling/leaderboard?type=${type}`);
             if (res.ok) setUsers(await res.json());
-        } catch (e) { console.error(e); }
+        } catch (e) { logger.error(e); }
         finally { setLoading(false); }
     }
 

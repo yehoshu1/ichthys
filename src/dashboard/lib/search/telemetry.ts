@@ -82,7 +82,7 @@ function sendTelemetry(payload: SearchTelemetryPayload): void {
         credentials: "same-origin",
         keepalive: true,
         body,
-    }).catch(() => undefined);
+    }).catch((error) => { console.warn(`Failed to send search telemetry:`, error); return undefined; });
 }
 
 export function hashSearchQuery(query: string): string {

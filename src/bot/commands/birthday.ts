@@ -554,7 +554,7 @@ const command: Command = {
                         .setDescription(`Showing the next ${sortedEntries.length} birthday${sortedEntries.length !== 1 ? 's' : ''}`);
 
                     for (const entry of sortedEntries) {
-                        const user = await interaction.client.users.fetch(entry.userId).catch(() => null);
+                        const user = await interaction.client.users.fetch(entry.userId).catch((error) => { logger.warn(`Failed to fetch user ${entry.userId} for birthday list:`, error); return null; });
                         const username = user?.tag || entry.userId;
                         
                         let timeText;
@@ -610,7 +610,7 @@ const command: Command = {
                     }).sort((a, b) => a.daysUntil - b.daysUntil);
 
                     const nextEntry = sortedEntries[0];
-                    const user = await interaction.client.users.fetch(nextEntry.userId).catch(() => null);
+                    const user = await interaction.client.users.fetch(nextEntry.userId).catch((error) => { logger.warn(`Failed to fetch user ${nextEntry.userId} for next birthday:`, error); return null; });
 
                     let description;
                     if (nextEntry.daysUntil === 0) {

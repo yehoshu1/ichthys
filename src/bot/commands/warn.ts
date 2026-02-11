@@ -190,7 +190,7 @@ async function handleWarnRemove(interaction: ChatInputCommandInteraction) {
                 .set({ active: false })
                 .where(eq(moderationCase.id, warning.id));
 
-            const user = await interaction.client.users.fetch(warning.userId).catch(() => null);
+            const user = await interaction.client.users.fetch(warning.userId).catch((error) => { logger.warn(`Failed to fetch user ${warning.userId} for warning display:`, error); return null; });
 
             await interaction.editReply(`✅ Warning Case #${caseNumber} for **${user?.tag || warning.userId}** has been removed.`);
             logger.info(`${interaction.user.tag} removed warning Case #${caseNumber} in ${interaction.guild!.name}`);
@@ -250,7 +250,7 @@ async function handleWarnings(interaction: ChatInputCommandInteraction) {
 
         // Show active warnings
         for (const warning of activeWarnings.slice(0, 5)) {
-            const moderator = await interaction.client.users.fetch(warning.moderatorId).catch(() => null);
+            const moderator = await interaction.client.users.fetch(warning.moderatorId).catch((error) => { logger.warn(`Failed to fetch moderator ${warning.moderatorId} for warning display:`, error); return null; });
             embed.addFields({
                 name: `Case #${warning.caseNumber} (Active)`,
                 value: [

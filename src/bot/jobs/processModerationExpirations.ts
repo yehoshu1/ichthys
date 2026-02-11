@@ -15,12 +15,12 @@ function isVoiceMuteCase(modCase: typeof moderationCase.$inferSelect): boolean {
 }
 
 async function expireMuteCase(modCase: typeof moderationCase.$inferSelect): Promise<void> {
-    const guild = await client.guilds.fetch(modCase.guildId).catch(() => null);
+    const guild = await client.guilds.fetch(modCase.guildId).catch((error) => { logger.warn(`Failed to fetch guild ${modCase.guildId} for moderation expiration:`, error); return null; });
     if (!guild) {
         return;
     }
 
-    const member = await guild.members.fetch(modCase.userId).catch(() => null);
+    const member = await guild.members.fetch(modCase.userId).catch((error) => { logger.warn(`Failed to fetch member ${modCase.userId} for moderation expiration:`, error); return null; });
     if (!member) {
         return;
     }
@@ -46,12 +46,12 @@ async function expireMuteCase(modCase: typeof moderationCase.$inferSelect): Prom
 }
 
 async function expireTimeoutCase(modCase: typeof moderationCase.$inferSelect): Promise<void> {
-    const guild = await client.guilds.fetch(modCase.guildId).catch(() => null);
+    const guild = await client.guilds.fetch(modCase.guildId).catch((error) => { logger.warn(`Failed to fetch guild ${modCase.guildId} for moderation expiration:`, error); return null; });
     if (!guild) {
         return;
     }
 
-    const member = await guild.members.fetch(modCase.userId).catch(() => null);
+    const member = await guild.members.fetch(modCase.userId).catch((error) => { logger.warn(`Failed to fetch member ${modCase.userId} for moderation expiration:`, error); return null; });
     if (!member) {
         return;
     }
@@ -62,12 +62,12 @@ async function expireTimeoutCase(modCase: typeof moderationCase.$inferSelect): P
 }
 
 async function expireBanCase(modCase: typeof moderationCase.$inferSelect): Promise<void> {
-    const guild = await client.guilds.fetch(modCase.guildId).catch(() => null);
+    const guild = await client.guilds.fetch(modCase.guildId).catch((error) => { logger.warn(`Failed to fetch guild ${modCase.guildId} for moderation expiration:`, error); return null; });
     if (!guild) {
         return;
     }
 
-    await guild.members.unban(modCase.userId, "Temporary ban expired").catch(() => null);
+    await guild.members.unban(modCase.userId, "Temporary ban expired").catch((error) => { logger.warn(`Failed to unban user ${modCase.userId} after temporary ban expired:`, error); return null; });
 }
 
 async function processExpiredCase(modCase: typeof moderationCase.$inferSelect): Promise<void> {

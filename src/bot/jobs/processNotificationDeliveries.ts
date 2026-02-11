@@ -84,12 +84,12 @@ async function processDelivery(
 
     try {
         if (delivery.channelType === 'DISCORD_CHANNEL') {
-            const guild = await client.guilds.fetch(delivery.guildId).catch(() => null);
+            const guild = await client.guilds.fetch(delivery.guildId).catch((error) => { logger.warn(`Failed to fetch guild ${delivery.guildId} for notification delivery:`, error); return null; });
             if (!guild) {
                 throw new Error(`Guild ${delivery.guildId} unavailable`);
             }
 
-            const channel = await guild.channels.fetch(delivery.target).catch(() => null);
+            const channel = await guild.channels.fetch(delivery.target).catch((error) => { logger.warn(`Failed to fetch channel ${delivery.target} for notification delivery:`, error); return null; });
             if (!channel || !channel.isTextBased()) {
                 throw new Error(`Channel ${delivery.target} not found or not text-based`);
             }

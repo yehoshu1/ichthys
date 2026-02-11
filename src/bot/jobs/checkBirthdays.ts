@@ -47,7 +47,7 @@ export async function checkBirthdays(client: Client) {
                 }
 
                 // Get guild
-                const guild = await client.guilds.fetch(config.guildId).catch(() => null);
+                const guild = await client.guilds.fetch(config.guildId).catch((error) => { logger.warn(`Failed to fetch guild ${config.guildId} for birthday check:`, error); return null; });
                 if (!guild) {
                     logger.warn(`Guild ${config.guildId} not found for birthday check`);
                     continue;
@@ -58,7 +58,7 @@ export async function checkBirthdays(client: Client) {
                     continue;
                 }
 
-                const channel = await guild.channels.fetch(config.channelId).catch(() => null);
+                const channel = await guild.channels.fetch(config.channelId).catch((error) => { logger.warn(`Failed to fetch birthday channel ${config.channelId}:`, error); return null; });
                 if (!channel || !channel.isTextBased()) {
                     logger.warn(`Birthday channel ${config.channelId} not found or not text-based`);
                     continue;
@@ -73,6 +73,33 @@ export async function checkBirthdays(client: Client) {
                     )
                 });
 
+                // Batch fetch members to avoid N+1 query pattern
+                const memberIds = birthdayEntries
+                    .filter(e => e.lastCelebratedYear !== currentYear)
+                    .map(e => e.userId);
+                
+                // Fetch all members at once if possible
+                let members: Map<string, any> = new Map();
+                try {
+                    // Try to fetch from cache first, then API
+                    for (const id of memberIds) {
+                        const cached = guild.members.cache.get(id);
+                        if (cached) {
+                            members.set(id, cached);
+                        }
+                    }
+                    // Fetch remaining members from API in batch
+                    const uncachedIds = memberIds.filter(id => !members.has(id));
+                    if (uncachedIds.length > 0) {
+                        const fetchedMembers = await guild.members.fetch({ user: uncachedIds });
+                        for (const [id, member] of fetchedMembers) {
+                            members.set(id, member);
+                        }
+                    }
+                } catch (error) {
+                    logger.warn(`Failed to batch fetch members for birthdays:`, error);
+                }
+
                 for (const entry of birthdayEntries) {
                     try {
                         // Check if already celebrated this year
@@ -81,8 +108,8 @@ export async function checkBirthdays(client: Client) {
                             continue;
                         }
 
-                        // Get user
-                        const member = await guild.members.fetch(entry.userId).catch(() => null);
+                        // Get user from batch-fetched members
+                        const member = members.get(entry.userId);
                         if (!member) {
                             logger.warn(`Member ${entry.userId} not found in guild ${config.guildId}`);
                             continue;
@@ -259,7 +286,7 @@ export async function removeExpiredBirthdayRoles(client: Client) {
             if (!config.roleId) continue;
 
             try {
-                const guild = await client.guilds.fetch(config.guildId).catch(() => null);
+                const guild = await client.guilds.fetch(config.guildId).catch((error) => { logger.warn(`Failed to fetch guild ${config.guildId} for birthday role removal:`, error); return null; });
                 if (!guild) continue;
 
                 // Find yesterday's birthdays
@@ -273,7 +300,7 @@ export async function removeExpiredBirthdayRoles(client: Client) {
 
                 for (const entry of yesterdayBirthdays) {
                     try {
-                        const member = await guild.members.fetch(entry.userId).catch(() => null);
+                        const member = await guild.members.fetch(entry.userId).catch((error) => { logger.warn(`Failed to fetch member ${entry.userId} for birthday celebration:`, error); return null; });
                         if (!member) continue;
 
                         // Check if member has the birthday role

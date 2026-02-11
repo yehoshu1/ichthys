@@ -36,7 +36,7 @@ async function sendVoiceLevelUpNotification(
     }
 
     const channel = member.guild.channels.cache.get(config.levelUpChannelId)
-        ?? await member.guild.channels.fetch(config.levelUpChannelId).catch(() => null);
+        ?? await member.guild.channels.fetch(config.levelUpChannelId).catch((error) => { logger.warn(`Failed to fetch level up channel ${config.levelUpChannelId}:`, error); return null; });
 
     if (!channel || !channel.isTextBased()) {
         return;

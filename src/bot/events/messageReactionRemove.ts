@@ -39,11 +39,11 @@ const event: Event<Events.MessageReactionRemove> = {
             if (config.type !== 'TOGGLE' && config.type !== 'UNIQUE') return;
 
             const member = guild.members.cache.get(user.id)
-                ?? await guild.members.fetch(user.id).catch(() => null);
+                ?? await guild.members.fetch(user.id).catch((error) => { logger.warn(`Failed to fetch member ${user.id} for reaction role removal:`, error); return null; });
             if (!member) return;
 
             const role = guild.roles.cache.get(config.roleId)
-                ?? await guild.roles.fetch(config.roleId).catch(() => null);
+                ?? await guild.roles.fetch(config.roleId).catch((error) => { logger.warn(`Failed to fetch role ${config.roleId} for reaction role removal:`, error); return null; });
             if (!role) return;
 
             if (member.roles.cache.has(role.id)) {
