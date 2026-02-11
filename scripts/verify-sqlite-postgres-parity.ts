@@ -34,10 +34,11 @@ function canonicalizeValue(value: unknown): unknown {
 function canonicalizeRows(rows: AnyRow[], primaryKey: string): AnyRow[] {
     return rows
         .map((row) => {
-            const normalized: AnyRow = {};
-            for (const [key, value] of Object.entries(row)) {
-                normalized[key] = canonicalizeValue(value);
-            }
+            const normalized = Object.fromEntries(
+                Object.entries(row)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([key, value]) => [key, canonicalizeValue(value)])
+            ) as AnyRow;
             return normalized;
         })
         .sort((a, b) => String(a[primaryKey]).localeCompare(String(b[primaryKey])));

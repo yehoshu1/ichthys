@@ -14,6 +14,7 @@ import { Checkbox } from "../../../../components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { useDiscordData } from "../../../../components/useDiscordData";
+import { ExampleBox, HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
 
 interface CommandConfigPayload {
     commandId: string;
@@ -62,6 +63,7 @@ interface IdLabelItem {
 interface MultiSelectChecklistProps {
     title: string;
     description: string;
+    tooltip?: string;
     items: IdLabelItem[];
     selected: string[];
     onChange: (next: string[]) => void;
@@ -70,6 +72,7 @@ interface MultiSelectChecklistProps {
 function MultiSelectChecklist({
     title,
     description,
+    tooltip,
     items,
     selected,
     onChange,
@@ -77,8 +80,12 @@ function MultiSelectChecklist({
     return (
         <div className="space-y-3 rounded-lg border p-4">
             <div>
-                <p className="font-medium">{title}</p>
-                <p className="text-sm text-muted-foreground">{description}</p>
+                {tooltip ? (
+                    <LabelWithTooltip label={title} tooltip={tooltip} className="font-medium" />
+                ) : (
+                    <p className="font-medium">{title}</p>
+                )}
+                <HelperText>{description}</HelperText>
             </div>
 
             {selected.length > 0 && (
@@ -302,6 +309,10 @@ export default function CommandConfigPage() {
                 <p className="text-muted-foreground">
                     Configure per-command access rules, limits, and auto-delete behavior for this server.
                 </p>
+                <ExampleBox>
+                    Restrict the /kick command to only Moderators and Admins by adding those roles to Enabled Roles.
+                    Or block the /warn command in #general by adding it to Disabled Channels.
+                </ExampleBox>
             </div>
 
             <Card>
@@ -351,28 +362,32 @@ export default function CommandConfigPage() {
                                 <div className="grid gap-4 lg:grid-cols-2">
                                     <MultiSelectChecklist
                                         title="Enabled Roles"
-                                        description="If set, user must have at least one of these roles."
+                                        description="Restrict command access to specific roles"
+                                        tooltip="If set, user must have at least one of these roles to use the command. Empty = no restriction."
                                         items={roleItems}
                                         selected={form.enabledRoles}
                                         onChange={(next) => setForm((prev) => ({ ...prev, enabledRoles: next }))}
                                     />
                                     <MultiSelectChecklist
                                         title="Disabled Roles"
-                                        description="Users with these roles are always blocked."
+                                        description="Block specific roles from using this command"
+                                        tooltip="Users with these roles are always blocked from using this command"
                                         items={roleItems}
                                         selected={form.disabledRoles}
                                         onChange={(next) => setForm((prev) => ({ ...prev, disabledRoles: next }))}
                                     />
                                     <MultiSelectChecklist
                                         title="Enabled Channels"
-                                        description="If set, command works only in these channels."
+                                        description="Limit command to specific channels"
+                                        tooltip="If set, command only works in these channels. Empty = all channels allowed."
                                         items={channelItems}
                                         selected={form.enabledChannels}
                                         onChange={(next) => setForm((prev) => ({ ...prev, enabledChannels: next }))}
                                     />
                                     <MultiSelectChecklist
                                         title="Disabled Channels"
-                                        description="Command is always blocked in these channels."
+                                        description="Block command in specific channels"
+                                        tooltip="Command is always blocked in these channels"
                                         items={channelItems}
                                         selected={form.disabledChannels}
                                         onChange={(next) => setForm((prev) => ({ ...prev, disabledChannels: next }))}
@@ -385,7 +400,10 @@ export default function CommandConfigPage() {
 
                             <TabsContent value="limits" className="space-y-4">
                                 <div className="max-w-sm space-y-2">
-                                    <Label>Max Limit (cannot be skipped unless role is allowed)</Label>
+                                    <LabelWithTooltip
+                                        label="Max Limit"
+                                        tooltip="Maximum number of items/targets per command use. For example, limit /move to 5 users at once."
+                                    />
                                     <Input
                                         type="number"
                                         min={1}
@@ -404,7 +422,8 @@ export default function CommandConfigPage() {
 
                                 <MultiSelectChecklist
                                     title="Roles That Can Skip Max Limit"
-                                    description="If request exceeds max limit, only these roles can bypass it."
+                                    description="Allow certain roles to bypass the max limit"
+                                    tooltip="These roles can bypass the max limit restriction"
                                     items={roleItems}
                                     selected={form.rolesCanSkipMaxLimit}
                                     onChange={(next) => setForm((prev) => ({ ...prev, rolesCanSkipMaxLimit: next }))}
@@ -415,10 +434,11 @@ export default function CommandConfigPage() {
                                 <div className="space-y-4 rounded-lg border p-4">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <Label>Delete Invocation Message (slash equivalent)</Label>
-                                            <p className="text-sm text-muted-foreground">
-                                                Deletes the initial bot response generated by the command.
-                                            </p>
+                                            <LabelWithTooltip
+                                                label="Delete Invocation Message"
+                                                tooltip="Deletes the initial bot response generated by the command"
+                                            />
+                                            <HelperText>Removes the command trigger message after execution</HelperText>
                                         </div>
                                         <Switch
                                             checked={form.autoDeleteInvocation}
@@ -427,7 +447,10 @@ export default function CommandConfigPage() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>Delete Bot Reply After N Seconds</Label>
+                                        <LabelWithTooltip
+                                            label="Delete Bot Reply After N Seconds"
+                                            tooltip="Automatically delete the bot's response after this many seconds"
+                                        />
                                         <Input
                                             type="number"
                                             min={0}
@@ -447,10 +470,11 @@ export default function CommandConfigPage() {
 
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <Label>Delete Replies When Invocation Is Deleted</Label>
-                                            <p className="text-sm text-muted-foreground">
-                                                If the original command response is removed, linked follow-up replies will also be removed.
-                                            </p>
+                                            <LabelWithTooltip
+                                                label="Delete Replies When Invocation Is Deleted"
+                                                tooltip="If the original command response is removed, linked follow-up replies will also be removed"
+                                            />
+                                            <HelperText>Cleans up related messages when the main response is deleted</HelperText>
                                         </div>
                                         <Switch
                                             checked={form.autoDeleteWithInvocationDeletion}

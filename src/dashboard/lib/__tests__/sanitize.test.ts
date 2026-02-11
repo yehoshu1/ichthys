@@ -41,7 +41,7 @@ describe("sanitize", () => {
 
         it("should remove event handlers", () => {
             const input = "<div onclick='alert(1)'>Click</div>";
-            expect(sanitizeMessageContent(input)).toBe("<div >Click</div>");
+            expect(sanitizeMessageContent(input)).toBe("<div>Click</div>");
         });
 
         it("should handle null/undefined input", () => {

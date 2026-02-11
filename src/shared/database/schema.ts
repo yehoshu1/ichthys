@@ -15,6 +15,12 @@ import {
 export const roleActionTriggerEnum = pgEnum('role_action_trigger', ['ADD', 'REMOVE']);
 export const roleActionTypeEnum = pgEnum('role_action_type', ['DM', 'KICK', 'LOG', 'MSG', 'MESSAGE']);
 export const reactionRoleTypeEnum = pgEnum('reaction_role_type', ['TOGGLE', 'ADD_ONLY', 'REMOVE_ONLY', 'UNIQUE']);
+export const roleComponentTypeEnum = pgEnum('role_component_type', ['REACTION', 'BUTTON', 'DROPDOWN']);
+export const roleComponentStyleEnum = pgEnum('role_component_style', ['PRIMARY', 'SECONDARY', 'SUCCESS', 'DANGER']);
+export const welcomeTargetTypeEnum = pgEnum('welcome_target_type', ['CHANNEL', 'DM']);
+export const welcomeBackgroundTypeEnum = pgEnum('welcome_background_type', ['COLOR', 'GRADIENT', 'IMAGE']);
+export const welcomeAvatarShapeEnum = pgEnum('welcome_avatar_shape', ['CIRCLE', 'SQUARE', 'ROUNDED']);
+export const welcomeImagePositionEnum = pgEnum('welcome_image_position', ['ABOVE', 'BELOW', 'ONLY']);
 export const scheduledRoleActionStatusEnum = pgEnum('scheduled_role_action_status', [
     'PENDING',
     'PROCESSING',
@@ -22,6 +28,11 @@ export const scheduledRoleActionStatusEnum = pgEnum('scheduled_role_action_statu
     'FAILED',
     'CANCELLED',
 ]);
+export const notificationSeverityEnum = pgEnum('notification_severity', ['INFO', 'WARNING', 'ERROR', 'CRITICAL']);
+export const notificationSourceEnum = pgEnum('notification_source', ['BOT_EVENT', 'BOT_JOB', 'DASHBOARD_API']);
+export const notificationDeliveryChannelEnum = pgEnum('notification_delivery_channel', ['DISCORD_CHANNEL', 'WEBHOOK']);
+export const notificationDeliveryStatusEnum = pgEnum('notification_delivery_status', ['PENDING', 'SENT', 'FAILED', 'SKIPPED']);
+export const notificationDigestModeEnum = pgEnum('notification_digest_mode', ['OFF', 'HOURLY', 'DAILY']);
 
 export const guildConfig = pgTable('guild_config', {
     id: uuid('id').defaultRandom().primaryKey(),
@@ -253,6 +264,100 @@ export const actionLog = pgTable('action_log', {
     guildTypeExecutedIdx: index('action_log_guild_type_executed_idx').on(table.guildId, table.actionType, table.executedAt),
 }));
 
+export const notificationEvent = pgTable('notification_event', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    eventType: text('event_type').notNull(),
+    severity: notificationSeverityEnum('severity').default('INFO').notNull(),
+    source: notificationSourceEnum('source').default('BOT_EVENT').notNull(),
+    title: text('title').notNull(),
+    body: text('body'),
+    actorUserId: text('actor_user_id'),
+    targetUserId: text('target_user_id'),
+    entityType: text('entity_type'),
+    entityId: text('entity_id'),
+    metadata: jsonb('metadata'),
+    dedupeKey: text('dedupe_key'),
+    occurrenceCount: integer('occurrence_count').default(1).notNull(),
+    inAppVisible: boolean('in_app_visible').default(true).notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildOccurredIdx: index('notification_event_guild_occurred_idx').on(table.guildId, table.occurredAt),
+    guildTypeOccurredIdx: index('notification_event_guild_type_occurred_idx').on(table.guildId, table.eventType, table.occurredAt),
+    guildSeverityOccurredIdx: index('notification_event_guild_severity_occurred_idx').on(table.guildId, table.severity, table.occurredAt),
+    guildDedupeIdx: index('notification_event_guild_dedupe_idx').on(table.guildId, table.dedupeKey),
+    guildVisibleOccurredIdx: index('notification_event_guild_visible_occurred_idx').on(table.guildId, table.inAppVisible, table.occurredAt),
+}));
+
+export const notificationUserState = pgTable('notification_user_state', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    notificationId: uuid('notification_id').notNull().references(() => notificationEvent.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    readAt: timestamp('read_at', { withTimezone: true, mode: 'date' }),
+    archivedAt: timestamp('archived_at', { withTimezone: true, mode: 'date' }),
+    pinnedAt: timestamp('pinned_at', { withTimezone: true, mode: 'date' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    notificationUserUnique: uniqueIndex('notification_user_state_notification_user_unique').on(table.notificationId, table.userId),
+    userReadIdx: index('notification_user_state_user_read_idx').on(table.userId, table.readAt),
+    userArchivedIdx: index('notification_user_state_user_archived_idx').on(table.userId, table.archivedAt),
+}));
+
+export const notificationUserCursor = pgTable('notification_user_cursor', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true, mode: 'date' }),
+    lastReadAt: timestamp('last_read_at', { withTimezone: true, mode: 'date' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildUserUnique: uniqueIndex('notification_user_cursor_guild_user_unique').on(table.guildId, table.userId),
+    guildSeenIdx: index('notification_user_cursor_guild_seen_idx').on(table.guildId, table.lastSeenAt),
+}));
+
+export const notificationPreference = pgTable('notification_preference', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    eventType: text('event_type').notNull(),
+    enabled: boolean('enabled').default(true).notNull(),
+    minSeverity: notificationSeverityEnum('min_severity').default('INFO').notNull(),
+    inAppEnabled: boolean('in_app_enabled').default(true).notNull(),
+    discordChannelEnabled: boolean('discord_channel_enabled').default(false).notNull(),
+    discordChannelId: text('discord_channel_id'),
+    webhookEnabled: boolean('webhook_enabled').default(false).notNull(),
+    webhookUrl: text('webhook_url'),
+    digestMode: notificationDigestModeEnum('digest_mode').default('OFF').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildEventUnique: uniqueIndex('notification_preference_guild_event_unique').on(table.guildId, table.eventType),
+    guildIdIdx: index('notification_preference_guild_id_idx').on(table.guildId),
+}));
+
+export const notificationDelivery = pgTable('notification_delivery', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    notificationId: uuid('notification_id').notNull().references(() => notificationEvent.id, { onDelete: 'cascade' }),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    channelType: notificationDeliveryChannelEnum('channel_type').notNull(),
+    target: text('target').notNull(),
+    status: notificationDeliveryStatusEnum('status').default('PENDING').notNull(),
+    attempts: integer('attempts').default(0).notNull(),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    lastError: text('last_error'),
+    sentAt: timestamp('sent_at', { withTimezone: true, mode: 'date' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    statusNextAttemptIdx: index('notification_delivery_status_next_attempt_idx').on(table.status, table.nextAttemptAt),
+    notificationIdx: index('notification_delivery_notification_idx').on(table.notificationId),
+    guildStatusIdx: index('notification_delivery_guild_status_idx').on(table.guildId, table.status),
+}));
+
 export const messageActivity = pgTable('message_activity', {
     id: uuid('id').defaultRandom().primaryKey(),
     guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
@@ -330,6 +435,10 @@ export const reactionRoleMessage = pgTable('reaction_role_message', {
     content: text('content'),
     embed: jsonb('embed'),
     color: integer('color'),
+    // 🆕 Support for different component types
+    componentType: roleComponentTypeEnum('component_type').default('REACTION').notNull(),
+    maxSelections: integer('max_selections').default(1), // For dropdowns: how many roles can be selected
+    placeholder: text('placeholder'), // For dropdowns: placeholder text
     enabled: boolean('enabled').default(true).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
@@ -344,11 +453,15 @@ export const reactionRole = pgTable('reaction_role', {
     reactionRoleMessageId: uuid('reaction_role_message_id').references(() => reactionRoleMessage.id, { onDelete: 'cascade' }),
     messageId: text('message_id').notNull(),
     channelId: text('channel_id').notNull(),
-    emoji: text('emoji').notNull(),
+    // 🆕 For reactions: emoji, for buttons: button label/emoji
+    emoji: text('emoji'),
+    label: text('label'), // 🆕 For buttons: button text
     roleId: text('role_id').notNull(),
     type: reactionRoleTypeEnum('type').default('TOGGLE').notNull(),
+    // 🆕 For buttons: style (PRIMARY, SECONDARY, SUCCESS, DANGER)
+    style: roleComponentStyleEnum('style').default('PRIMARY'),
     exclusiveRoleIds: text('exclusive_role_ids').array(),
-    description: text('description'),
+    description: text('description'), // 🆕 For dropdowns: option description
     enabled: boolean('enabled').default(true).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
@@ -357,6 +470,97 @@ export const reactionRole = pgTable('reaction_role', {
     messageEmojiUnique: uniqueIndex('reaction_role_message_emoji_unique').on(table.messageId, table.emoji),
     guildIdIdx: index('reaction_role_guild_id_idx').on(table.guildId),
     reactionRoleMessageIdx: index('reaction_role_reaction_role_message_idx').on(table.reactionRoleMessageId),
+}));
+
+// 🆕 Welcome System Configuration (ProBot-style)
+export const welcomeConfig = pgTable('welcome_config', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+
+    // ═══════════════════════════════════════════════════════════
+    // WELCOME MESSAGE SETTINGS
+    // ═══════════════════════════════════════════════════════════
+
+    // Basic toggle
+    enabled: boolean('enabled').default(false).notNull(),
+
+    // Message target
+    targetType: welcomeTargetTypeEnum('target_type').default('CHANNEL').notNull(),
+    channelId: text('channel_id'),
+
+    // Message content with [variable] format (ProBot style)
+    messageTemplate: text('message_template'),
+    embedEnabled: boolean('embed_enabled').default(false).notNull(),
+    embedConfig: jsonb('embed_config'),
+
+    // ═══════════════════════════════════════════════════════════
+    // GOODBYE MESSAGE SETTINGS
+    // ═══════════════════════════════════════════════════════════
+
+    goodbyeEnabled: boolean('goodbye_enabled').default(false).notNull(),
+    goodbyeChannelId: text('goodbye_channel_id'),
+    goodbyeMessageTemplate: text('goodbye_message_template'),
+    goodbyeEmbedEnabled: boolean('goodbye_embed_enabled').default(false).notNull(),
+
+    // ═══════════════════════════════════════════════════════════
+    // WELCOME IMAGE CARD SETTINGS
+    // ═══════════════════════════════════════════════════════════
+
+    imageEnabled: boolean('image_enabled').default(false).notNull(),
+    // Image send mode: WITH_TEXT, BEFORE_TEXT, TO_CHANNEL, IMAGE_ONLY
+    imageSendMode: text('image_send_mode').default('WITH_TEXT'),
+    imageChannelId: text('image_channel_id'), // For TO_CHANNEL mode
+
+    // Canvas dimensions (ProBot-style customizable)
+    canvasWidth: integer('canvas_width').default(1024),
+    canvasHeight: integer('canvas_height').default(500),
+
+    // Background settings
+    backgroundType: welcomeBackgroundTypeEnum('background_type').default('COLOR').notNull(),
+    backgroundValue: text('background_value').default('#36393f'), // Color, gradient, image URL
+
+    // Avatar settings
+    avatarShape: welcomeAvatarShapeEnum('avatar_shape').default('CIRCLE').notNull(),
+    avatarX: integer('avatar_x').default(150),
+    avatarY: integer('avatar_y').default(150),
+    avatarSize: integer('avatar_size').default(128),
+    avatarBorderColor: text('avatar_border_color').default('#ffffff'),
+    avatarBorderWidth: integer('avatar_border_width').default(4),
+
+    // Username text settings
+    usernameX: integer('username_x').default(300),
+    usernameY: integer('username_y').default(130),
+    usernameFont: text('username_font').default('Arial'),
+    usernameSize: integer('username_size').default(32),
+    usernameColor: text('username_color').default('#ffffff'),
+    usernameAlign: text('username_align').default('left'),
+
+    // Subtitle text settings
+    subtitleEnabled: boolean('subtitle_enabled').default(true).notNull(),
+    subtitleTemplate: text('subtitle_template').default('Welcome to [server]!'),
+    subtitleX: integer('subtitle_x').default(300),
+    subtitleY: integer('subtitle_y').default(180),
+    subtitleFont: text('subtitle_font').default('Arial'),
+    subtitleSize: integer('subtitle_size').default(24),
+    subtitleColor: text('subtitle_color').default('#cccccc'),
+
+    // Server name overlay
+    showServerName: boolean('show_server_name').default(false).notNull(),
+    serverNameX: integer('server_name_x').default(300),
+    serverNameY: integer('server_name_y').default(80),
+    serverNameFont: text('server_name_font').default('Arial'),
+    serverNameSize: integer('server_name_size').default(28),
+    serverNameColor: text('server_name_color').default('#ffffff'),
+
+    // Safety settings
+    cooldownEnabled: boolean('cooldown_enabled').default(false).notNull(),
+    cooldownSeconds: integer('cooldown_seconds').default(5),
+
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildIdUnique: uniqueIndex('welcome_config_guild_id_unique').on(table.guildId),
+    guildIdIdx: index('welcome_config_guild_id_idx').on(table.guildId),
 }));
 
 export const discordUserCache = pgTable('discord_user_cache', {
@@ -520,6 +724,21 @@ export type NewRoleAction = typeof roleAction.$inferInsert;
 export type ActionLog = typeof actionLog.$inferSelect;
 export type NewActionLog = typeof actionLog.$inferInsert;
 
+export type NotificationEvent = typeof notificationEvent.$inferSelect;
+export type NewNotificationEvent = typeof notificationEvent.$inferInsert;
+
+export type NotificationUserState = typeof notificationUserState.$inferSelect;
+export type NewNotificationUserState = typeof notificationUserState.$inferInsert;
+
+export type NotificationUserCursor = typeof notificationUserCursor.$inferSelect;
+export type NewNotificationUserCursor = typeof notificationUserCursor.$inferInsert;
+
+export type NotificationPreference = typeof notificationPreference.$inferSelect;
+export type NewNotificationPreference = typeof notificationPreference.$inferInsert;
+
+export type NotificationDelivery = typeof notificationDelivery.$inferSelect;
+export type NewNotificationDelivery = typeof notificationDelivery.$inferInsert;
+
 export type MessageActivity = typeof messageActivity.$inferSelect;
 export type NewMessageActivity = typeof messageActivity.$inferInsert;
 
@@ -549,3 +768,6 @@ export type NewReactionRoleMessage = typeof reactionRoleMessage.$inferInsert;
 
 export type ReactionRole = typeof reactionRole.$inferSelect;
 export type NewReactionRole = typeof reactionRole.$inferInsert;
+
+export type WelcomeConfig = typeof welcomeConfig.$inferSelect;
+export type NewWelcomeConfig = typeof welcomeConfig.$inferInsert;

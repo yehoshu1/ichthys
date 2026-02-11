@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components
 import { Badge } from "../../../../components/ui/badge";
 import { Separator } from "../../../../components/ui/separator";
 import { ChannelSelect, RoleSelect } from "../../../../components/DiscordSelectors";
+import { ExampleBox, HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
 
 import {
     Shield,
@@ -181,6 +182,12 @@ export default function ModerationPage() {
                 </TabsList>
 
                 <TabsContent value="automod" className="space-y-4">
+                    <ExampleBox>
+                        Set Spam Threshold to 5 messages per 5 seconds. If a user sends 6 messages rapidly, 
+                        they&apos;ll receive the configured action (warn/mute/kick). Mute duration only applies 
+                        if you select Mute as the action.
+                    </ExampleBox>
+
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
@@ -193,12 +200,10 @@ export default function ModerationPage() {
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label>Enable Spam Protection</Label>
-                                    <p className="text-sm text-muted-foreground">
-                                        Automatically detect users sending too many messages quickly.
-                                    </p>
-                                </div>
+                                <LabelWithTooltip
+                                    label="Enable Spam Protection"
+                                    tooltip="Automatically detect users sending too many messages quickly"
+                                />
                                 <Switch
                                     checked={config.autoModEnabled}
                                     onCheckedChange={(checked) => setConfig({ ...config, autoModEnabled: checked })}
@@ -210,7 +215,10 @@ export default function ModerationPage() {
                                     <Separator />
                                     <div className="grid gap-4 md:grid-cols-3">
                                         <div className="space-y-2">
-                                            <Label>Spam Threshold</Label>
+                                            <LabelWithTooltip
+                                                label="Spam Threshold"
+                                                tooltip="Number of messages allowed per 5-second window. Recommended: 5"
+                                            />
                                             <Input
                                                 type="number"
                                                 min={2}
@@ -221,7 +229,10 @@ export default function ModerationPage() {
                                             <p className="text-xs text-muted-foreground">Messages per 5 seconds</p>
                                         </div>
                                         <div className="space-y-2">
-                                            <Label>Action</Label>
+                                            <LabelWithTooltip
+                                                label="Action"
+                                                tooltip="What to do when spam is detected"
+                                            />
                                             <Select
                                                 value={config.spamAction}
                                                 onValueChange={(value) => setConfig({ ...config, spamAction: value })}
@@ -237,7 +248,10 @@ export default function ModerationPage() {
                                             </Select>
                                         </div>
                                         <div className="space-y-2">
-                                            <Label>Mute Duration (minutes)</Label>
+                                            <LabelWithTooltip
+                                                label="Mute Duration (minutes)"
+                                                tooltip="Only applies when Action is set to Mute"
+                                            />
                                             <Input
                                                 type="number"
                                                 min={1}
@@ -264,12 +278,10 @@ export default function ModerationPage() {
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label>Filter Invite Links</Label>
-                                    <p className="text-sm text-muted-foreground">
-                                        Delete messages containing Discord server invites.
-                                    </p>
-                                </div>
+                                <LabelWithTooltip
+                                    label="Filter Invite Links"
+                                    tooltip="Delete messages containing Discord server invites"
+                                />
                                 <Switch
                                     checked={config.inviteFilterEnabled}
                                     onCheckedChange={(checked) => setConfig({ ...config, inviteFilterEnabled: checked })}
@@ -313,12 +325,10 @@ export default function ModerationPage() {
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <Label>Enable Word Filter</Label>
-                                    <p className="text-sm text-muted-foreground">
-                                        Automatically delete messages containing banned words.
-                                    </p>
-                                </div>
+                                <LabelWithTooltip
+                                    label="Enable Word Filter"
+                                    tooltip="Automatically delete messages containing banned words"
+                                />
                                 <Switch
                                     checked={config.wordFilterEnabled}
                                     onCheckedChange={(checked) => setConfig({ ...config, wordFilterEnabled: checked })}
@@ -349,6 +359,7 @@ export default function ModerationPage() {
 
                                     <div className="space-y-4">
                                         <Label>Banned Words List</Label>
+                                        <HelperText>Words are case-insensitive.</HelperText>
                                         <div className="flex gap-2">
                                             <Input
                                                 placeholder="Enter a word to ban..."
@@ -380,7 +391,7 @@ export default function ModerationPage() {
                                         </div>
 
                                         <p className="text-xs text-muted-foreground">
-                                            Click on a word to remove it. Words are case-insensitive.
+                                            Click on a word to remove it.
                                         </p>
                                     </div>
                                 </>
@@ -402,7 +413,10 @@ export default function ModerationPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                <Label>Mute Role</Label>
+                                <LabelWithTooltip
+                                    label="Mute Role"
+                                    tooltip="The role assigned to muted users. Should have restricted channel permissions."
+                                />
                                 <RoleSelect
                                     guildId={guildId}
                                     value={config.muteRoleId || ""}
@@ -428,7 +442,10 @@ export default function ModerationPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                <Label>Log Channel</Label>
+                                <LabelWithTooltip
+                                    label="Log Channel"
+                                    tooltip="All moderation actions will be logged here for audit purposes"
+                                />
                                 <ChannelSelect
                                     guildId={guildId}
                                     value={config.logChannelId || ""}

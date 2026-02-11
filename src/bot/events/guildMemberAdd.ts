@@ -5,6 +5,8 @@ import { db } from '../../shared/database/client';
 import { userJoin, guildConfig } from '../../shared/database/schema';
 import { eq, and } from 'drizzle-orm';
 import { buildMessage } from '../utils/embeds';
+import { emitGuildNotificationSafe } from '../services/notificationEmitter';
+import { sendWelcomeMessage } from '../services/welcomeService';
 
 const event: Event<Events.GuildMemberAdd> = {
     name: Events.GuildMemberAdd,
@@ -44,50 +46,94 @@ const event: Event<Events.GuildMemberAdd> = {
                 logger.debug(`Created join record for ${member.user.tag} in ${member.guild.name}`);
             }
 
-            // 2. Fetch guild config for welcome features
+            // 2. Fetch guild config for legacy welcome features
             const config = await db.query.guildConfig.findFirst({
                 where: eq(guildConfig.guildId, member.guild.id)
             });
 
-            if (!config || !config.welcomeEnabled) return;
-
-            // 3. Auto-assign role if configured
-            if (config.autoRoleId) {
+            // 3. Auto-assign role if configured (legacy system)
+            if (config?.autoRoleId) {
                 try {
                     await member.roles.add(config.autoRoleId);
                     logger.info(`Auto-assigned role ${config.autoRoleId} to ${member.user.tag} in ${member.guild.name}`);
+                    await emitGuildNotificationSafe({
+                        guildId: member.guild.id,
+                        eventType: 'WELCOME_AUTO_ROLE_ASSIGNED',
+                        severity: 'INFO',
+                        source: 'BOT_EVENT',
+                        title: `Auto-role assigned to ${member.user.tag}`,
+                        targetUserId: member.id,
+                        metadata: {
+                            roleId: config.autoRoleId,
+                        },
+                    });
                 } catch (roleError) {
                     logger.error(`Failed to auto-assign role to ${member.user.tag}:`, roleError);
+                    await emitGuildNotificationSafe({
+                        guildId: member.guild.id,
+                        eventType: 'WELCOME_AUTO_ROLE_ASSIGN_FAILED',
+                        severity: 'ERROR',
+                        source: 'BOT_EVENT',
+                        title: `Failed to auto-assign role to ${member.user.tag}`,
+                        body: roleError instanceof Error ? roleError.message : 'Unknown error',
+                        targetUserId: member.id,
+                        metadata: {
+                            roleId: config.autoRoleId,
+                        },
+                        dedupeKey: `welcome-auto-role-failed:${config.autoRoleId}`,
+                        dedupeWindowSeconds: 600,
+                    });
                 }
             }
 
-            // 4. Send join message if configured
-            if (config.joinMessageChannelId) {
-                try {
-                    const channel = await member.guild.channels.fetch(config.joinMessageChannelId);
-                    if (channel && channel.isTextBased()) {
-                        const variables = {
-                            'user': member.toString(),
-                            'username': member.user.username,
-                            'server': member.guild.name,
-                            'memberCount': member.guild.memberCount.toString(),
-                            'date': new Date().toLocaleDateString(),
-                            'time': new Date().toLocaleTimeString(),
-                        };
+            // 4. 🆕 NEW: Send welcome message using new welcome system
+            // This takes priority over legacy system if enabled
+            const welcomeSent = await sendWelcomeMessage(member);
 
-                        const messageData = buildMessage(
-                            config.joinMessage,
-                            config.joinMessageEmbed as any,
-                            variables
-                        );
+            // 5. Legacy welcome message (only if new system didn't send)
+            if (!welcomeSent && config?.welcomeEnabled) {
+                // Send join message if configured (legacy system)
+                if (config.joinMessageChannelId) {
+                    try {
+                        const channel = await member.guild.channels.fetch(config.joinMessageChannelId);
+                        if (channel && channel.isTextBased()) {
+                            const variables = {
+                                'user': member.toString(),
+                                'username': member.user.username,
+                                'server': member.guild.name,
+                                'memberCount': member.guild.memberCount.toString(),
+                                'date': new Date().toLocaleDateString(),
+                                'time': new Date().toLocaleTimeString(),
+                            };
 
-                        if (messageData) {
-                            await (channel as TextChannel).send(messageData);
-                            logger.debug(`Sent join message for ${member.user.tag} in ${member.guild.name}`);
+                            const messageData = buildMessage(
+                                config.joinMessage,
+                                config.joinMessageEmbed as any,
+                                variables
+                            );
+
+                            if (messageData) {
+                                await (channel as TextChannel).send(messageData);
+                                logger.debug(`Sent legacy join message for ${member.user.tag} in ${member.guild.name}`);
+                            }
                         }
+                    } catch (msgError) {
+                        logger.error(`Failed to send join message for ${member.user.tag}:`, msgError);
+                        await emitGuildNotificationSafe({
+                            guildId: member.guild.id,
+                            eventType: 'WELCOME_JOIN_MESSAGE_FAILED',
+                            severity: 'ERROR',
+                            source: 'BOT_EVENT',
+                            title: `Failed to send join message for ${member.user.tag}`,
+                            body: msgError instanceof Error ? msgError.message : 'Unknown error',
+                            targetUserId: member.id,
+                            metadata: {
+                                channelId: config.joinMessageChannelId,
+                            },
+                            dedupeKey: `welcome-join-message-failed:${config.joinMessageChannelId ?? 'none'}`,
+                            dedupeWindowSeconds: 600,
+                        });
                     }
-                } catch (msgError) {
-                    logger.error(`Failed to send join message for ${member.user.tag}:`, msgError);
                 }
             }
 

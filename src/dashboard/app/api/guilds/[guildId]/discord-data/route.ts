@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireGuildManageAccess } from "@/lib/guild-auth";
 import logger from "@/lib/logger";
 import { getToken } from "next-auth/jwt";
+import { emitGuildNotification } from "@shared/services/notification-service";
 
 const CACHE_TTL = 300 * 1000; // 5 minutes
 const cache = new Map<string, { data: DiscordData, timestamp: number }>();
@@ -35,7 +36,10 @@ interface DiscordData {
     }>;
 }
 
-async function fetchWithBotToken(guildId: string, botToken: string): Promise<{ roles: DiscordApiRole[]; channels: DiscordApiChannel[] } | null> {
+async function fetchWithBotToken(
+    guildId: string,
+    botToken: string
+): Promise<{ data: { roles: DiscordApiRole[]; channels: DiscordApiChannel[] } | null; missingPermissions: boolean }> {
     try {
         const [rolesResponse, channelsResponse] = await Promise.all([
             fetch(`https://discord.com/api/v10/guilds/${guildId}/roles`, {
@@ -52,16 +56,25 @@ async function fetchWithBotToken(guildId: string, botToken: string): Promise<{ r
                 channelsStatus: channelsResponse.status,
                 guildId
             });
-            return null;
+            return {
+                data: null,
+                missingPermissions: rolesResponse.status === 403 || channelsResponse.status === 403,
+            };
         }
 
         const roles = await rolesResponse.json() as DiscordApiRole[];
         const channels = await channelsResponse.json() as DiscordApiChannel[];
 
-        return { roles, channels };
+        return {
+            data: { roles, channels },
+            missingPermissions: false,
+        };
     } catch (error) {
         logger.error("Bot token fetch failed", { error, guildId });
-        return null;
+        return {
+            data: null,
+            missingPermissions: false,
+        };
     }
 }
 
@@ -125,10 +138,13 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
     try {
         const botToken = process.env.DISCORD_TOKEN;
         let result: { roles: DiscordApiRole[]; channels: DiscordApiChannel[] } | null = null;
+        let botMissingPermissions = false;
 
         // Try bot token first (preferred - has higher rate limits)
         if (botToken) {
-            result = await fetchWithBotToken(guildId, botToken);
+            const botResult = await fetchWithBotToken(guildId, botToken);
+            result = botResult.data;
+            botMissingPermissions = botResult.missingPermissions;
         }
 
         // If bot token failed or not configured, try user token as fallback
@@ -139,6 +155,19 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             if (userToken) {
                 result = await fetchWithUserToken(guildId, userToken);
             }
+        }
+
+        if (botMissingPermissions) {
+            await emitGuildNotification({
+                guildId,
+                eventType: 'GUILD_BOT_MISSING_PERMISSIONS',
+                severity: 'ERROR',
+                source: 'DASHBOARD_API',
+                title: 'Bot is missing required guild permissions',
+                actorUserId: auth.userId,
+                dedupeKey: `guild-bot-missing-permissions:${guildId}`,
+                dedupeWindowSeconds: 600,
+            });
         }
 
         // If both failed, return error

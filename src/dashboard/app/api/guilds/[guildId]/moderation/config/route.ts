@@ -6,6 +6,7 @@ import { requireGuildManageAccess, requireGuildManageRolesAccess } from "@/lib/g
 import { nullableDiscordIdSchema, parseJsonBody } from "@/lib/validation";
 import { z } from "zod";
 import logger from "@/lib/logger";
+import { emitDashboardSettingsChanged } from "@/lib/notification-events";
 
 const moderationConfigSchema = z.object({
     autoModEnabled: z.boolean().default(false),
@@ -93,6 +94,12 @@ export async function POST(
             });
 
         logger.info("Updated moderation settings", { guildId, userId: auth.userId });
+        await emitDashboardSettingsChanged({
+            guildId,
+            userId: auth.userId,
+            module: "moderation",
+            action: "update",
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

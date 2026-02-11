@@ -19,6 +19,7 @@ import {
 import { eq } from "drizzle-orm";
 import { requireGuildManageAccess } from "@/lib/guild-auth";
 import logger from "@/lib/logger";
+import { emitGuildNotification } from "@shared/services/notification-service";
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
@@ -79,6 +80,20 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             messageAliases: aliases,
             commandConfigs,
         };
+
+        await emitGuildNotification({
+            guildId,
+            eventType: 'DASHBOARD_SETTINGS_EXPORTED',
+            severity: 'INFO',
+            source: 'DASHBOARD_API',
+            title: 'Settings exported',
+            actorUserId: auth.userId,
+            metadata: {
+                version: exportData.version,
+            },
+            dedupeKey: `dashboard-settings-exported:${guildId}`,
+            dedupeWindowSeconds: 60,
+        });
 
         return new NextResponse(JSON.stringify(exportData, null, 2), {
             status: 200,

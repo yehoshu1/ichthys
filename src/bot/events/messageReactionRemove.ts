@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { db } from '../../shared/database/client';
 import { reactionRole } from '../../shared/database/schema';
 import { and, eq } from 'drizzle-orm';
+import { emitGuildNotificationSafe } from '../services/notificationEmitter';
 
 const event: Event<Events.MessageReactionRemove> = {
     name: Events.MessageReactionRemove,
@@ -50,6 +51,23 @@ const event: Event<Events.MessageReactionRemove> = {
             }
         } catch (error) {
             logger.error('Error handling reaction role removal:', error);
+            if (reaction.message.guild) {
+                await emitGuildNotificationSafe({
+                    guildId: reaction.message.guild.id,
+                    eventType: 'REACTION_ROLE_PROCESSING_ERROR',
+                    severity: 'ERROR',
+                    source: 'BOT_EVENT',
+                    title: `Reaction role removal failed`,
+                    body: error instanceof Error ? error.message : 'Unknown error',
+                    targetUserId: user.id,
+                    metadata: {
+                        messageId: reaction.message.id,
+                        emoji: reaction.emoji.id || reaction.emoji.name || null,
+                    },
+                    dedupeKey: `reaction-role-remove-error:${reaction.message.id}:${reaction.emoji.id || reaction.emoji.name || 'unknown'}`,
+                    dedupeWindowSeconds: 900,
+                });
+            }
         }
     }
 };

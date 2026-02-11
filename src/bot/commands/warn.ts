@@ -4,6 +4,7 @@ import { db } from '../../shared/database/client';
 import { moderationCase, moderationSettings } from '../../shared/database/schema';
 import { eq, and, sql, desc } from 'drizzle-orm';
 import logger from '../utils/logger';
+import { emitGuildNotificationSafe } from '../services/notificationEmitter';
 
 async function getNextCaseNumber(guildId: string): Promise<number> {
     const result = await db
@@ -31,6 +32,20 @@ async function createModCase(
         reason: reason || null,
         active: true,
     }).returning();
+
+    await emitGuildNotificationSafe({
+        guildId,
+        eventType: 'MOD_CASE_CREATED_WARN',
+        severity: 'WARNING',
+        source: 'BOT_EVENT',
+        title: `Warning case #${caseNumber} created`,
+        targetUserId: userId,
+        actorUserId: moderatorId,
+        metadata: {
+            caseId: modCase.id,
+            caseNumber,
+        },
+    });
 
     return modCase;
 }
@@ -137,6 +152,18 @@ async function handleWarnRemove(interaction: ChatInputCommandInteraction) {
 
             await interaction.editReply(`✅ All active warnings for **${target.tag}** have been removed.`);
             logger.info(`${interaction.user.tag} removed all warnings for ${target.tag} in ${interaction.guild!.name}`);
+            await emitGuildNotificationSafe({
+                guildId: interaction.guildId!,
+                eventType: 'MOD_WARNING_REMOVED',
+                severity: 'INFO',
+                source: 'BOT_EVENT',
+                title: `All warnings removed for ${target.tag}`,
+                targetUserId: target.id,
+                actorUserId: interaction.user.id,
+                metadata: {
+                    scope: 'all',
+                },
+            });
 
         } else if (warnId) {
             // Remove specific warning by case number
@@ -167,6 +194,20 @@ async function handleWarnRemove(interaction: ChatInputCommandInteraction) {
 
             await interaction.editReply(`✅ Warning Case #${caseNumber} for **${user?.tag || warning.userId}** has been removed.`);
             logger.info(`${interaction.user.tag} removed warning Case #${caseNumber} in ${interaction.guild!.name}`);
+            await emitGuildNotificationSafe({
+                guildId: interaction.guildId!,
+                eventType: 'MOD_WARNING_REMOVED',
+                severity: 'INFO',
+                source: 'BOT_EVENT',
+                title: `Warning case #${caseNumber} removed`,
+                targetUserId: warning.userId,
+                actorUserId: interaction.user.id,
+                metadata: {
+                    caseId: warning.id,
+                    caseNumber,
+                    scope: 'single',
+                },
+            });
 
         } else {
             await interaction.editReply('❌ Please specify either a user to clear all warnings, or a specific warning ID.');

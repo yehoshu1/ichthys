@@ -7,13 +7,22 @@ import { eq, and, sql } from 'drizzle-orm';
 import { calculateLevel, checkAndAssignLevelRewards } from '../utils/leveling';
 import { buildMessage } from '../utils/embeds';
 import { messageAliasService } from '../services/messageAliasService';
+import { sanitizeContent, sanitizeEmbed, validateEmbed } from '../utils/sanitize';
+import { emitGuildNotificationSafe } from '../services/notificationEmitter';
+
+function getPositiveIntEnv(name: string, fallback: number): number {
+    const raw = process.env[name];
+    if (!raw) return fallback;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 const CONFIG_TTL_MS = 60_000;
 const ACTIVITY_FLUSH_INTERVAL_MS = 5_000;
 const ACTIVITY_CHUNK_SIZE = 50;
 const MAX_CONFIG_CACHE_ENTRIES = 1_000;
-const MAX_ALIAS_COOLDOWN_ENTRIES = 10_000;
-const MAX_ACTIVITY_BUFFER_ENTRIES = 5_000;
+const MAX_ALIAS_COOLDOWN_ENTRIES = getPositiveIntEnv('MAX_ALIAS_COOLDOWN_ENTRIES', 5_000);
+const MAX_ACTIVITY_BUFFER_ENTRIES = getPositiveIntEnv('MAX_ACTIVITY_BUFFER_ENTRIES', 2_000);
 
 type GuildConfigRow = typeof guildConfig.$inferSelect;
 
@@ -273,30 +282,88 @@ async function processMessageAliases(message: Message): Promise<void> {
             // Send response
             try {
                 const responseData: { content?: string; embeds?: object[] } = {};
-                
+
                 if (alias.response) {
-                    responseData.content = alias.response;
+                    // Sanitize the response content to prevent abuse
+                    const sanitizedContent = sanitizeContent(alias.response);
+                    responseData.content = sanitizedContent;
                 }
-                
+
                 if (alias.responseEmbed) {
-                    // responseEmbed is already parsed JSON from Drizzle
-                    responseData.embeds = [alias.responseEmbed as object];
+                    // Validate and sanitize embed before sending
+                    if (validateEmbed(alias.responseEmbed)) {
+                        const sanitizedEmbed = sanitizeEmbed(alias.responseEmbed);
+                        responseData.embeds = [sanitizedEmbed as object];
+                    } else {
+                        logger.warn(`Invalid embed detected for alias ${alias.id}, skipping embed`);
+                        await emitGuildNotificationSafe({
+                            guildId: message.guild.id,
+                            eventType: 'ALIAS_EMBED_INVALID',
+                            severity: 'WARNING',
+                            source: 'BOT_EVENT',
+                            title: `Alias ${alias.trigger} has an invalid embed`,
+                            targetUserId: message.author.id,
+                            metadata: {
+                                aliasId: alias.id,
+                                trigger: alias.trigger,
+                            },
+                            dedupeKey: `alias-invalid-embed:${alias.id}`,
+                            dedupeWindowSeconds: 3600,
+                        });
+                    }
                 }
-                
+
                 if ((responseData.content || responseData.embeds) && message.channel.isTextBased() && !message.channel.isDMBased()) {
                     await message.channel.send(responseData);
                 }
                 
                 // Increment usage count
-                await db.update(messageAlias)
+                const [updatedAlias] = await db.update(messageAlias)
                     .set({ 
                         usageCount: sql`usage_count + 1`,
                         updatedAt: new Date()
                     })
-                    .where(eq(messageAlias.id, alias.id));
+                    .where(eq(messageAlias.id, alias.id))
+                    .returning({
+                        id: messageAlias.id,
+                        usageCount: messageAlias.usageCount,
+                        trigger: messageAlias.trigger,
+                    });
+
+                if (updatedAlias && updatedAlias.usageCount > 0 && updatedAlias.usageCount % 500 === 0) {
+                    await emitGuildNotificationSafe({
+                        guildId: message.guild.id,
+                        eventType: 'ALIAS_HIGH_USAGE',
+                        severity: 'INFO',
+                        source: 'BOT_EVENT',
+                        title: `Alias ${updatedAlias.trigger} reached ${updatedAlias.usageCount} uses`,
+                        metadata: {
+                            aliasId: updatedAlias.id,
+                            usageCount: updatedAlias.usageCount,
+                            trigger: updatedAlias.trigger,
+                        },
+                        dedupeKey: `alias-high-usage:${updatedAlias.id}:${updatedAlias.usageCount}`,
+                        dedupeWindowSeconds: 86400,
+                    });
+                }
                 
             } catch (error) {
                 logger.error(`Failed to send alias response for ${alias.id}:`, error);
+                await emitGuildNotificationSafe({
+                    guildId: message.guild.id,
+                    eventType: 'ALIAS_RESPONSE_FAILED',
+                    severity: 'WARNING',
+                    source: 'BOT_EVENT',
+                    title: `Alias response failed for trigger ${alias.trigger}`,
+                    body: error instanceof Error ? error.message : 'Unknown error',
+                    targetUserId: message.author.id,
+                    metadata: {
+                        aliasId: alias.id,
+                        trigger: alias.trigger,
+                    },
+                    dedupeKey: `alias-response-failed:${alias.id}`,
+                    dedupeWindowSeconds: 600,
+                });
             }
             
             // Only process the first matching alias

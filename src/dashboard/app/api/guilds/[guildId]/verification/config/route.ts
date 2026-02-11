@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireGuildManageAccess, requireGuildManageRolesAccess } from "@/lib/guild-auth";
 import { nullableDiscordIdSchema, optionalTextSchema, parseJsonBody } from "@/lib/validation";
 import logger from "@/lib/logger";
+import { emitDashboardSettingsChanged } from "@/lib/notification-events";
 
 const verificationConfigSchema = z.object({
     verificationEnabled: z.boolean().optional(),
@@ -76,6 +77,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
                 lastMemberSync: null,
                 updatedAt: new Date(),
             },
+        });
+
+        await emitDashboardSettingsChanged({
+            guildId,
+            userId: auth.userId,
+            module: "verification",
+            action: "update",
         });
 
         return NextResponse.json({ success: true });

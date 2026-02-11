@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireGuildManageAccess } from "@/lib/guild-auth";
 import logger from "../../../../lib/logger";
 import { discordCache, dedupeRequest } from "@/lib/discord-cache";
+import { emitGuildNotification } from "@shared/services/notification-service";
 
 interface DiscordGuild {
     id: string;
@@ -118,6 +119,18 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
 
     try {
         const result = await fetchGuildData(guildId, { accessToken: auth.accessToken });
+        if (!result.isBotMember) {
+            await emitGuildNotification({
+                guildId,
+                eventType: 'GUILD_BOT_MISSING_IN_GUILD',
+                severity: 'CRITICAL',
+                source: 'DASHBOARD_API',
+                title: 'Bot is not in this guild',
+                actorUserId: auth.userId,
+                dedupeKey: `guild-bot-missing:${guildId}`,
+                dedupeWindowSeconds: 600,
+            });
+        }
         return NextResponse.json(result);
     } catch (error) {
         if (error instanceof Error) {
@@ -135,6 +148,16 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
                 );
             }
             if (error.message === "NO_GUILD" || error.message === "FETCH_FAILED") {
+                await emitGuildNotification({
+                    guildId,
+                    eventType: 'GUILD_BOT_MISSING_IN_GUILD',
+                    severity: 'CRITICAL',
+                    source: 'DASHBOARD_API',
+                    title: 'Bot is not in this guild',
+                    actorUserId: auth.userId,
+                    dedupeKey: `guild-bot-missing:${guildId}`,
+                    dedupeWindowSeconds: 600,
+                }).catch(() => null);
                 return NextResponse.json(
                     { error: "Bot not in server" },
                     { status: 404 }

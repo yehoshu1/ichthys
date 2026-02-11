@@ -33,6 +33,18 @@ if (missingEnvVars.length > 0) {
     process.exit(1);
 }
 
+// Global error handlers for uncaught exceptions and unhandled rejections
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Keep the process alive but log the error for monitoring
+});
+
+process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception:', error);
+    // Give logger time to flush before exiting
+    setTimeout(() => process.exit(1), 1000);
+});
+
 // Login to Discord
 async function startBot() {
     try {
@@ -44,6 +56,7 @@ async function startBot() {
         const { setupAnalyticsSyncJob } = await import('./jobs/syncAnalytics');
         const { setupScheduledRoleActionsJob } = await import('./jobs/processScheduledRoleActions');
         const { setupModerationExpirationsJob } = await import('./jobs/processModerationExpirations');
+        const { setupNotificationDeliveryJob } = await import('./jobs/processNotificationDeliveries');
         const { default: startUserCacheCleanupJob } = await import('./jobs/cleanupUserCache');
         const { default: startGrowthTrackingJob } = await import('./jobs/trackGrowth');
         const { setupVoiceXpProcessingJob } = await import('./jobs/processVoiceXp');
@@ -55,6 +68,7 @@ async function startBot() {
         setupAnalyticsSyncJob();
         setupScheduledRoleActionsJob();
         setupModerationExpirationsJob();
+        setupNotificationDeliveryJob();
         startUserCacheCleanupJob();
         startGrowthTrackingJob();
         setupVoiceXpProcessingJob();

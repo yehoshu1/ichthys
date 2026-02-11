@@ -7,7 +7,15 @@ import { parseCsvList } from '../../shared/command-config';
 
 
 const CONFIG_CACHE_TTL_MS = 15_000;
-const MAX_GUILD_CACHE_ENTRIES = 1_000;
+
+function getPositiveIntEnv(name: string, fallback: number): number {
+    const raw = process.env[name];
+    if (!raw) return fallback;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const MAX_GUILD_CACHE_ENTRIES = getPositiveIntEnv('MAX_COMMAND_CONFIG_GUILD_CACHE_ENTRIES', 500);
 
 export interface ResolvedCommandConfig extends Omit<CommandConfig, 'enabledRoles' | 'disabledRoles' | 'enabledChannels' | 'disabledChannels' | 'rolesCanSkipMaxLimit'> {
     enabledRoles: string[];

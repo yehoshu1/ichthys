@@ -2,6 +2,12 @@
 
 The web dashboard is the command center for your server. It provides a comprehensive interface for configuring all aspects of the ΙΧΘΥΣ bot.
 
+## Search Behavior
+
+- Global search is implemented inside the dashboard app (no external search service).
+- Results are composed from settings/doc sources and ranked locally.
+- Semantic/vector search is intentionally deferred; see `docs/adr/0001-defer-meilisearch-integration.md`.
+
 ## Deep-Dive Module Docs
 
 For implementation-level detail per module, use:

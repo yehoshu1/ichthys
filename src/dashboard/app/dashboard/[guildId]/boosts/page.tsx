@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Zap, Clock } from "lucide-react";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
 import Image from "next/image";
+import { ExampleBox, HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
 
 interface BoostConfig {
     boostEnabled: boolean;
@@ -153,6 +154,12 @@ export default function BoostsPage() {
                 </Card>
             </div>
 
+            <ExampleBox>
+                When a user boosts, they use <code>/boost claim</code> to receive the <strong>Booster</strong> role. 
+                If they stop boosting, the bot waits the grace period (e.g., 7 days) before removing their role, 
+                giving them time to re-boost without losing benefits.
+            </ExampleBox>
+
             <div className="grid gap-6 lg:grid-cols-3">
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
@@ -200,7 +207,10 @@ export default function BoostsPage() {
 
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label>Primary Color</Label>
+                                        <LabelWithTooltip
+                                            label="Primary Color"
+                                            tooltip="The main color for the booster role. Use hex format like #2CB7C9."
+                                        />
                                         <Input
                                             value={config?.boostRoleColorPrimary || ""}
                                             onChange={(e) => setConfig({ ...config!, boostRoleColorPrimary: e.target.value })}
@@ -208,16 +218,19 @@ export default function BoostsPage() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Secondary Color (gradient)</Label>
+                                        <LabelWithTooltip
+                                            label="Secondary Color (gradient)"
+                                            tooltip="Optional second color for a gradient effect on the role."
+                                        />
                                         <Input
                                             value={config?.boostRoleColorSecondary || ""}
                                             onChange={(e) => setConfig({ ...config!, boostRoleColorSecondary: e.target.value })}
                                             placeholder="#F4B740"
                                         />
                                     </div>
-                                    <p className="text-[0.8rem] text-muted-foreground md:col-span-2">
+                                    <HelperText className="md:col-span-2">
                                         Gradient colors are stored for enhanced role styles. If unavailable, the primary color is used.
-                                    </p>
+                                    </HelperText>
                                 </div>
 
                                 <div className="space-y-2">

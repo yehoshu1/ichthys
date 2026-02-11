@@ -7,6 +7,7 @@ This guide is the canonical setup reference for the current Ixoye codebase.
 - Node.js: `22.x` recommended
 - npm: `11.9.0` (declared in `package.json`)
 - Database: PostgreSQL 17 (`DATABASE_URL=postgresql://...`)
+- Search: in-process dashboard search (no external Meilisearch dependency)
 - Bot framework: Discord.js v14
 - Dashboard: Next.js 16 App Router
 
@@ -95,6 +96,14 @@ npm ci
 ```
 
 If lockfile changes during development, run `npm ci` again.
+
+## 3.1 Search Guardrail Check
+
+Run this to ensure Meilisearch artifacts were not accidentally introduced:
+
+```bash
+npm run guard:no-meili
+```
 
 ## 4. Initialize Database
 

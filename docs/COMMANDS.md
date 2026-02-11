@@ -31,6 +31,7 @@ Run scripts with `npm run <script>`.
 | `db:migrate:delta` | Delta sync SQLite changes to PostgreSQL. | Near-zero cutover sync |
 | `db:migrate:verify` | Verify SQLite/PostgreSQL parity checksums and counts. | Cutover validation |
 | `deploy:safe` | Safe deployment with backup workflow. | Production deploy safety |
+| `guard:no-meili` | Fails if Meilisearch env keys/imports/dependencies are introduced. | Architecture guardrail |
 
 ## Slash Command Overview
 

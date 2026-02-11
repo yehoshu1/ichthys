@@ -20,6 +20,7 @@ import {
 import { requireGuildManageRolesAccess } from "@/lib/guild-auth";
 import { eq } from "drizzle-orm";
 import logger from "@/lib/logger";
+import { emitGuildNotification } from "@shared/services/notification-service";
 import {
     normalizeDiscordId,
     normalizeDiscordIdList,
@@ -119,6 +120,9 @@ function normalizeCsvDiscordIds(
         addWarning(warnings, warningKey);
         return null;
     }
+
+    // Transitional compatibility for pre-v3 exports (CSV string lists).
+    addWarning(warnings, "legacyCsvInput.used");
 
     const entries = value.split(",");
     const normalized = normalizeDiscordIdList(entries);
@@ -673,16 +677,43 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([key, count]) => ({ key, count }));
 
+        const warningCount = warningEntries.reduce((total, entry) => total + entry.count, 0);
+        await emitGuildNotification({
+            guildId,
+            eventType: 'DASHBOARD_SETTINGS_IMPORTED',
+            severity: warningCount > 0 ? 'WARNING' : 'INFO',
+            source: 'DASHBOARD_API',
+            title: `Settings imported${warningCount > 0 ? ` with ${warningCount} warning(s)` : ''}`,
+            actorUserId: auth.userId,
+            metadata: {
+                warningCount,
+                warnings: warningEntries,
+            },
+            dedupeKey: `dashboard-settings-imported:${guildId}`,
+            dedupeWindowSeconds: 60,
+        });
+
         return NextResponse.json({
             success: true,
             warnings: warningEntries,
-            warningCount: warningEntries.reduce((total, entry) => total + entry.count, 0),
+            warningCount,
         });
     } catch (error) {
         logger.error("Error importing settings", {
             error: error instanceof Error ? error.message : String(error),
             guildId,
         });
+        await emitGuildNotification({
+            guildId,
+            eventType: 'DASHBOARD_SETTINGS_IMPORT_FAILED',
+            severity: 'ERROR',
+            source: 'DASHBOARD_API',
+            title: `Settings import failed`,
+            body: error instanceof Error ? error.message : String(error),
+            actorUserId: auth.userId,
+            dedupeKey: `dashboard-settings-import-failed:${guildId}`,
+            dedupeWindowSeconds: 120,
+        }).catch(() => null);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

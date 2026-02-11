@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { RoleSelect, ChannelSelect } from "../../../../components/DiscordSelectors";
+import { ExampleBox, LabelWithTooltip } from "../../../../components/HelpTooltip";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "../../../../components/ui/card";
@@ -363,6 +364,12 @@ export default function ReactionRolesPage() {
                 </div>
             </div>
 
+            <ExampleBox>
+                Create a &quot;Toggle&quot; role for @Gamer - users can add/remove it by reacting with 🎮. 
+                Use &quot;Unique&quot; for color roles so users can only have one color at a time. 
+                &quot;Add Only&quot; is great for verification roles that shouldn&apos;t be removable.
+            </ExampleBox>
+
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ReactionRoleTab)} className="space-y-6">
                 <TabsList className="grid w-full grid-cols-2 max-w-md">
                     <TabsTrigger value="messages" className="flex items-center gap-2">
@@ -531,7 +538,11 @@ export default function ReactionRolesPage() {
                             <CardContent>
                                 <form onSubmit={handleSaveMessage} className="space-y-6">
                                     <div className="space-y-2">
-                                        <Label>Target Channel</Label>
+                                        <LabelWithTooltip
+                                            label="Target Channel"
+                                            tooltip="The channel where the reaction role message will be posted"
+                                            required
+                                        />
                                         <ChannelSelect
                                             guildId={guildId}
                                             value={messageForm.channelId}
@@ -542,7 +553,10 @@ export default function ReactionRolesPage() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>Title (Optional)</Label>
+                                        <LabelWithTooltip
+                                            label="Title"
+                                            tooltip="A title for your reaction role message"
+                                        />
                                         <Input
                                             value={messageForm.title}
                                             onChange={(e) => setMessageForm({ ...messageForm, title: e.target.value })}
@@ -551,7 +565,11 @@ export default function ReactionRolesPage() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>Message Content</Label>
+                                        <LabelWithTooltip
+                                            label="Message Content"
+                                            tooltip="The main text of your reaction role message"
+                                            required
+                                        />
                                         <Textarea
                                             value={messageForm.content}
                                             onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
@@ -779,7 +797,12 @@ export default function ReactionRolesPage() {
 
                                     <div className="grid gap-6 md:grid-cols-2">
                                         <div className="space-y-2">
-                                            <Label htmlFor="emoji">Emoji</Label>
+                                            <LabelWithTooltip
+                                                label="Emoji"
+                                                tooltip="Use Unicode emoji (🎮) or custom emoji format (:emoji_name:)"
+                                                htmlFor="emoji"
+                                                required
+                                            />
                                             <Input
                                                 id="emoji"
                                                 value={roleForm.emoji}
@@ -787,13 +810,14 @@ export default function ReactionRolesPage() {
                                                 placeholder="e.g. 🎮 or :custom_emoji:"
                                                 required
                                             />
-                                            <p className="text-xs text-muted-foreground">
-                                                Use Unicode emoji (🎮) or custom emoji format
-                                            </p>
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label>Role to Assign</Label>
+                                            <LabelWithTooltip
+                                                label="Role to Assign"
+                                                tooltip="The role users will receive when they react"
+                                                required
+                                            />
                                             <RoleSelect
                                                 guildId={guildId}
                                                 value={roleForm.roleId}
@@ -805,7 +829,11 @@ export default function ReactionRolesPage() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>Reaction Type</Label>
+                                        <LabelWithTooltip
+                                            label="Reaction Type"
+                                            tooltip="Toggle allows adding/removing. Unique ensures only one role from this message. Add/Remove Only restrict direction."
+                                            required
+                                        />
                                         <Select
                                             value={roleForm.type}
                                             onValueChange={(value) => setRoleForm({ ...roleForm, type: value as any })}

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireGuildManageAccess, requireGuildManageRolesAccess } from "@/lib/guild-auth";
 import { nullableDiscordIdSchema, optionalEmbedSchema, optionalTextSchema, parseJsonBody } from "@/lib/validation";
 import logger from "@/lib/logger";
+import { emitDashboardSettingsChanged } from "@/lib/notification-events";
 
 const boostsConfigSchema = z.object({
     boostEnabled: z.boolean().optional(),
@@ -101,6 +102,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
                 boostRoleRemovalDmEnabled: body.boostRoleRemovalDmEnabled ?? true,
                 updatedAt: new Date(),
             },
+        });
+
+        await emitDashboardSettingsChanged({
+            guildId,
+            userId: auth.userId,
+            module: "boosts",
+            action: "update",
         });
 
         return NextResponse.json({ success: true });

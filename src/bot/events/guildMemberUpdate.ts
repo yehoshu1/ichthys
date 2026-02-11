@@ -5,6 +5,7 @@ import { db } from '../../shared/database/client';
 import { welcomeTrigger, messageTemplate, userJoin, guildConfig, userBoost, roleAction, actionLog, verificationMessageRule, scheduledRoleAction } from '../../shared/database/schema';
 import { eq, and, sql, inArray } from 'drizzle-orm';
 import { buildMessage } from '../utils/embeds';
+import { emitGuildNotificationSafe } from '../services/notificationEmitter';
 
 const event: Event<Events.GuildMemberUpdate> = {
     name: Events.GuildMemberUpdate,
@@ -52,6 +53,17 @@ const event: Event<Events.GuildMemberUpdate> = {
                                     eq(userJoin.userId, newMember.id)
                                 ));
                             logger.info(`User ${newMember.user.tag} un-verified in ${newMember.guild.name}`);
+                            await emitGuildNotificationSafe({
+                                guildId: newMember.guild.id,
+                                eventType: 'VERIFICATION_USER_UNVERIFIED',
+                                severity: 'WARNING',
+                                source: 'BOT_EVENT',
+                                title: `${newMember.user.tag} is no longer verified`,
+                                targetUserId: newMember.id,
+                                metadata: {
+                                    userId: newMember.id,
+                                },
+                            });
                         }
                     }
                 }
@@ -111,6 +123,17 @@ const event: Event<Events.GuildMemberUpdate> = {
                                 eq(userJoin.userId, newMember.id)
                             ));
                         logger.info(`User ${newMember.user.tag} verified in ${newMember.guild.name}`);
+                        await emitGuildNotificationSafe({
+                            guildId: newMember.guild.id,
+                            eventType: 'VERIFICATION_USER_VERIFIED',
+                            severity: 'INFO',
+                            source: 'BOT_EVENT',
+                            title: `${newMember.user.tag} completed verification`,
+                            targetUserId: newMember.id,
+                            metadata: {
+                                userId: newMember.id,
+                            },
+                        });
                     }
                 }
             } catch (error) {
@@ -144,6 +167,21 @@ const event: Event<Events.GuildMemberUpdate> = {
                         logger.info(`Applied verification profile ${profile.name || profile.roleId} to ${newMember.user.tag}`);
                     } catch (error) {
                         logger.error(`Failed to send profile verification message for ${newMember.user.tag}:`, error);
+                        await emitGuildNotificationSafe({
+                            guildId: newMember.guild.id,
+                            eventType: 'VERIFICATION_PROFILE_MESSAGE_FAILED',
+                            severity: 'ERROR',
+                            source: 'BOT_EVENT',
+                            title: `Verification profile message failed for ${newMember.user.tag}`,
+                            body: error instanceof Error ? error.message : 'Unknown error',
+                            targetUserId: newMember.id,
+                            metadata: {
+                                roleId: profile.roleId,
+                                profileId: profile.id,
+                            },
+                            dedupeKey: `verification-profile-failed:${profile.id}:${newMember.id}`,
+                            dedupeWindowSeconds: 1800,
+                        });
                     }
                 }
             }
@@ -204,9 +242,35 @@ const event: Event<Events.GuildMemberUpdate> = {
                         }
                         if (triggers.length > 0 && role) {
                             logger.info(`Processed ${triggers.length} welcome trigger(s) for role ${role.name} in guild ${newMember.guild.name}`);
+                            await emitGuildNotificationSafe({
+                                guildId: newMember.guild.id,
+                                eventType: 'WELCOME_TRIGGER_SENT',
+                                severity: 'INFO',
+                                source: 'BOT_EVENT',
+                                title: `Sent ${triggers.length} welcome trigger(s) for ${newMember.user.tag}`,
+                                targetUserId: newMember.id,
+                                metadata: {
+                                    roleId,
+                                    triggerCount: triggers.length,
+                                },
+                            });
                         }
                     } catch (error) {
                         logger.error(`Error processing welcome triggers for role ${role?.name || roleId}:`, error);
+                        await emitGuildNotificationSafe({
+                            guildId: newMember.guild.id,
+                            eventType: 'WELCOME_TRIGGER_FAILED',
+                            severity: 'ERROR',
+                            source: 'BOT_EVENT',
+                            title: `Welcome trigger failed for role ${role?.name || roleId}`,
+                            body: error instanceof Error ? error.message : 'Unknown error',
+                            targetUserId: newMember.id,
+                            metadata: {
+                                roleId,
+                            },
+                            dedupeKey: `welcome-trigger-failed:${roleId}`,
+                            dedupeWindowSeconds: 600,
+                        });
                     }
 
                     try {
@@ -233,6 +297,17 @@ const event: Event<Events.GuildMemberUpdate> = {
         } else if (oldBoost && !newBoost) {
             // Boost Removed
             logger.info(`User ${newMember.user.tag} stopped boosting ${newMember.guild.name}`);
+            await emitGuildNotificationSafe({
+                guildId: newMember.guild.id,
+                eventType: 'BOOST_ENDED',
+                severity: 'INFO',
+                source: 'BOT_EVENT',
+                title: `${newMember.user.tag} stopped boosting`,
+                targetUserId: newMember.id,
+                metadata: {
+                    userId: newMember.id,
+                },
+            });
             try {
                 await db.update(userBoost)
                     .set({
@@ -260,6 +335,20 @@ async function handleBoost(member: GuildMember, boostDate: Date, type: 'new' | '
         if (!config?.boostEnabled) return;
 
         logger.info(`User ${member.user.tag} ${type === 'new' ? 'started boosting' : 'renewed boost for'} ${member.guild.name}`);
+        await emitGuildNotificationSafe({
+            guildId: member.guild.id,
+            eventType: type === 'new' ? 'BOOST_STARTED' : 'BOOST_RENEWED',
+            severity: 'INFO',
+            source: 'BOT_EVENT',
+            title: type === 'new'
+                ? `${member.user.tag} started boosting`
+                : `${member.user.tag} renewed boost`,
+            targetUserId: member.id,
+            metadata: {
+                userId: member.id,
+                boostType: type,
+            },
+        });
 
         // 1. Update Database
         const boostEndsAt = new Date(boostDate);
@@ -402,8 +491,37 @@ async function executeRoleAction(member: GuildMember, action: typeof roleAction.
 
             if (success) {
                 logger.info(`Executed ${action.actionType} action for ${member.user.tag} in ${member.guild.name}`);
+                await emitGuildNotificationSafe({
+                    guildId: member.guild.id,
+                    eventType: 'ROLE_ACTION_EXECUTED',
+                    severity: 'INFO',
+                    source: 'BOT_EVENT',
+                    title: `Role action ${action.actionType} executed for ${member.user.tag}`,
+                    targetUserId: member.id,
+                    metadata: {
+                        actionId: action.id,
+                        roleId: action.roleId,
+                        actionType: action.actionType,
+                    },
+                });
             } else {
                 logger.warn(`Action ${action.actionType} for ${member.user.tag} partially failed: ${errorMessage}`);
+                await emitGuildNotificationSafe({
+                    guildId: member.guild.id,
+                    eventType: 'ROLE_ACTION_FAILED',
+                    severity: 'ERROR',
+                    source: 'BOT_EVENT',
+                    title: `Role action ${action.actionType} failed for ${member.user.tag}`,
+                    body: errorMessage,
+                    targetUserId: member.id,
+                    metadata: {
+                        actionId: action.id,
+                        roleId: action.roleId,
+                        actionType: action.actionType,
+                    },
+                    dedupeKey: `role-action-failed:${action.id}:${member.id}`,
+                    dedupeWindowSeconds: 900,
+                });
             }
 
         } catch (error) {
@@ -422,6 +540,19 @@ async function executeRoleAction(member: GuildMember, action: typeof roleAction.
             updatedAt: new Date()
         });
         logger.info(`Queued ${action.actionType} action for ${member.user.tag} at ${executeAt.toISOString()}`);
+        await emitGuildNotificationSafe({
+            guildId: member.guild.id,
+            eventType: 'ROLE_ACTION_QUEUED',
+            severity: 'INFO',
+            source: 'BOT_EVENT',
+            title: `Role action ${action.actionType} queued for ${member.user.tag}`,
+            targetUserId: member.id,
+            metadata: {
+                actionId: action.id,
+                roleId: action.roleId,
+                executeAt: executeAt.toISOString(),
+            },
+        });
         return;
     }
 

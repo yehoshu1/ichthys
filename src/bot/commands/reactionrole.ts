@@ -326,8 +326,10 @@ async function handleList(interaction: ChatInputCommandInteraction) {
 
         const lines = Object.entries(grouped).map(([messageId, roles]) => {
             const roleList = roles.map(r => {
-                const emoji = r.emoji.length > 10 ? `<:emoji:${r.emoji}>` : r.emoji;
-                return `${emoji} → <#${r.channelId}> <@&${r.roleId}> (${r.type})`;
+                const emojiDisplay = r.emoji
+                    ? (r.emoji.length > 10 ? `<:emoji:${r.emoji}>` : r.emoji)
+                    : (r.label || '🔘');
+                return `${emojiDisplay} → <#${r.channelId}> <@&${r.roleId}> (${r.type})`;
             }).join('\n   ');
             return `**Message:** \`${messageId}\`\n   ${roleList}`;
         });

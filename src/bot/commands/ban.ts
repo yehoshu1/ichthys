@@ -4,6 +4,7 @@ import { db } from '../../shared/database/client';
 import { moderationCase, moderationSettings } from '../../shared/database/schema';
 import { eq, sql } from 'drizzle-orm';
 import logger from '../utils/logger';
+import { emitGuildNotificationSafe } from '../services/notificationEmitter';
 
 const MODERATION_ACTIONS = {
     BAN: { color: 0xDC143C, label: 'Ban' },
@@ -42,6 +43,21 @@ async function createModCase(
         expiresAt: expiresAt || null,
         active: action !== 'UNBAN',
     }).returning();
+
+    await emitGuildNotificationSafe({
+        guildId,
+        eventType: action === 'BAN' ? 'MOD_CASE_CREATED_BAN' : 'MOD_CASE_CREATED_UNBAN',
+        severity: action === 'BAN' ? 'ERROR' : 'INFO',
+        source: 'BOT_EVENT',
+        title: `${action} case #${caseNumber} created`,
+        targetUserId: userId,
+        actorUserId: moderatorId,
+        metadata: {
+            caseId: modCase.id,
+            caseNumber,
+            duration: duration ?? null,
+        },
+    });
 
     return modCase;
 }

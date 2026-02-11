@@ -14,6 +14,7 @@ import { Trophy, Trash } from "lucide-react";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
 import { useDiscordData } from "../../../../components/useDiscordData";
 import { toast } from "sonner";
+import { ExampleBox, HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
 
 // Types
 interface LevelingConfig {
@@ -166,9 +167,16 @@ function SettingsTab({ guildId }: { guildId: string }) {
 
                     <div className="space-y-4">
                         <Label className="text-base">XP Rates</Label>
+                        <ExampleBox>
+                            With Min: 15 and Max: 25 XP, users will randomly receive between 15-25 XP per message 
+                            (within the cooldown period). Voice users get XP for every minute they stay in a voice channel.
+                        </ExampleBox>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>Min Text XP</Label>
+                                <LabelWithTooltip
+                                    label="Min Text XP"
+                                    tooltip="The minimum XP a user can earn from a single message."
+                                />
                                 <Input
                                     type="number"
                                     value={isNaN(config.textXpMin) ? "" : config.textXpMin}
@@ -176,7 +184,10 @@ function SettingsTab({ guildId }: { guildId: string }) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Max Text XP</Label>
+                                <LabelWithTooltip
+                                    label="Max Text XP"
+                                    tooltip="The maximum XP a user can earn from a single message. Actual XP awarded will be random between Min and Max."
+                                />
                                 <Input
                                     type="number"
                                     value={isNaN(config.textXpMax) ? "" : config.textXpMax}
@@ -188,20 +199,28 @@ function SettingsTab({ guildId }: { guildId: string }) {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label>Text XP Cooldown (seconds)</Label>
+                            <LabelWithTooltip
+                                label="Text XP Cooldown (seconds)"
+                                tooltip="How long users must wait between earning XP from messages. Prevents spam farming."
+                            />
                             <Input
                                 type="number"
                                 value={isNaN(config.textXpCooldown) ? "" : config.textXpCooldown}
                                 onChange={(e) => setConfig({ ...config, textXpCooldown: e.target.value === "" ? NaN : parseInt(e.target.value) })}
                             />
+                            <HelperText>Recommended: 60 seconds. Prevents XP farming from spam.</HelperText>
                         </div>
                         <div className="space-y-2">
-                            <Label>Voice XP (per minute)</Label>
+                            <LabelWithTooltip
+                                label="Voice XP (per minute)"
+                                tooltip="XP earned for each minute spent in voice channels. Users must not be muted/deafened to earn."
+                            />
                             <Input
                                 type="number"
                                 value={isNaN(config.voiceXpPerMinute) ? "" : config.voiceXpPerMinute}
                                 onChange={(e) => setConfig({ ...config, voiceXpPerMinute: e.target.value === "" ? NaN : parseInt(e.target.value) })}
                             />
+                            <HelperText>Users must be unmuted and undeafened to earn voice XP.</HelperText>
                         </div>
                     </div>
 
@@ -219,7 +238,10 @@ function SettingsTab({ guildId }: { guildId: string }) {
                         {config.levelUpNotifEnabled && (
                             <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label>Level Up Channel (Optional)</Label>
+                                    <LabelWithTooltip
+                                        label="Level Up Channel (Optional)"
+                                        tooltip="Channel where level up announcements are posted. Leave blank to announce in the same channel where the user leveled up."
+                                    />
                                     <ChannelSelect
                                         guildId={guildId}
                                         value={config.levelUpChannelId || ""}
@@ -227,10 +249,13 @@ function SettingsTab({ guildId }: { guildId: string }) {
                                         allowNone={true}
                                         placeholder="Select a channel or leave blank for context channel"
                                     />
-                                    <p className="text-[0.8rem] text-muted-foreground">If left blank, the message will be sent in the channel where the user leveled up.</p>
+                                    <HelperText>If left blank, the message will be sent in the channel where the user leveled up.</HelperText>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Custom Level Up Message</Label>
+                                    <LabelWithTooltip
+                                        label="Custom Level Up Message"
+                                        tooltip="Use {user} to mention the player, {level} for their new level, and {xp} for their total XP."
+                                    />
                                     <MessageEditor
                                         content={config.levelUpMessage || ""}
                                         embed={config.levelUpMessageEmbed}
@@ -250,8 +275,16 @@ function SettingsTab({ guildId }: { guildId: string }) {
 
                     <div className="space-y-4 pt-4 border-t">
                         <div className="flex items-center justify-between">
-                            <Label className="text-base">Level Rewards</Label>
+                            <LabelWithTooltip
+                                label="Level Rewards"
+                                tooltip="Automatically assign roles when users reach specific levels. For example: Level 5 = Active role, Level 10 = Veteran role."
+                            />
                         </div>
+                        <ExampleBox>
+                            At <strong>Level 5</strong>, users automatically receive the <strong>@Active</strong> role. 
+                            At <strong>Level 25</strong>, they get the <strong>@Veteran</strong> role. 
+                            Roles are given automatically when users level up.
+                        </ExampleBox>
                         <LevelRewardsManager guildId={guildId} />
                     </div>
                 </CardContent>
@@ -321,7 +354,10 @@ function LevelRewardsManager({ guildId }: { guildId: string }) {
         <div className="space-y-4 border rounded-md p-4 bg-card/50">
             <div className="flex items-end gap-4">
                 <div className="space-y-2 flex-1">
-                    <Label>At Level</Label>
+                    <LabelWithTooltip
+                        label="At Level"
+                        tooltip="The level at which the user will automatically receive the specified role."
+                    />
                     <input
                         type="number"
                         min="1"
@@ -331,7 +367,10 @@ function LevelRewardsManager({ guildId }: { guildId: string }) {
                     />
                 </div>
                 <div className="space-y-2 flex-[2]">
-                    <Label>Award Role</Label>
+                    <LabelWithTooltip
+                        label="Award Role"
+                        tooltip="The role to assign when the user reaches the specified level. Make sure the bot's role is higher than this role."
+                    />
                     <RoleSelect
                         guildId={guildId}
                         value={newRoleId}

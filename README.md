@@ -19,6 +19,11 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 - **UI Components**: [shadcn/ui](https://ui.shadcn.com/), [Lucide Icons](https://lucide.dev/)
 - **Charts**: [Recharts](https://recharts.org/)
 
+### Search Architecture
+- Dashboard global search is local/in-process and built from existing settings/doc sources.
+- Ixoye does not currently depend on Meilisearch or external vector search services.
+- Decision record: [ADR 0001](docs/adr/0001-defer-meilisearch-integration.md).
+
 ## 📂 Documentation
 
 - **[Setup Guide](docs/SETUP.md)**: How to install, configure, and run the bot locally or in production.

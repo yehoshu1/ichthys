@@ -12,6 +12,7 @@ import { Trash2, Plus, ShieldCheck, UserX, UserCheck } from "lucide-react";
 import Image from "next/image";
 import { useDiscordData } from "../../../../components/useDiscordData";
 import { toast } from "sonner";
+import { HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
 
 // Types
 interface VerificationConfig {
@@ -357,18 +358,24 @@ export default function VerificationPage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>Unverified Role (Assigned to new members)</Label>
+                                    <LabelWithTooltip
+                                        label="Unverified Role"
+                                        tooltip="Assigned to new members automatically. Removed when they verify."
+                                    />
                                     <RoleSelect
                                         guildId={guildId}
                                         value={config.unverifiedRoleId || ""}
                                         onChange={(value) => setConfig({ ...config, unverifiedRoleId: value })}
                                         allowNone={true}
                                     />
-                                    <p className="text-[0.8rem] text-muted-foreground">Optional. This role will be removed when a user is verified.</p>
+                                    <HelperText>Optional. This role will be removed when a user is verified.</HelperText>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>Verification Role (User gets this when verified)</Label>
+                                    <LabelWithTooltip
+                                        label="Verification Role"
+                                        tooltip="Given when a user completes verification"
+                                    />
                                     <RoleSelect
                                         guildId={guildId}
                                         value={config.verificationRoleId || ""}
@@ -378,7 +385,10 @@ export default function VerificationPage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>Grace Period (Days)</Label>
+                                    <LabelWithTooltip
+                                        label="Grace Period (Days)"
+                                        tooltip="Users who joined longer ago than this without verifying will be kicked"
+                                    />
                                     <Input
                                         type="number"
                                         min="1"
@@ -386,7 +396,6 @@ export default function VerificationPage() {
                                         value={config.verificationGraceDays}
                                         onChange={(e) => setConfig({ ...config, verificationGraceDays: parseInt(e.target.value) })}
                                     />
-                                    <p className="text-[0.8rem] text-muted-foreground">Users joined longer than this without verification will be kicked.</p>
                                 </div>
 
                                 <div className="flex items-center space-x-2">
@@ -395,11 +404,18 @@ export default function VerificationPage() {
                                         checked={config.verificationKickDmEnabled}
                                         onCheckedChange={(checked) => setConfig({ ...config, verificationKickDmEnabled: checked })}
                                     />
-                                    <Label htmlFor="dm-enabled">Send DM before kicking</Label>
+                                    <LabelWithTooltip
+                                        label="Send DM before kicking"
+                                        tooltip="Send a warning message to the user before they are kicked"
+                                        htmlFor="dm-enabled"
+                                    />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>Default Verification Message (Optional)</Label>
+                                    <LabelWithTooltip
+                                        label="Default Verification Message (Optional)"
+                                        tooltip="Posted in channel when a user verifies. Use {user} to mention them."
+                                    />
                                     <div className="relative">
                                         <textarea
                                             className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -408,9 +424,9 @@ export default function VerificationPage() {
                                             onChange={(e) => setConfig({ ...config, verificationMessage: e.target.value })}
                                         />
                                     </div>
-                                    <p className="text-[0.8rem] text-muted-foreground">
+                                    <HelperText>
                                         Message sent to the channel when a user is verified. Use <code>{'{user}'}</code> to mention the user.
-                                    </p>
+                                    </HelperText>
                                 </div>
 
                                 <Button type="submit" disabled={saving}>
@@ -425,6 +441,9 @@ export default function VerificationPage() {
                             <div className="mb-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
                                 <p className="text-sm text-blue-900 dark:text-blue-200"><strong>Example:</strong> If a user with the @Premium member role verifies, send them "Welcome to the premium community! Enjoy exclusive perks and early access." Regular members see "Welcome to our community!" instead.</p>
                             </div>
+                            <HelperText>
+                                Create custom welcome messages for users with specific roles. Perfect for premium members, VIPs, or special access groups.
+                            </HelperText>
                             <CardTitle>Role-Specific Messages</CardTitle>
                             <CardDescription>Send different messages based on the user's existing roles.</CardDescription>
                         </CardHeader>
@@ -498,6 +517,9 @@ export default function VerificationPage() {
                             <div className="mb-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
                                 <p className="text-sm text-blue-900 dark:text-blue-200"><strong>Example:</strong> Create an "Adult Verified" profile that gives users the @Adult role and notifies them in the #adults-only-restricted channel when applied.</p>
                             </div>
+                            <HelperText>
+                                Set up multiple verification tiers with different roles and notification channels for specialized access control.
+                            </HelperText>
                             <CardTitle>Additional Verification Profiles</CardTitle>
                             <CardDescription>Assign separate verified roles and notify a channel when applied. Verify users into specific roles such as Restricted Channels, Premium Access, or custom verification profiles.</CardDescription>
                         </CardHeader>

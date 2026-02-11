@@ -18,6 +18,7 @@ import { birthdayConfig, birthdayEntry, birthdayLog } from '../../shared/databas
 import { eq, and } from 'drizzle-orm';
 import logger from '../utils/logger';
 import { Client, TextChannel } from 'discord.js';
+import { emitGuildNotificationSafe } from '../services/notificationEmitter';
 
 /**
  * Check for birthdays and send announcements
@@ -133,8 +134,35 @@ export async function checkBirthdays(client: Client) {
                             });
                             messageSent = true;
                             logger.info(`Sent birthday message for ${member.user.tag} in ${guild.name}`);
+                            await emitGuildNotificationSafe({
+                                guildId: config.guildId,
+                                eventType: 'BIRTHDAY_ANNOUNCEMENT_SENT',
+                                severity: 'INFO',
+                                source: 'BOT_JOB',
+                                title: `Birthday announcement sent for ${member.user.tag}`,
+                                targetUserId: member.id,
+                                metadata: {
+                                    birthdayEntryId: entry.id,
+                                    channelId: config.channelId,
+                                },
+                            });
                         } catch (sendError) {
                             logger.error(`Failed to send birthday message for ${member.user.tag}:`, sendError);
+                            await emitGuildNotificationSafe({
+                                guildId: config.guildId,
+                                eventType: 'BIRTHDAY_ANNOUNCEMENT_FAILED',
+                                severity: 'ERROR',
+                                source: 'BOT_JOB',
+                                title: `Birthday announcement failed for ${member.user.tag}`,
+                                body: sendError instanceof Error ? sendError.message : 'Unknown error',
+                                targetUserId: member.id,
+                                metadata: {
+                                    birthdayEntryId: entry.id,
+                                    channelId: config.channelId,
+                                },
+                                dedupeKey: `birthday-announcement-failed:${entry.id}`,
+                                dedupeWindowSeconds: 3600,
+                            });
                         }
 
                         // Assign birthday role if configured
@@ -146,9 +174,36 @@ export async function checkBirthdays(client: Client) {
                                     await member.roles.add(role, 'Birthday celebration');
                                     roleAssigned = true;
                                     logger.info(`Assigned birthday role to ${member.user.tag}`);
+                                    await emitGuildNotificationSafe({
+                                        guildId: config.guildId,
+                                        eventType: 'BIRTHDAY_ROLE_ASSIGNED',
+                                        severity: 'INFO',
+                                        source: 'BOT_JOB',
+                                        title: `Birthday role assigned to ${member.user.tag}`,
+                                        targetUserId: member.id,
+                                        metadata: {
+                                            roleId: config.roleId,
+                                            birthdayEntryId: entry.id,
+                                        },
+                                    });
                                 }
                             } catch (roleError) {
                                 logger.error(`Failed to assign birthday role to ${member.user.tag}:`, roleError);
+                                await emitGuildNotificationSafe({
+                                    guildId: config.guildId,
+                                    eventType: 'BIRTHDAY_ROLE_ASSIGN_FAILED',
+                                    severity: 'WARNING',
+                                    source: 'BOT_JOB',
+                                    title: `Birthday role assignment failed for ${member.user.tag}`,
+                                    body: roleError instanceof Error ? roleError.message : 'Unknown error',
+                                    targetUserId: member.id,
+                                    metadata: {
+                                        roleId: config.roleId,
+                                        birthdayEntryId: entry.id,
+                                    },
+                                    dedupeKey: `birthday-role-assign-failed:${entry.id}`,
+                                    dedupeWindowSeconds: 3600,
+                                });
                             }
                         }
 
@@ -225,9 +280,36 @@ export async function removeExpiredBirthdayRoles(client: Client) {
                         if (member.roles.cache.has(config.roleId!)) {
                             await member.roles.remove(config.roleId!, 'Birthday celebration ended');
                             logger.info(`Removed birthday role from ${member.user.tag}`);
+                            await emitGuildNotificationSafe({
+                                guildId: config.guildId,
+                                eventType: 'BIRTHDAY_ROLE_REMOVED',
+                                severity: 'INFO',
+                                source: 'BOT_JOB',
+                                title: `Birthday role removed from ${member.user.tag}`,
+                                targetUserId: member.id,
+                                metadata: {
+                                    roleId: config.roleId,
+                                    birthdayEntryId: entry.id,
+                                },
+                            });
                         }
                     } catch (memberError) {
                         logger.error(`Error removing role from ${entry.userId}:`, memberError);
+                        await emitGuildNotificationSafe({
+                            guildId: config.guildId,
+                            eventType: 'BIRTHDAY_ROLE_REMOVE_FAILED',
+                            severity: 'WARNING',
+                            source: 'BOT_JOB',
+                            title: `Birthday role removal failed for user ${entry.userId}`,
+                            body: memberError instanceof Error ? memberError.message : 'Unknown error',
+                            targetUserId: entry.userId,
+                            metadata: {
+                                roleId: config.roleId,
+                                birthdayEntryId: entry.id,
+                            },
+                            dedupeKey: `birthday-role-remove-failed:${entry.id}`,
+                            dedupeWindowSeconds: 3600,
+                        });
                     }
                 }
             } catch (guildError) {

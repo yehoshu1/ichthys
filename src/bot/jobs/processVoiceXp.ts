@@ -1,14 +1,15 @@
 import cron from 'node-cron';
 import { GuildMember } from 'discord.js';
-import { and, asc, eq, gt, isNotNull } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull } from 'drizzle-orm';
 import client from '../client';
 import logger from '../utils/logger';
 import { db } from '../../shared/database/client';
-import { levelProfile, type GuildConfig } from '../../shared/database/schema';
-import { getGuildLevelingConfig, processVoiceXpForMember } from '../services/voiceXpService';
+import { levelProfile, guildConfig, type GuildConfig } from '../../shared/database/schema';
+import { processVoiceXpForMember } from '../services/voiceXpService';
 
 const CHUNK_SIZE = 100;
 const VOICE_XP_CRON = '*/5 * * * *';
+const DELAY_BETWEEN_CHUNKS_MS = 10; // Small delay to prevent event loop blocking
 
 interface VoiceXpRunStats {
     processedProfiles: number;
@@ -22,6 +23,7 @@ interface VoiceXpRunStats {
     totalMinutesProcessed: number;
     totalXpAwarded: number;
     totalLevelUps: number;
+    dbQueries: number; // Track DB query count for monitoring
 }
 
 interface ActiveVoiceProfile {
@@ -43,20 +45,27 @@ function getHumanMemberCountInVoice(member: GuildMember): number {
     return count;
 }
 
-async function getGuildConfigCached(
-    cache: Map<string, GuildConfig | null>,
-    guildId: string
-): Promise<GuildConfig | null> {
-    if (cache.has(guildId)) {
-        return cache.get(guildId) ?? null;
-    }
+/**
+ * 🎯 PERFORMANCE FIX: Batch fetch all guild configs at once
+ * This replaces the N+1 query pattern where we fetched config for each profile
+ */
+async function getGuildConfigsBatch(guildIds: string[]): Promise<Map<string, GuildConfig>> {
+    if (guildIds.length === 0) return new Map();
 
-    const config = await getGuildLevelingConfig(guildId);
-    cache.set(guildId, config ?? null);
-    return config ?? null;
+    const uniqueGuildIds = [...new Set(guildIds)];
+
+    const configs = await db
+        .select()
+        .from(guildConfig)
+        .where(inArray(guildConfig.guildId, uniqueGuildIds));
+
+    return new Map(configs.map(c => [c.guildId, c]));
 }
 
+
+
 export async function processVoiceXpOnce(): Promise<void> {
+    const startTime = Date.now();
     const stats: VoiceXpRunStats = {
         processedProfiles: 0,
         awardedProfiles: 0,
@@ -68,13 +77,18 @@ export async function processVoiceXpOnce(): Promise<void> {
         errors: 0,
         totalMinutesProcessed: 0,
         totalXpAwarded: 0,
-        totalLevelUps: 0
+        totalLevelUps: 0,
+        dbQueries: 0
     };
 
-    const configCache = new Map<string, GuildConfig | null>();
     let cursorId: string | null = null;
+    let hasMore = true;
+    let chunksProcessed = 0;
 
-    while (true) {
+    while (hasMore) {
+        chunksProcessed++;
+
+        // Fetch chunk of active profiles
         const activeProfiles: ActiveVoiceProfile[] = cursorId
             ? await db.select({
                 id: levelProfile.id,
@@ -99,17 +113,27 @@ export async function processVoiceXpOnce(): Promise<void> {
                 .limit(CHUNK_SIZE);
 
         if (activeProfiles.length === 0) {
+            hasMore = false;
             break;
         }
 
         cursorId = activeProfiles[activeProfiles.length - 1].id;
+
+        // 🎯 PERFORMANCE FIX: Batch fetch ALL guild configs for this chunk in ONE query
+        const uniqueGuildIds = [...new Set(activeProfiles.map(p => p.guildId))];
+        const guildConfigMap = await getGuildConfigsBatch(uniqueGuildIds);
+        stats.dbQueries += 1; // Track this query
+
         const now = new Date();
 
+        // Process profiles using cached configs
         for (const activeProfile of activeProfiles) {
             stats.processedProfiles += 1;
 
             try {
-                const config = await getGuildConfigCached(configCache, activeProfile.guildId);
+                // 🎯 Use batch-fetched config instead of individual query
+                const config = guildConfigMap.get(activeProfile.guildId) ?? null;
+
                 if (!config?.levelingEnabled) {
                     stats.skippedDisabled += 1;
 
@@ -198,14 +222,31 @@ export async function processVoiceXpOnce(): Promise<void> {
                 logger.error(`Failed processing voice XP for ${activeProfile.guildId}/${activeProfile.userId}:`, error);
             }
         }
+
+        // 🎯 PERFORMANCE FIX: Add small delay between chunks to prevent event loop blocking
+        if (hasMore) {
+            await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CHUNKS_MS));
+        }
     }
 
+    const durationMs = Date.now() - startTime;
+
     logger.info(
-        `Voice XP run complete: profiles=${stats.processedProfiles}, awarded=${stats.awardedProfiles}, `
-        + `minutes=${stats.totalMinutesProcessed}, xp=${stats.totalXpAwarded}, levelUps=${stats.totalLevelUps}, `
-        + `staleFinalized=${stats.staleFinalized}, noElapsed=${stats.skippedNoElapsed}, `
-        + `disabled=${stats.skippedDisabled}, unavailable=${stats.skippedUnavailable}, `
-        + `casConflicts=${stats.casConflicts}, errors=${stats.errors}`
+        `Voice XP run complete: ` +
+        `profiles=${stats.processedProfiles}, ` +
+        `awarded=${stats.awardedProfiles}, ` +
+        `minutes=${stats.totalMinutesProcessed}, ` +
+        `xp=${stats.totalXpAwarded}, ` +
+        `levelUps=${stats.totalLevelUps}, ` +
+        `staleFinalized=${stats.staleFinalized}, ` +
+        `noElapsed=${stats.skippedNoElapsed}, ` +
+        `disabled=${stats.skippedDisabled}, ` +
+        `unavailable=${stats.skippedUnavailable}, ` +
+        `casConflicts=${stats.casConflicts}, ` +
+        `errors=${stats.errors}, ` +
+        `dbQueries=${stats.dbQueries}, ` + // Track query count
+        `chunks=${chunksProcessed}, ` +
+        `durationMs=${durationMs}`
     );
 }
 

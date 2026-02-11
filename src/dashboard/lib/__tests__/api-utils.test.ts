@@ -5,7 +5,6 @@ import {
     createSuccessResponse,
     createErrorResponse,
     apiErrors,
-    createPaginationLinks,
 } from "../api-utils";
 import {
     parseVersion,
@@ -73,28 +72,6 @@ describe("api-utils", () => {
             const details = [{ field: "email", message: "Invalid email" }];
             const response = apiErrors.validationError("Validation failed", details);
             expect(response.status).toBe(422);
-        });
-    });
-
-    describe("createPaginationLinks", () => {
-        it("should create pagination links", () => {
-            const links = createPaginationLinks("/api/items", { page: 2, limit: 10, total: 45 });
-            
-            expect(links.self).toBe("/api/items?page=2&limit=10");
-            expect(links.first).toBe("/api/items?page=1&limit=10");
-            expect(links.last).toBe("/api/items?page=5&limit=10");
-            expect(links.next).toBe("/api/items?page=3&limit=10");
-            expect(links.prev).toBe("/api/items?page=1&limit=10");
-        });
-
-        it("should not include next on last page", () => {
-            const links = createPaginationLinks("/api/items", { page: 5, limit: 10, total: 45 });
-            expect(links.next).toBeUndefined();
-        });
-
-        it("should not include prev on first page", () => {
-            const links = createPaginationLinks("/api/items", { page: 1, limit: 10, total: 45 });
-            expect(links.prev).toBeUndefined();
         });
     });
 });

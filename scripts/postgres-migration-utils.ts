@@ -39,6 +39,11 @@ const ARRAY_COLUMNS = new Set([
     'roles_can_skip_max_limit',
 ]);
 
+// Legacy SQLite columns that were intentionally removed from the Postgres schema.
+const LEGACY_DROP_COLUMNS = new Set([
+    'aliases',
+]);
+
 const JSON_COLUMNS = new Set([
     'join_message_embed',
     'leave_message_embed',
@@ -197,6 +202,10 @@ export function transformRow(row: AnyRow): AnyRow {
     const result: AnyRow = {};
 
     for (const [column, value] of Object.entries(row)) {
+        if (LEGACY_DROP_COLUMNS.has(column)) {
+            continue;
+        }
+
         if (ARRAY_COLUMNS.has(column)) {
             result[column] = normalizeDiscordIdArray(value);
             continue;

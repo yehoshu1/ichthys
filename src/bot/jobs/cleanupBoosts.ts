@@ -4,6 +4,7 @@ import { userBoost, guildConfig, actionLog } from '../../shared/database/schema'
 import { eq, and, lt } from 'drizzle-orm';
 import client from '../client';
 import logger from '../utils/logger';
+import { emitGuildNotificationSafe } from '../services/notificationEmitter';
 
 export function setupBoostCleanupJob() {
     // Run every day at 3:00 AM
@@ -45,8 +46,35 @@ export async function cleanupExpiredBoosts() {
                     try {
                         await member.roles.remove(config.boostRoleId);
                         logger.info(`Removed boost role from ${member.user.tag} in ${guild.name}`);
+                        await emitGuildNotificationSafe({
+                            guildId: boost.guildId,
+                            eventType: 'BOOST_ROLE_REMOVED',
+                            severity: 'WARNING',
+                            source: 'BOT_JOB',
+                            title: `Removed expired boost role from ${member.user.tag}`,
+                            targetUserId: boost.userId,
+                            metadata: {
+                                roleId: config.boostRoleId,
+                                boostId: boost.id,
+                            },
+                        });
                     } catch (roleError) {
                         logger.error(`Failed to remove boost role from ${member.user.id} in ${guild.id}:`, roleError);
+                        await emitGuildNotificationSafe({
+                            guildId: boost.guildId,
+                            eventType: 'BOOST_ROLE_REMOVE_FAILED',
+                            severity: 'ERROR',
+                            source: 'BOT_JOB',
+                            title: `Failed to remove expired boost role from ${member.user.tag}`,
+                            body: roleError instanceof Error ? roleError.message : 'Unknown error',
+                            targetUserId: boost.userId,
+                            metadata: {
+                                roleId: config.boostRoleId,
+                                boostId: boost.id,
+                            },
+                            dedupeKey: `boost-role-remove-failed:${boost.id}`,
+                            dedupeWindowSeconds: 1800,
+                        });
                     }
                 }
 

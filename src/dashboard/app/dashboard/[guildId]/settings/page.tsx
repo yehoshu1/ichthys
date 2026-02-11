@@ -6,12 +6,15 @@ import { Button } from "../../../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "../../../../components/ui/card";
 import { Input } from "../../../../components/ui/input";
 import { Label } from "../../../../components/ui/label";
+import { Switch } from "../../../../components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "../../../../components/ui/alert";
-import { Download, Upload, FileJson, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Download, Upload, FileJson, AlertTriangle, CheckCircle2, HelpCircle } from "lucide-react";
+import { useTooltips } from "../../../../components/TooltipContext";
 
 export default function SettingsPage() {
     const params = useParams();
     const guildId = params.guildId as string;
+    const { tooltipsEnabled, setTooltipsEnabled } = useTooltips();
 
     const [importFile, setImportFile] = useState<File | null>(null);
     const [isImporting, setIsImporting] = useState(false);
@@ -77,6 +80,33 @@ export default function SettingsPage() {
                 <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
                 <p className="text-muted-foreground">Manage your server configuration and backups.</p>
             </div>
+
+            {/* User Preferences */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <HelpCircle className="h-5 w-5" />
+                        User Preferences
+                    </CardTitle>
+                    <CardDescription>
+                        Customize your dashboard experience.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                            <Label className="text-base">Show Help Tooltips</Label>
+                            <p className="text-sm text-muted-foreground">
+                                Display helpful tooltips, examples, and explanations throughout the dashboard.
+                            </p>
+                        </div>
+                        <Switch
+                            checked={tooltipsEnabled}
+                            onCheckedChange={setTooltipsEnabled}
+                        />
+                    </div>
+                </CardContent>
+            </Card>
 
             <div className="grid gap-6 md:grid-cols-2">
                 {/* Export Card */}

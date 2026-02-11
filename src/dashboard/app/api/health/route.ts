@@ -1,127 +1,128 @@
 import { NextResponse } from "next/server";
-import { db } from "@shared/database/client";
-import { sql } from "drizzle-orm";
+import { checkPoolHealth, getPoolMetrics } from "@shared/database/client";
 import logger from "@/lib/logger";
 
-interface HealthStatus {
-    status: "healthy" | "degraded" | "unhealthy";
-    timestamp: string;
-    version: string;
-    services: {
-        database: {
-            status: "healthy" | "unhealthy";
-            responseTimeMs: number;
-            error?: string;
-        };
-        discord: {
-            status: "healthy" | "unhealthy";
-            responseTimeMs: number;
-            error?: string;
-        };
-    };
-    uptime: number;
-}
-
-const START_TIME = Date.now();
-
-/**
- * Check database connectivity
- */
-async function checkDatabase(): Promise<{ status: "healthy" | "unhealthy"; responseTimeMs: number; error?: string }> {
-    const start = Date.now();
-    try {
-        // Simple query to check connectivity
-        await db.execute(sql`SELECT 1`);
-        return {
-            status: "healthy",
-            responseTimeMs: Date.now() - start,
-        };
-    } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        logger.error("Health check: Database connection failed", { error: message });
-        return {
-            status: "unhealthy",
-            responseTimeMs: Date.now() - start,
-            error: message,
-        };
-    }
+interface HealthCheck {
+    name: string;
+    healthy: boolean;
+    responseTime: number;
+    message?: string;
 }
 
 /**
- * Check Discord API connectivity
+ * Health check endpoint for monitoring and load balancers
+ * Returns 200 if healthy, 503 if unhealthy
  */
-async function checkDiscord(): Promise<{ status: "healthy" | "unhealthy"; responseTimeMs: number; error?: string }> {
-    const start = Date.now();
+export async function GET() {
+    const startTime = Date.now();
+    const checks: HealthCheck[] = [];
+
+    // Check database
+    const dbStart = Date.now();
     try {
-        const response = await fetch("https://discord.com/api/v10/gateway", {
-            method: "GET",
-            cache: "no-store",
+        const dbHealth = await checkPoolHealth();
+        checks.push({
+            name: "database",
+            healthy: dbHealth.healthy,
+            responseTime: Date.now() - dbStart,
+            message: dbHealth.healthy ? undefined : "Database connection failed"
         });
-
-        if (!response.ok) {
-            throw new Error(`Discord API returned ${response.status}`);
-        }
-
-        return {
-            status: "healthy",
-            responseTimeMs: Date.now() - start,
-        };
     } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        logger.error("Health check: Discord API connection failed", { error: message });
-        return {
-            status: "unhealthy",
-            responseTimeMs: Date.now() - start,
-            error: message,
-        };
-    }
-}
-
-/**
- * GET /api/health
- * Comprehensive health check endpoint
- */
-export async function GET(): Promise<NextResponse> {
-    const [database, discord] = await Promise.all([
-        checkDatabase(),
-        checkDiscord(),
-    ]);
-
-    // Determine overall status
-    let status: "healthy" | "degraded" | "unhealthy" = "healthy";
-    if (database.status === "unhealthy" && discord.status === "unhealthy") {
-        status = "unhealthy";
-    } else if (database.status === "unhealthy" || discord.status === "unhealthy") {
-        status = "degraded";
+        checks.push({
+            name: "database",
+            healthy: false,
+            responseTime: Date.now() - dbStart,
+            message: error instanceof Error ? error.message : "Unknown error"
+        });
     }
 
-    const health: HealthStatus = {
-        status,
+    // Check Discord bot connection (if applicable)
+    const discordStart = Date.now();
+    const discordHealthy = !!process.env.DISCORD_TOKEN;
+    checks.push({
+        name: "discord_config",
+        healthy: discordHealthy,
+        responseTime: Date.now() - discordStart,
+        message: discordHealthy ? undefined : "Discord token not configured"
+    });
+
+    // Overall health
+    const healthy = checks.every(c => c.healthy);
+    const totalResponseTime = Date.now() - startTime;
+
+    const response = {
+        status: healthy ? "healthy" : "unhealthy",
         timestamp: new Date().toISOString(),
-        version: process.env.npm_package_version || "1.0.0",
-        services: {
-            database,
-            discord,
-        },
-        uptime: Date.now() - START_TIME,
+        responseTime: totalResponseTime,
+        version: process.env.npm_package_version || "unknown",
+        checks: checks.reduce((acc, check) => ({
+            ...acc,
+            [check.name]: {
+                healthy: check.healthy,
+                responseTime: check.responseTime,
+                message: check.message
+            }
+        }), {})
     };
 
-    // Return appropriate status code
-    const statusCode = status === "healthy" ? 200 : status === "degraded" ? 200 : 503;
+    // Log if unhealthy
+    if (!healthy) {
+        logger.error("Health check failed", response);
+    }
 
-    return NextResponse.json(health, {
-        status: statusCode,
-        headers: {
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-        },
+    return NextResponse.json(response, {
+        status: healthy ? 200 : 503
     });
 }
 
 /**
- * HEAD /api/health
- * Lightweight health check for load balancers
+ * Detailed health check with metrics
+ * For internal monitoring use
  */
-export async function HEAD(): Promise<NextResponse> {
-    return new NextResponse(null, { status: 200 });
+export async function POST() {
+    const checks: HealthCheck[] = [];
+
+    // Database health with metrics
+    const dbStart = Date.now();
+    try {
+        const dbHealth = await checkPoolHealth();
+        const poolMetrics = getPoolMetrics();
+
+        checks.push({
+            name: "database",
+            healthy: dbHealth.healthy,
+            responseTime: Date.now() - dbStart,
+            message: dbHealth.healthy
+                ? `Pool: ${poolMetrics.total} total, ${poolMetrics.idle} idle, ${poolMetrics.waiting} waiting`
+                : "Database connection failed"
+        });
+    } catch (error) {
+        checks.push({
+            name: "database",
+            healthy: false,
+            responseTime: Date.now() - dbStart,
+            message: error instanceof Error ? error.message : "Unknown error"
+        });
+    }
+
+    // Memory usage
+    const memUsage = process.memoryUsage();
+    const memHealthy = memUsage.heapUsed < 1024 * 1024 * 1024; // 1GB threshold
+
+    checks.push({
+        name: "memory",
+        healthy: memHealthy,
+        responseTime: 0,
+        message: `Heap: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB, RSS: ${Math.round(memUsage.rss / 1024 / 1024)}MB`
+    });
+
+    const healthy = checks.every(c => c.healthy);
+
+    return NextResponse.json({
+        status: healthy ? "healthy" : "unhealthy",
+        timestamp: new Date().toISOString(),
+        checks
+    }, {
+        status: healthy ? 200 : 503
+    });
 }
