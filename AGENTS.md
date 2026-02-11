@@ -20,7 +20,7 @@ This document provides essential information for AI coding agents working on the
 |-----------|------------|
 | Bot | Discord.js v14, TypeScript, Bun 1.0+ |
 | Dashboard | Next.js 16 (App Router), React 19, Tailwind CSS 4 |
-| Database | SQLite with Drizzle ORM |
+| Database | PostgreSQL 17 with Drizzle ORM |
 | Authentication | NextAuth.js v4 with Discord OAuth2 |
 | Logging | Winston with daily rotation |
 | Process Manager | PM2 |
@@ -55,7 +55,7 @@ ixoye/
 │   ├── COMMANDS.md            # Bot commands reference
 │   └── DASHBOARD.md           # Dashboard user guide
 ├── drizzle/                    # Database migrations (generated)
-├── data/                       # SQLite database files (runtime)
+
 ├── logs/                       # Application logs (runtime)
 ├── drizzle.config.ts          # Drizzle ORM configuration
 ├── tailwind.config.ts         # Tailwind CSS configuration
@@ -152,7 +152,7 @@ NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=generate_with_openssl_rand_base64_32
 
 # Database
-DATABASE_URL=file:./data/ixoye.db
+DATABASE_URL=postgresql://ixoye:change_me@localhost:5432/ixoye
 
 # Optional
 LOG_LEVEL=info                    # debug, info, warn, error
@@ -290,9 +290,8 @@ The Dockerfile uses multi-stage builds:
 - Ensure redirect URI in Discord app matches `NEXTAUTH_URL`
 
 ### Database errors
-- Ensure `data/` directory exists and is writable
 - Run `npm run db:push` to update schema
-- Check `DATABASE_URL` format (should be `file:./data/ixoye.db`)
+- Check `DATABASE_URL` format (should be `postgresql://...`)
 
 ## Useful Resources
 

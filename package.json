@@ -25,9 +25,6 @@
     "db:backup:list": "tsx scripts/backup-db.ts list",
     "db:restore": "tsx scripts/restore-db.ts",
     "db:restore:list": "tsx scripts/restore-db.ts list",
-    "db:migrate:sqlite-import": "tsx scripts/migrate-sqlite-to-postgres.ts",
-    "db:migrate:delta": "tsx scripts/migrate-delta-sqlite-to-postgres.ts",
-    "db:migrate:verify": "tsx scripts/verify-sqlite-postgres-parity.ts",
     "deploy:safe": "bash scripts/deploy-with-backup.sh",
     "guard:no-meili": "bash scripts/guardrails/check-no-meili.sh",
     "test": "vitest run",
@@ -86,7 +83,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/luxon": "^3.7.1",
     "@types/node": "^22.15.14",
     "@types/node-cron": "^3.0.11",
@@ -95,7 +91,6 @@
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^1.6.0",
     "autoprefixer": "^10.4.24",
-    "better-sqlite3": "^12.6.2",
     "concurrently": "^9.2.1",
     "drizzle-kit": "^0.31.8",
     "postcss": "^8.5.6",

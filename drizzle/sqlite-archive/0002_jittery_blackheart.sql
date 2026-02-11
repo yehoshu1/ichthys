@@ -1,1 +1,0 @@
-ALTER TABLE `command_config` DROP COLUMN `aliases`;
