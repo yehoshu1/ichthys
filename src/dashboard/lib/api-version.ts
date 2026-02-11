@@ -17,6 +17,16 @@ export const API_VERSIONS = {
         changes: ["Initial API release"],
         deprecated: false,
     },
+    "0.2.0": {
+        released: "2026-02-10",
+        changes: [
+            "Added comprehensive tooltip system throughout dashboard",
+            "Added user preference toggle for help tooltips",
+            "Enhanced UX with examples and helper text on all pages",
+            "Added interactive variable tooltips in MessageEditor",
+        ],
+        deprecated: false,
+    },
 };
 
 /**

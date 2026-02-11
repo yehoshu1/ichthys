@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireGuildManageAccess } from "@/lib/guild-auth";
 import { nullableDiscordIdSchema, optionalEmbedSchema, optionalTextSchema, parseJsonBody } from "@/lib/validation";
 import logger from "@/lib/logger";
+import { emitDashboardSettingsChanged } from "@/lib/notification-events";
 
 const levelingConfigSchema = z.object({
     levelingEnabled: z.boolean().optional(),
@@ -94,6 +95,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
                 levelUpMessageEmbed: body.levelUpMessageEmbed || null,
                 updatedAt: new Date(),
             },
+        });
+
+        await emitDashboardSettingsChanged({
+            guildId,
+            userId: auth.userId,
+            module: "leveling",
+            action: "update",
         });
 
         return NextResponse.json({ success: true });

@@ -5,17 +5,11 @@
  * Used for message content, templates, and other user-generated content.
  */
 
-// Characters/sequences to sanitize in message content
-const DANGEROUS_PATTERNS = [
-    /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,  // Script tags
-    /<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi,  // Iframe tags
-    /<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi,  // Object tags
-    /<embed\b[^<]*>/gi,  // Embed tags
-    /javascript:/gi,  // JavaScript protocol
-    /on\w+\s*=/gi,  // Event handlers (onclick, onload, etc.)
-    /<meta\b[^>]*>/gi,  // Meta tags
-    /<link\b[^>]*>/gi,  // Link tags that could import styles
-];
+const SCRIPT_TAG_PATTERN = /<script\b[^>]*>[\s\S]*?<\/script>/gi;
+const DISALLOWED_TAG_PATTERN = /<\/?(iframe|object|embed|meta|link)\b[^>]*>/gi;
+const JS_PROTOCOL_ATTR_PATTERN = /\b(href|src)\s*=\s*(['"])\s*javascript:[^'"]*\2/gi;
+const JS_PROTOCOL_ATTR_UNQUOTED_PATTERN = /\b(href|src)\s*=\s*javascript:[^\s>]+/gi;
+const EVENT_HANDLER_ATTR_PATTERN = /\s+on\w+\s*=\s*(".*?"|'.*?'|[^\s>]+)/gi;
 
 // HTML entities to escape in text content
 const HTML_ENTITIES: Record<string, string> = {
@@ -43,11 +37,12 @@ export function sanitizeMessageContent(content: string): string {
     }
     
     let sanitized = content;
-    
-    // Remove dangerous patterns
-    DANGEROUS_PATTERNS.forEach((pattern) => {
-        sanitized = sanitized.replace(pattern, "");
-    });
+
+    sanitized = sanitized.replace(SCRIPT_TAG_PATTERN, "");
+    sanitized = sanitized.replace(DISALLOWED_TAG_PATTERN, "");
+    sanitized = sanitized.replace(JS_PROTOCOL_ATTR_PATTERN, "$1=$2$2");
+    sanitized = sanitized.replace(JS_PROTOCOL_ATTR_UNQUOTED_PATTERN, '$1=""');
+    sanitized = sanitized.replace(EVENT_HANDLER_ATTR_PATTERN, "");
     
     // Remove null bytes
     sanitized = sanitized.replace(/\x00/g, "");

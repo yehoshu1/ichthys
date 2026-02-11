@@ -17,7 +17,6 @@ import {
     Zap,
     ScrollText,
     Settings,
-    Bell,
     Search,
     LogOut,
     Menu,
@@ -37,6 +36,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetClose } from "../../../componen
 import ThemeToggle from "../../../components/ThemeToggle";
 import { toast } from "sonner";
 import GlobalSearchModal from "../../../components/GlobalSearchModal";
+import GuildNotificationBell from "../../../components/GuildNotificationBell";
 import { DASHBOARD_NAV_ITEMS, DashboardNavId } from "../../../lib/search/dashboard-nav";
 import type { SearchOpenMethod } from "../../../lib/search/telemetry";
 
@@ -434,9 +434,7 @@ export default function DashboardLayout({
                             <Search className="h-5 w-5" />
                         </Button>
                         <ThemeToggle />
-                        <Button variant="ghost" size="icon">
-                            <Bell className="h-5 w-5" />
-                        </Button>
+                        <GuildNotificationBell guildId={guildId} />
                     </div>
                 </header>
 

@@ -4,6 +4,90 @@ import logger from '../utils/logger';
 import { db } from '../../shared/database/client';
 import { reactionRole } from '../../shared/database/schema';
 import { eq, and } from 'drizzle-orm';
+import { emitGuildNotificationSafe } from '../services/notificationEmitter';
+
+function getPositiveIntEnv(name: string, fallback: number): number {
+    const raw = process.env[name];
+    if (!raw) return fallback;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/**
+ * 🎯 PERFORMANCE FIX: Cache for reaction roles per message
+ * This prevents repeated database queries for the same message
+ */
+interface ReactionRoleCacheEntry {
+    roles: typeof reactionRole.$inferSelect[];
+    expiresAt: number;
+}
+
+const reactionRoleCache = new Map<string, ReactionRoleCacheEntry>();
+const REACTION_ROLE_CACHE_TTL_MS = 60_000; // 1 minute
+const MAX_REACTION_ROLE_CACHE_ENTRIES = getPositiveIntEnv('MAX_REACTION_ROLE_CACHE_ENTRIES', 500);
+const MAX_REACTION_ROLES_PER_MESSAGE = 50; // Reasonable limit
+
+function getCacheKey(messageId: string): string {
+    return messageId;
+}
+
+/**
+ * 🎯 PERFORMANCE FIX: Fetch reaction roles with caching
+ */
+async function getReactionRolesForMessage(messageId: string): Promise<typeof reactionRole.$inferSelect[]> {
+    const cacheKey = getCacheKey(messageId);
+    const now = Date.now();
+
+    // Check cache
+    const cached = reactionRoleCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+        return cached.roles;
+    }
+
+    // Fetch from database with limit
+    const roles = await db.query.reactionRole.findMany({
+        where: and(
+            eq(reactionRole.messageId, messageId),
+            eq(reactionRole.enabled, true)
+        ),
+        limit: MAX_REACTION_ROLES_PER_MESSAGE
+    });
+
+    // 🎯 PERFORMANCE FIX: Cache management - LRU eviction
+    if (reactionRoleCache.size >= MAX_REACTION_ROLE_CACHE_ENTRIES) {
+        // Remove oldest 10% of entries
+        const entries = Array.from(reactionRoleCache.entries())
+            .sort((a, b) => a[1].expiresAt - b[1].expiresAt);
+        const toRemove = Math.ceil(MAX_REACTION_ROLE_CACHE_ENTRIES * 0.1);
+        for (let i = 0; i < toRemove; i++) {
+            const [key] = entries[i] ?? [];
+            if (key) reactionRoleCache.delete(key);
+        }
+    }
+
+    reactionRoleCache.set(cacheKey, {
+        roles,
+        expiresAt: now + REACTION_ROLE_CACHE_TTL_MS
+    });
+
+    return roles;
+}
+
+/**
+ * 🎯 PERFORMANCE FIX: Invalidate reaction role cache
+ * Call this when reaction roles are modified
+ */
+export function invalidateReactionRoleCache(messageId: string): void {
+    reactionRoleCache.delete(getCacheKey(messageId));
+}
+
+/**
+ * Clear entire reaction role cache (useful for admin commands)
+ */
+export function clearReactionRoleCache(): void {
+    reactionRoleCache.clear();
+    logger.info('Reaction role cache cleared');
+}
 
 const event: Event<Events.MessageReactionAdd> = {
     name: Events.MessageReactionAdd,
@@ -45,6 +129,22 @@ const event: Event<Events.MessageReactionAdd> = {
                 ?? await reaction.message.guild.members.fetch(user.id).catch(() => null);
             if (!member) {
                 logger.warn(`Member ${user.id} not found in guild ${guildId} for reaction role`);
+                await emitGuildNotificationSafe({
+                    guildId,
+                    eventType: 'REACTION_ROLE_CONFIG_BROKEN',
+                    severity: 'WARNING',
+                    source: 'BOT_EVENT',
+                    title: `Reaction role member lookup failed`,
+                    body: `Member ${user.id} not found while processing reaction role`,
+                    targetUserId: user.id,
+                    metadata: {
+                        messageId,
+                        emoji,
+                        roleId: config.roleId,
+                    },
+                    dedupeKey: `reaction-role-config-broken:member:${guildId}:${messageId}:${emoji}`,
+                    dedupeWindowSeconds: 1800,
+                });
                 return;
             }
 
@@ -52,6 +152,22 @@ const event: Event<Events.MessageReactionAdd> = {
                 ?? await reaction.message.guild.roles.fetch(config.roleId).catch(() => null);
             if (!role) {
                 logger.warn(`Role ${config.roleId} not found for reaction role in guild ${guildId}`);
+                await emitGuildNotificationSafe({
+                    guildId,
+                    eventType: 'REACTION_ROLE_CONFIG_BROKEN',
+                    severity: 'WARNING',
+                    source: 'BOT_EVENT',
+                    title: `Reaction role configuration references missing role`,
+                    body: `Role ${config.roleId} not found`,
+                    targetUserId: user.id,
+                    metadata: {
+                        messageId,
+                        emoji,
+                        roleId: config.roleId,
+                    },
+                    dedupeKey: `reaction-role-config-broken:role:${guildId}:${messageId}:${emoji}`,
+                    dedupeWindowSeconds: 1800,
+                });
                 return;
             }
 
@@ -76,6 +192,23 @@ const event: Event<Events.MessageReactionAdd> = {
             logger.debug(`Processed reaction role ${config.type} for user ${user.tag} in guild ${reaction.message.guild.name}`);
         } catch (error) {
             logger.error('Error handling reaction role:', error);
+            if (reaction.message.guild) {
+                await emitGuildNotificationSafe({
+                    guildId: reaction.message.guild.id,
+                    eventType: 'REACTION_ROLE_PROCESSING_ERROR',
+                    severity: 'ERROR',
+                    source: 'BOT_EVENT',
+                    title: `Reaction role processing failed`,
+                    body: error instanceof Error ? error.message : 'Unknown error',
+                    targetUserId: user.id,
+                    metadata: {
+                        messageId: reaction.message.id,
+                        emoji: reaction.emoji.id || reaction.emoji.name || null,
+                    },
+                    dedupeKey: `reaction-role-processing-error:${reaction.message.id}:${reaction.emoji.id || reaction.emoji.name || 'unknown'}`,
+                    dedupeWindowSeconds: 900,
+                });
+            }
         }
     }
 };
@@ -84,7 +217,7 @@ async function handleToggle(
     member: GuildMember,
     role: Role,
     reaction: MessageReaction | PartialMessageReaction,
-    exclusiveRoleIds?: string | null
+    exclusiveRoleIds?: string[] | null
 ) {
     // If user already has the role, remove it
     if (member.roles.cache.has(role.id)) {
@@ -95,8 +228,8 @@ async function handleToggle(
         await member.roles.add(role.id);
 
         // Handle exclusive roles if configured
-        if (exclusiveRoleIds) {
-            const rolesToRemove = exclusiveRoleIds.split(',').filter(id => id !== role.id);
+        if (exclusiveRoleIds && exclusiveRoleIds.length > 0) {
+            const rolesToRemove = exclusiveRoleIds.filter((id) => id !== role.id);
             for (const roleId of rolesToRemove) {
                 if (member.roles.cache.has(roleId)) {
                     await member.roles.remove(roleId).catch(() => null);
@@ -122,21 +255,13 @@ async function handleUnique(
     member: GuildMember,
     role: Role,
     reaction: MessageReaction | PartialMessageReaction,
-    exclusiveRoleIds?: string | null
+    exclusiveRoleIds?: string[] | null
 ) {
-    // Remove all exclusive roles first
-    const exclusiveIds = exclusiveRoleIds?.split(',') || [];
-
-    // Also find other reaction roles on the same message and treat them as exclusive
-    const otherReactionRoles = await db.query.reactionRole.findMany({
-        where: and(
-            eq(reactionRole.messageId, reaction.message.id),
-            eq(reactionRole.enabled, true)
-        )
-    });
+    // 🎯 PERFORMANCE FIX: Use cached reaction roles instead of querying database
+    const otherReactionRoles = await getReactionRolesForMessage(reaction.message.id);
 
     const allExclusiveIds = new Set([
-        ...exclusiveIds,
+        ...(exclusiveRoleIds ?? []),
         ...otherReactionRoles.map(r => r.roleId).filter(id => id !== role.id)
     ]);
 

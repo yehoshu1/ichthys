@@ -131,15 +131,18 @@ async function getGuildPermissions(
             },
             cache: "no-store",
         });
-    } catch {
-        return jsonError(503, "Failed to validate guild permissions");
+    } catch (error) {
+        console.error("Failed to fetch guilds from Discord:", error);
+        return jsonError(503, "Failed to validate guild permissions - network error");
     }
 
     if (!response.ok) {
+        const errorText = await response.text().catch(() => "unknown");
+        console.error("Discord API error:", { status: response.status, error: errorText });
         if (response.status === 401 || response.status === 403) {
-            return jsonError(401, "Unauthorized");
+            return jsonError(401, "Unauthorized - Discord token invalid");
         }
-        return jsonError(503, "Failed to validate guild permissions");
+        return jsonError(503, `Failed to validate guild permissions - Discord API ${response.status}`);
     }
 
     const guilds = await response.json() as DiscordGuildPermissionPayload[];
@@ -202,8 +205,16 @@ async function requireGuildAccess(
     const guildPermissionsResult = await getGuildPermissions(sessionResult.userId, sessionResult.accessToken);
     if (guildPermissionsResult instanceof Map) {
         const guild = guildPermissionsResult.get(guildId);
+        console.log("Guild permissions check:", { 
+            guildId, 
+            userId: sessionResult.userId,
+            hasGuild: !!guild,
+            isOwner: guild?.owner,
+            permissions: guild?.permissions
+        });
         if (!hasRequiredPermissions(guild, requiredPermissions)) {
-            return jsonError(403, "Forbidden");
+            console.error("Permission denied:", { guildId, userId: sessionResult.userId });
+            return jsonError(403, "Forbidden - You don't have MANAGE_GUILD permission");
         }
         return sessionResult;
     }

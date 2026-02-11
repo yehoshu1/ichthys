@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireGuildManageAccess, requireGuildManageRolesAccess } from "@/lib/guild-auth";
 import { discordIdSchema, nullableDiscordIdSchema, optionalEmbedSchema, optionalTextSchema, parseJsonBody } from "@/lib/validation";
 import logger from "@/lib/logger";
+import { emitDashboardSettingsChanged } from "@/lib/notification-events";
 
 const roleActionSchema = z.object({
     id: z.string().trim().min(1).optional(),
@@ -68,6 +69,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
                 })
                 .where(and(eq(roleAction.id, body.id), eq(roleAction.guildId, guildId)))
                 .returning();
+            await emitDashboardSettingsChanged({
+                guildId,
+                userId: auth.userId,
+                module: "role-actions",
+                action: "update",
+                metadata: { roleActionId: body.id },
+            });
             return NextResponse.json(updated[0]);
         }
 
@@ -85,6 +93,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
             logChannelId: body.logChannelId || null,
             enabled: body.enabled ?? true,
         }).returning();
+        await emitDashboardSettingsChanged({
+            guildId,
+            userId: auth.userId,
+            module: "role-actions",
+            action: "create",
+            metadata: { roleActionId: inserted[0]?.id ?? null },
+        });
         return NextResponse.json(inserted[0]);
     } catch (error) {
         logger.error("Error saving role action", { error: error instanceof Error ? error.message : String(error), guildId });
@@ -106,6 +121,14 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ guildI
 
         await db.delete(roleAction)
             .where(and(eq(roleAction.id, id), eq(roleAction.guildId, guildId)));
+
+        await emitDashboardSettingsChanged({
+            guildId,
+            userId: auth.userId,
+            module: "role-actions",
+            action: "delete",
+            metadata: { roleActionId: id },
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

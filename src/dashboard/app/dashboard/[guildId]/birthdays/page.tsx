@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../components/ui/table";
 import { Cake, Trash, Calendar, Clock, Gift } from "lucide-react";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
+import { ExampleBox, HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 
@@ -185,15 +186,23 @@ function SettingsTab({ guildId }: { guildId: string }) {
 
                     {config.enabled && (
                         <>
+                            <ExampleBox>
+                                At 9:00 AM server time, the bot will announce &quot;🎉 Happy Birthday @User! They are now 25 years old!&quot; 
+                                in #general and assign the @Birthday role for 24 hours.
+                            </ExampleBox>
+
                             {/* Channel Selection */}
                             <div className="space-y-2">
-                                <Label className="text-base flex items-center gap-2">
-                                    <Calendar className="h-4 w-4" />
-                                    Channel
-                                </Label>
-                                <p className="text-sm text-muted-foreground mb-2">
-                                    Choose the channel for birthday messages to be sent in.
-                                </p>
+                                <LabelWithTooltip
+                                    label={
+                                        <span className="flex items-center gap-2">
+                                            <Calendar className="h-4 w-4" />
+                                            Channel
+                                        </span>
+                                    }
+                                    tooltip="Channel where birthday announcements are posted"
+                                />
+                                <HelperText>Choose the channel for birthday messages to be sent in.</HelperText>
                                 <ChannelSelect
                                     guildId={guildId}
                                     value={config.channelId || ""}
@@ -204,13 +213,16 @@ function SettingsTab({ guildId }: { guildId: string }) {
 
                             {/* Birthday Role */}
                             <div className="space-y-2">
-                                <Label className="text-base flex items-center gap-2">
-                                    <Gift className="h-4 w-4" />
-                                    Birthday Role
-                                </Label>
-                                <p className="text-sm text-muted-foreground mb-2">
-                                    Give a role to members celebrating their birthday.
-                                </p>
+                                <LabelWithTooltip
+                                    label={
+                                        <span className="flex items-center gap-2">
+                                            <Gift className="h-4 w-4" />
+                                            Birthday Role
+                                        </span>
+                                    }
+                                    tooltip="Temporary role given to users on their birthday. Auto-removes after the day ends if enabled."
+                                />
+                                <HelperText>Give a role to members celebrating their birthday.</HelperText>
                                 <RoleSelect
                                     guildId={guildId}
                                     value={config.roleId || ""}
@@ -222,10 +234,11 @@ function SettingsTab({ guildId }: { guildId: string }) {
 
                             {/* Message Template */}
                             <div className="space-y-2">
-                                <Label className="text-base">Message</Label>
-                                <p className="text-sm text-muted-foreground mb-2">
-                                    Customize the birthday message.
-                                </p>
+                                <LabelWithTooltip
+                                    label="Message"
+                                    tooltip="Use {user.mention} to ping them, {age} for their age (if they set birth year)"
+                                />
+                                <HelperText>Customize the birthday message.</HelperText>
                                 <MessageEditor
                                     content={config.messageTemplate}
                                     embed={config.messageEmbed}
@@ -244,13 +257,16 @@ function SettingsTab({ guildId }: { guildId: string }) {
 
                             {/* Hour of Day */}
                             <div className="space-y-2">
-                                <Label className="text-base flex items-center gap-2">
-                                    <Clock className="h-4 w-4" />
-                                    Time to Send Message
-                                </Label>
-                                <p className="text-sm text-muted-foreground mb-2">
-                                    Change the hour at which the birthday messages should be sent (in server time).
-                                </p>
+                                <LabelWithTooltip
+                                    label={
+                                        <span className="flex items-center gap-2">
+                                            <Clock className="h-4 w-4" />
+                                            Time to Send Message
+                                        </span>
+                                    }
+                                    tooltip="What hour (server time) to post birthday messages"
+                                />
+                                <HelperText>Change the hour at which the birthday messages should be sent (in server time).</HelperText>
                                 <Select
                                     value={config.hourOfDay.toString()}
                                     onValueChange={(value) => setConfig({ ...config, hourOfDay: parseInt(value) })}
@@ -274,10 +290,11 @@ function SettingsTab({ guildId }: { guildId: string }) {
                                 
                                 <div className="flex items-center justify-between space-x-2">
                                     <div className="space-y-0.5">
-                                        <Label>Show Age</Label>
-                                        <p className="text-sm text-muted-foreground">
-                                            Display the user's age in the birthday message.
-                                        </p>
+                                        <LabelWithTooltip
+                                            label="Show Age"
+                                            tooltip="Display the user's age in the message. Only works if they provided their birth year."
+                                        />
+                                        <HelperText>Display the user's age in the birthday message.</HelperText>
                                     </div>
                                     <Switch
                                         checked={config.showAge}
@@ -287,13 +304,16 @@ function SettingsTab({ guildId }: { guildId: string }) {
 
                                 {/* Mention Role Selection */}
                                 <div className="space-y-2">
-                                    <Label className="text-base flex items-center gap-2">
-                                        <span className="text-lg">@</span>
-                                        Mention Role
-                                    </Label>
-                                    <p className="text-sm text-muted-foreground mb-2">
-                                        Select a role to mention in birthday messages (optional).
-                                    </p>
+                                    <LabelWithTooltip
+                                        label={
+                                            <span className="flex items-center gap-2">
+                                                <span className="text-lg">@</span>
+                                                Mention Role
+                                            </span>
+                                        }
+                                        tooltip="Optionally mention @everyone, @here, or a specific role to draw attention"
+                                    />
+                                    <HelperText>Select a role to mention in birthday messages (optional).</HelperText>
                                     <div className="flex gap-2">
                                         <Select
                                             value={config.mentionRoleId === "everyone" ? "everyone" : config.mentionRoleId === "here" ? "here" : config.mentionRoleId ? "custom" : "none"}
@@ -339,10 +359,11 @@ function SettingsTab({ guildId }: { guildId: string }) {
 
                                 <div className="flex items-center justify-between space-x-2">
                                     <div className="space-y-0.5">
-                                        <Label>Auto-Remove Role</Label>
-                                        <p className="text-sm text-muted-foreground">
-                                            Automatically remove the birthday role after the day ends.
-                                        </p>
+                                        <LabelWithTooltip
+                                            label="Auto-Remove Role"
+                                            tooltip="Automatically remove the birthday role after the day ends (midnight)"
+                                        />
+                                        <HelperText>Automatically remove the birthday role after the day ends.</HelperText>
                                     </div>
                                     <Switch
                                         checked={config.autoRemoveRole}

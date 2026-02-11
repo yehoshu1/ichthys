@@ -12,6 +12,7 @@ backups/
 *.swo
 *~
 .next/
+src/dashboard/.next.root-owned/
 out/
 build/
 coverage/

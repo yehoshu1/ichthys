@@ -6,7 +6,8 @@ This guide is the canonical setup reference for the current Ixoye codebase.
 
 - Node.js: `22.x` recommended
 - npm: `11.9.0` (declared in `package.json`)
-- Database: SQLite (`DATABASE_URL=file:./data/ixoye.db` by default)
+- Database: PostgreSQL 17 (`DATABASE_URL=postgresql://...`)
+- Search: in-process dashboard search (no external Meilisearch dependency)
 - Bot framework: Discord.js v14
 - Dashboard: Next.js 16 App Router
 
@@ -64,14 +65,24 @@ openssl rand -base64 32
 | `DISCORD_CLIENT_SECRET` | Yes | Discord app client secret for NextAuth provider. |
 | `NEXTAUTH_SECRET` | Yes | Session/JWT signing secret for dashboard auth. |
 | `NEXTAUTH_URL` | Yes | Base URL for auth callback handling. |
-| `DATABASE_URL` | Yes | SQLite DSN. Default local path is `file:./data/ixoye.db`. |
+| `DATABASE_URL` | Yes | PostgreSQL DSN used by bot, dashboard, and Drizzle. |
+| `POSTGRES_HOST` | Yes | PostgreSQL hostname (Docker service name in compose: `postgres`). |
+| `POSTGRES_PORT` | Yes | PostgreSQL port (`5432`). |
+| `POSTGRES_DB` | Yes | PostgreSQL database name. |
+| `POSTGRES_USER` | Yes | PostgreSQL username. |
+| `POSTGRES_PASSWORD` | Yes | PostgreSQL password. |
 | `DASHBOARD_URL` | No | Base URL for the `/dashboard` command. Required for users to access the dashboard link. |
 
 ### Common Local Values
 
 ```env
 NEXTAUTH_URL=http://localhost:4000
-DATABASE_URL=file:./data/ixoye.db
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=ixoye
+POSTGRES_USER=ixoye
+POSTGRES_PASSWORD=change_me
+DATABASE_URL=postgresql://ixoye:change_me@localhost:5432/ixoye
 NODE_ENV=development
 LOG_LEVEL=info
 ```
@@ -86,12 +97,20 @@ npm ci
 
 If lockfile changes during development, run `npm ci` again.
 
-## 4. Initialize Database
+## 3.1 Search Guardrail Check
 
-Push schema to local DB:
+Run this to ensure Meilisearch artifacts were not accidentally introduced:
 
 ```bash
-npm run db:push
+npm run guard:no-meili
+```
+
+## 4. Initialize Database
+
+Apply migrations to local DB:
+
+```bash
+npm run db:migrate
 ```
 
 Optional GUI:

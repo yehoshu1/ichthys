@@ -4,6 +4,7 @@ import { db } from '../../shared/database/client';
 import { moderationCase, moderationSettings } from '../../shared/database/schema';
 import { eq, sql } from 'drizzle-orm';
 import logger from '../utils/logger';
+import { emitGuildNotificationSafe } from '../services/notificationEmitter';
 
 async function getNextCaseNumber(guildId: string): Promise<number> {
     const result = await db
@@ -31,6 +32,20 @@ async function createModCase(
         reason: reason || null,
         active: false,
     }).returning();
+
+    await emitGuildNotificationSafe({
+        guildId,
+        eventType: 'MOD_CASE_CREATED_KICK',
+        severity: 'WARNING',
+        source: 'BOT_EVENT',
+        title: `Kick case #${caseNumber} created`,
+        targetUserId: userId,
+        actorUserId: moderatorId,
+        metadata: {
+            caseId: modCase.id,
+            caseNumber,
+        },
+    });
 
     return modCase;
 }

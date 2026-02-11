@@ -16,6 +16,7 @@ import { Badge } from "../../../../components/ui/badge";
 import { Textarea } from "../../../../components/ui/textarea";
 import { ChannelMultiSelect, RoleMultiSelect } from "../../../../components/DiscordSelectors";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
+import { ExampleBox, HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
 
 // Types
 interface MessageAlias {
@@ -28,8 +29,8 @@ interface MessageAlias {
     caseSensitive: boolean;
     deleteTrigger: boolean;
     requirePrefix: string | null;
-    allowedChannels: string | null;
-    allowedRoles: string | null;
+    allowedChannels: string[] | null;
+    allowedRoles: string[] | null;
     cooldownSeconds: number;
     usageCount: number;
     createdBy: string;
@@ -74,8 +75,9 @@ function normalizeIdList(values: string[]): string[] {
     return [...unique];
 }
 
-function parseStoredIdList(value: string | null): string[] {
+function parseStoredIdList(value: string[] | string | null): string[] {
     if (!value) return [];
+    if (Array.isArray(value)) return normalizeIdList(value);
     return normalizeIdList(value.split(","));
 }
 
@@ -309,6 +311,11 @@ export default function AliasesPage() {
                 <p className="text-muted-foreground">
                     Create custom trigger words that make the bot respond with predefined messages.
                 </p>
+                <ExampleBox>
+                    Create a &quot;rules&quot; alias that responds with server rules when users type &quot;!rules&quot;. 
+                    Enable &quot;Delete Trigger&quot; to clean up the command message automatically. 
+                    Set a 30-second cooldown so users can&apos;t spam the command.
+                </ExampleBox>
             </div>
 
             <Card>
@@ -336,13 +343,13 @@ export default function AliasesPage() {
                             <form onSubmit={handleSubmit} className="space-y-6 pt-4">
                                 {/* Trigger Word */}
                                 <div className="space-y-2">
-                                    <Label htmlFor="trigger">
+                                    <LabelWithTooltip
+                                        htmlFor="trigger"
+                                        tooltip="The word or phrase that triggers the bot to respond"
+                                    >
                                         <Hash className="h-4 w-4 inline mr-1" />
                                         Trigger Word
-                                    </Label>
-                                    <p className="text-sm text-muted-foreground">
-                                        The word that triggers the bot response.
-                                    </p>
+                                    </LabelWithTooltip>
                                     <div className="flex gap-2">
                                         <Select
                                             value="custom"
@@ -376,13 +383,13 @@ export default function AliasesPage() {
 
                                 {/* Response Message */}
                                 <div className="space-y-2">
-                                    <Label htmlFor="response">
+                                    <LabelWithTooltip
+                                        htmlFor="response"
+                                        tooltip="The message the bot will send when the trigger is detected"
+                                    >
                                         <MessageCircle className="h-4 w-4 inline mr-1" />
                                         Response Message
-                                    </Label>
-                                    <p className="text-sm text-muted-foreground">
-                                        The message the bot will send when triggered.
-                                    </p>
+                                    </LabelWithTooltip>
                                     <Textarea
                                         id="response"
                                         value={formData.response}
@@ -418,7 +425,9 @@ export default function AliasesPage() {
 
                                 {/* Prefix */}
                                 <div className="space-y-2">
-                                    <Label>Require Prefix</Label>
+                                    <LabelWithTooltip tooltip="Optionally require a prefix like ! before the trigger word">
+                                        Require Prefix
+                                    </LabelWithTooltip>
                                     <Select
                                         value={formData.requirePrefix || "none"}
                                         onValueChange={(value) => setFormData({ ...formData, requirePrefix: value === "none" ? null : value })}
@@ -434,17 +443,17 @@ export default function AliasesPage() {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    <p className="text-sm text-muted-foreground">
-                                        Example: With &quot;!&quot; prefix, typing &quot;!{formData.trigger || "rules"}&quot; triggers the response.
-                                    </p>
                                 </div>
 
                                 {/* Cooldown */}
                                 <div className="space-y-2">
-                                    <Label className="flex items-center gap-2">
+                                    <LabelWithTooltip
+                                        className="flex items-center gap-2"
+                                        tooltip="How long each user must wait before using this alias again"
+                                    >
                                         <Clock className="h-4 w-4" />
                                         Cooldown
-                                    </Label>
+                                    </LabelWithTooltip>
                                     <Select
                                         value={formData.cooldownSeconds.toString()}
                                         onValueChange={(value) => setFormData({ ...formData, cooldownSeconds: parseInt(value) })}
@@ -460,20 +469,17 @@ export default function AliasesPage() {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    <p className="text-sm text-muted-foreground">
-                                        Per-user cooldown to prevent spam.
-                                    </p>
                                 </div>
 
                                 {/* Channel Restrictions */}
                                 <div className="space-y-2">
-                                    <Label className="flex items-center gap-2">
+                                    <LabelWithTooltip
+                                        className="flex items-center gap-2"
+                                        tooltip="Restrict this alias to specific channels only. Leave empty for all channels."
+                                    >
                                         <Hash className="h-4 w-4" />
                                         Allowed Channels (Optional)
-                                    </Label>
-                                    <p className="text-sm text-muted-foreground">
-                                        Leave empty to allow in all channels.
-                                    </p>
+                                    </LabelWithTooltip>
                                     <ChannelMultiSelect
                                         guildId={guildId}
                                         values={formData.allowedChannels}
@@ -483,13 +489,13 @@ export default function AliasesPage() {
 
                                 {/* Role Restrictions */}
                                 <div className="space-y-2">
-                                    <Label className="flex items-center gap-2">
+                                    <LabelWithTooltip
+                                        className="flex items-center gap-2"
+                                        tooltip="Only users with these roles can trigger this alias. Leave empty for all users."
+                                    >
                                         <User className="h-4 w-4" />
                                         Required Role (Optional)
-                                    </Label>
-                                    <p className="text-sm text-muted-foreground">
-                                        Leave empty to allow all users.
-                                    </p>
+                                    </LabelWithTooltip>
                                     <RoleMultiSelect
                                         guildId={guildId}
                                         values={formData.allowedRoles}
@@ -502,9 +508,7 @@ export default function AliasesPage() {
                                     <div className="flex items-center justify-between space-x-2">
                                         <div className="space-y-0.5">
                                             <Label>Enabled</Label>
-                                            <p className="text-sm text-muted-foreground">
-                                                Whether this alias is active.
-                                            </p>
+                                            <HelperText>Whether this alias is active and responding to trigger words.</HelperText>
                                         </div>
                                         <Switch
                                             checked={formData.enabled}
@@ -515,9 +519,7 @@ export default function AliasesPage() {
                                     <div className="flex items-center justify-between space-x-2">
                                         <div className="space-y-0.5">
                                             <Label>Case Sensitive</Label>
-                                            <p className="text-sm text-muted-foreground">
-                                                Require exact capitalization match.
-                                            </p>
+                                            <HelperText>Require exact capitalization match for the trigger word.</HelperText>
                                         </div>
                                         <Switch
                                             checked={formData.caseSensitive}
@@ -528,9 +530,7 @@ export default function AliasesPage() {
                                     <div className="flex items-center justify-between space-x-2">
                                         <div className="space-y-0.5">
                                             <Label>Delete Trigger</Label>
-                                            <p className="text-sm text-muted-foreground">
-                                                Delete the message that triggered the alias.
-                                            </p>
+                                            <HelperText>Automatically delete the message that triggered the alias.</HelperText>
                                         </div>
                                         <Switch
                                             checked={formData.deleteTrigger}

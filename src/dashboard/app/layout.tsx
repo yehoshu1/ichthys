@@ -4,6 +4,7 @@ import "./globals.css";
 import AuthProvider from "../components/AuthProvider";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { Toaster } from "sonner";
+import { TooltipProvider } from "../components/TooltipContext";
 
 const dmSans = DM_Sans({
     subsets: ["latin"],
@@ -43,10 +44,12 @@ export default function RootLayout({
             </head>
             <body className={`${dmSans.variable} ${spaceGrotesk.variable}`}>
                 <AuthProvider>
-                    <ErrorBoundary>
-                        {children}
-                        <Toaster richColors theme="system" />
-                    </ErrorBoundary>
+                    <TooltipProvider>
+                        <ErrorBoundary>
+                            {children}
+                            <Toaster richColors theme="system" />
+                        </ErrorBoundary>
+                    </TooltipProvider>
                 </AuthProvider>
             </body>
         </html>

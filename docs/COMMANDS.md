@@ -20,13 +20,18 @@ Run scripts with `npm run <script>`.
 | `start` | Start compiled bot from `dist`. | Production runtime |
 | `deploy` | Deploy slash commands to Discord API. | After slash command changes |
 | `db:generate` | Generate Drizzle migrations from schema changes. | Migration authoring |
-| `db:push` | Push schema to DB. | Local schema sync |
+| `db:migrate` | Apply versioned Drizzle migrations to PostgreSQL. | Standard schema rollout |
+| `db:push` | Direct schema push (prefer migrations for shared/prod environments). | Local prototyping |
 | `db:studio` | Open Drizzle Studio. | Manual DB inspection |
 | `db:backup` | Create timestamped DB backup. | Pre-change safety |
 | `db:backup:list` | List backups. | Backup audit |
 | `db:restore` | Restore DB from backup. | Recovery |
 | `db:restore:list` | List restore candidates. | Recovery planning |
+| `db:migrate:sqlite-import` | Full SQLite -> PostgreSQL import. | Initial cutover load |
+| `db:migrate:delta` | Delta sync SQLite changes to PostgreSQL. | Near-zero cutover sync |
+| `db:migrate:verify` | Verify SQLite/PostgreSQL parity checksums and counts. | Cutover validation |
 | `deploy:safe` | Safe deployment with backup workflow. | Production deploy safety |
+| `guard:no-meili` | Fails if Meilisearch env keys/imports/dependencies are introduced. | Architecture guardrail |
 
 ## Slash Command Overview
 

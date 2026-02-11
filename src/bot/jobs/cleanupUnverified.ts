@@ -3,7 +3,8 @@ import client from '../client';
 import logger from '../utils/logger';
 import { db } from '../../shared/database/client';
 import { guildConfig, userJoin, actionLog } from '../../shared/database/schema';
-import { eq, and, isNull, lte } from 'drizzle-orm';
+import { eq, and, isNull, lte, gt } from 'drizzle-orm';
+import { emitGuildNotificationSafe } from '../services/notificationEmitter';
 
 export default function startCleanupJob() {
     // Run every hour
@@ -28,6 +29,35 @@ export default function startCleanupJob() {
                         isNull(userJoin.kickedAt),
                         lte(userJoin.joinedAt, cutoffDate)
                     ));
+
+                const warningWindowEnd = new Date(cutoffDate.getTime() + (24 * 60 * 60 * 1000));
+                const expiringSoonUsers = await db.select({
+                    userId: userJoin.userId,
+                })
+                    .from(userJoin)
+                    .where(and(
+                        eq(userJoin.guildId, config.guildId),
+                        eq(userJoin.isVerified, false),
+                        isNull(userJoin.kickedAt),
+                        gt(userJoin.joinedAt, cutoffDate),
+                        lte(userJoin.joinedAt, warningWindowEnd)
+                    ));
+
+                if (expiringSoonUsers.length > 0) {
+                    await emitGuildNotificationSafe({
+                        guildId: config.guildId,
+                        eventType: 'VERIFICATION_GRACE_EXPIRING',
+                        severity: 'WARNING',
+                        source: 'BOT_JOB',
+                        title: `${expiringSoonUsers.length} unverified member(s) nearing grace deadline`,
+                        metadata: {
+                            count: expiringSoonUsers.length,
+                            graceDays: config.verificationGraceDays,
+                        },
+                        dedupeKey: `verification-grace-expiring:${new Date().toISOString().slice(0, 10)}`,
+                        dedupeWindowSeconds: 3600,
+                    });
+                }
 
                 if (unverifiedUsers.length === 0) continue;
 
@@ -70,6 +100,17 @@ export default function startCleanupJob() {
                                 });
 
                                 logger.info(`Kicked unverified user ${member.user.tag} from ${guild.name}`);
+                                await emitGuildNotificationSafe({
+                                    guildId: config.guildId,
+                                    eventType: 'VERIFICATION_AUTO_KICK_SUCCESS',
+                                    severity: 'WARNING',
+                                    source: 'BOT_JOB',
+                                    title: `Auto-kicked unverified member ${member.user.tag}`,
+                                    targetUserId: userRecord.userId,
+                                    metadata: {
+                                        graceDays: config.verificationGraceDays,
+                                    },
+                                });
                             } else {
                                 logger.warn(`Cannot kick ${member.user.tag} from ${guild.name} (missing permissions).`);
                                 // Log failure
@@ -80,6 +121,17 @@ export default function startCleanupJob() {
                                     success: false,
                                     errorMessage: 'Missing Permissions'
                                 });
+                                await emitGuildNotificationSafe({
+                                    guildId: config.guildId,
+                                    eventType: 'VERIFICATION_AUTO_KICK_FAILED',
+                                    severity: 'ERROR',
+                                    source: 'BOT_JOB',
+                                    title: `Failed to auto-kick ${member.user.tag}`,
+                                    body: 'Missing permissions',
+                                    targetUserId: userRecord.userId,
+                                    dedupeKey: `verification-auto-kick-failed:${userRecord.userId}`,
+                                    dedupeWindowSeconds: 1800,
+                                });
                             }
                         } else {
                             // Member left guild?
@@ -89,6 +141,17 @@ export default function startCleanupJob() {
                         }
                     } catch (err) {
                         logger.error(`Error processing kick for user ${userRecord.userId}:`, err);
+                        await emitGuildNotificationSafe({
+                            guildId: config.guildId,
+                            eventType: 'VERIFICATION_AUTO_KICK_FAILED',
+                            severity: 'ERROR',
+                            source: 'BOT_JOB',
+                            title: `Error auto-kicking user ${userRecord.userId}`,
+                            body: err instanceof Error ? err.message : 'Unknown error',
+                            targetUserId: userRecord.userId,
+                            dedupeKey: `verification-auto-kick-failed:${userRecord.userId}`,
+                            dedupeWindowSeconds: 1800,
+                        });
                     }
                 }
             }

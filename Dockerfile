@@ -1,7 +1,7 @@
 # Base stage with Node.js
 FROM node:22-bookworm-slim AS base
-# Install OpenSSL and sqlite3 (required for NextAuth and backup scripts)
-RUN apt-get update -y && apt-get install -y openssl sqlite3 && rm -rf /var/lib/apt/lists/*
+# Install OpenSSL and PostgreSQL client tooling (required for NextAuth and backup scripts)
+RUN apt-get update -y && apt-get install -y openssl postgresql-client && rm -rf /var/lib/apt/lists/*
 # Use latest npm across all stages
 RUN npm install -g npm@11.9.0
 
@@ -9,7 +9,7 @@ RUN npm install -g npm@11.9.0
 FROM base AS dev
 WORKDIR /app
 # Install build tools
-RUN apt-get update -y && apt-get install -y python3 make g++ cron && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package.json package-lock.json ./
@@ -21,20 +21,14 @@ RUN npm install || npm ci
 COPY . .
 RUN chmod +x /app/scripts/dev-start.sh
 
-# Setup cron for daily backups at 1 AM
-RUN echo "0 1 * * * cd /app && npm run db:backup >> /var/log/cron.log 2>&1" > /etc/cron.d/ixoye-backup \
-    && chmod 0644 /etc/cron.d/ixoye-backup \
-    && crontab /etc/cron.d/ixoye-backup \
-    && touch /var/log/cron.log
-
-# Start cron and dev server
-CMD ["sh", "-c", "cron && sh /app/scripts/dev-start.sh"]
+# Start dev server
+CMD ["sh", "/app/scripts/dev-start.sh"]
 
 # Builder stage
 FROM base AS builder
 WORKDIR /app
 
-# Install build dependencies for native modules (better-sqlite3)
+# Install build dependencies for native modules
 RUN apt-get update -y && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
@@ -82,9 +76,9 @@ COPY --from=builder /app/scripts ./scripts
 
 # Create unprivileged runtime user and writable directories
 RUN groupadd -r appuser && useradd -r -g appuser appuser \
-    && mkdir -p /app/data /app/logs /app/backups \
+    && mkdir -p /app/logs /app/backups \
     && chown -R appuser:appuser /app \
-    && chmod 770 /app/data /app/logs /app/backups
+    && chmod 770 /app/logs /app/backups
 
 # Expose ports
 # Bot doesn't need exposed port, but Dashboard does (typically 3000)

@@ -4,6 +4,7 @@ import client from "../client";
 import logger from "../utils/logger";
 import { db } from "../../shared/database/client";
 import { actionLog, moderationCase, moderationSettings } from "../../shared/database/schema";
+import { emitGuildNotificationSafe } from "../services/notificationEmitter";
 
 const MAX_CASES_PER_RUN = 100;
 const EXPIRABLE_ACTIONS = ["MUTE", "TIMEOUT", "BAN"] as const;
@@ -90,6 +91,19 @@ async function processExpiredCase(modCase: typeof moderationCase.$inferSelect): 
             success: true,
             metadata: JSON.stringify({ caseId: modCase.id, caseNumber: modCase.caseNumber }),
         });
+        await emitGuildNotificationSafe({
+            guildId: modCase.guildId,
+            eventType: 'MOD_CASE_EXPIRED_SUCCESS',
+            severity: 'INFO',
+            source: 'BOT_JOB',
+            title: `${modCase.action} case #${modCase.caseNumber} expired`,
+            targetUserId: modCase.userId,
+            metadata: {
+                caseId: modCase.id,
+                caseNumber: modCase.caseNumber,
+                action: modCase.action,
+            },
+        });
     } catch (error) {
         logger.error(`Failed to expire moderation case ${modCase.id}:`, error);
         await db.insert(actionLog).values({
@@ -99,6 +113,22 @@ async function processExpiredCase(modCase: typeof moderationCase.$inferSelect): 
             success: false,
             errorMessage: error instanceof Error ? error.message : "Unknown error",
             metadata: JSON.stringify({ caseId: modCase.id, caseNumber: modCase.caseNumber }),
+        });
+        await emitGuildNotificationSafe({
+            guildId: modCase.guildId,
+            eventType: 'MOD_CASE_EXPIRED_FAILED',
+            severity: 'ERROR',
+            source: 'BOT_JOB',
+            title: `Failed to expire ${modCase.action} case #${modCase.caseNumber}`,
+            body: error instanceof Error ? error.message : 'Unknown error',
+            targetUserId: modCase.userId,
+            metadata: {
+                caseId: modCase.id,
+                caseNumber: modCase.caseNumber,
+                action: modCase.action,
+            },
+            dedupeKey: `mod-case-expired-failed:${modCase.id}`,
+            dedupeWindowSeconds: 1800,
         });
     }
 }

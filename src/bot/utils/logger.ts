@@ -39,6 +39,26 @@ const fileFormat = winston.format.combine(
 );
 
 const logDir = 'logs';
+const todayDate = new Date().toISOString().slice(0, 10);
+
+function ensureWritableLogFile(filePath: string): void {
+    if (fs.existsSync(filePath)) {
+        fs.accessSync(filePath, fs.constants.W_OK);
+        return;
+    }
+
+    const fileHandle = fs.openSync(filePath, 'a');
+    fs.closeSync(fileHandle);
+}
+
+function createRotatingFileTransport(options: DailyRotateFile.DailyRotateFileTransportOptions): DailyRotateFile {
+    const transport = new DailyRotateFile(options);
+    transport.on('error', (error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`File logging transport error (${options.filename}): ${message}`);
+    });
+    return transport;
+}
 
 const transports: winston.transport[] = [
     // Console transport
@@ -50,10 +70,12 @@ const transports: winston.transport[] = [
 try {
     fs.mkdirSync(logDir, { recursive: true });
     fs.accessSync(logDir, fs.constants.W_OK);
+    ensureWritableLogFile(path.join(logDir, `error-${todayDate}.log`));
+    ensureWritableLogFile(path.join(logDir, `combined-${todayDate}.log`));
 
     transports.push(
         // Error log rotation
-        new DailyRotateFile({
+        createRotatingFileTransport({
             filename: path.join(logDir, 'error-%DATE%.log'),
             datePattern: 'YYYY-MM-DD',
             zippedArchive: true,
@@ -64,7 +86,7 @@ try {
         }),
 
         // Combined log rotation
-        new DailyRotateFile({
+        createRotatingFileTransport({
             filename: path.join(logDir, 'combined-%DATE%.log'),
             datePattern: 'YYYY-MM-DD',
             zippedArchive: true,

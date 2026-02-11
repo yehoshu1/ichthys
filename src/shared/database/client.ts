@@ -1,55 +1,131 @@
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import * as schema from './schema';
 
-// Create SQLite database connection
-const sqlite = new Database(process.env.DATABASE_URL?.replace('file:', '') || './data/ixoye.db');
+const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://ixoye:ixoye@localhost:5432/ixoye';
 
-// Enable foreign keys
-sqlite.pragma('foreign_keys = ON');
-sqlite.pragma('journal_mode = WAL');
-sqlite.pragma('synchronous = NORMAL');
-sqlite.pragma('busy_timeout = 5000');
-
-function tableExists(tableName: string): boolean {
-    const row = sqlite.prepare(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1"
-    ).get(tableName) as { name?: string } | undefined;
-
-    return row?.name === tableName;
+function getNumericEnv(name: string, fallback: number): number {
+    const raw = process.env[name];
+    if (!raw) return fallback;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function getTableColumns(tableName: string): Set<string> {
-    const escapedTableName = tableName.replace(/'/g, "''");
-    const rows = sqlite.prepare(`PRAGMA table_info('${escapedTableName}')`).all() as Array<{ name: string }>;
-    return new Set(rows.map((row) => row.name));
-}
+export const pool = new Pool({
+    connectionString: databaseUrl,
+    max: getNumericEnv('PG_POOL_MAX', 8),
+    idleTimeoutMillis: getNumericEnv('PG_IDLE_TIMEOUT_MS', 30_000),
+    connectionTimeoutMillis: getNumericEnv('PG_CONNECT_TIMEOUT_MS', 10_000),
+    // 🎯 PERFORMANCE FIX: Add query and statement timeouts to prevent hanging queries
+    query_timeout: getNumericEnv('PG_QUERY_TIMEOUT_MS', 30_000),
+    statement_timeout: getNumericEnv('PG_STATEMENT_TIMEOUT_MS', 30_000),
+    ssl: process.env.NODE_ENV === 'production'
+        ? { rejectUnauthorized: true }
+        : process.env.PG_SSL === 'true'
+            ? { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false' }
+            : false,
+});
 
-function ensureColumn(tableName: string, columnName: string, addColumnSql: string): void {
-    if (!tableExists(tableName)) {
-        return;
+// 🎯 PERFORMANCE FIX: Add connection validation and error handling
+pool.on('error', (error) => {
+    console.error('Unexpected PostgreSQL pool error:', error);
+});
+
+pool.on('connect', (client) => {
+    client.on('error', (err) => {
+        console.error('PostgreSQL client error:', err);
+    });
+});
+
+pool.on('acquire', () => {
+    // Track connection acquisition for monitoring
+    if (process.env.NODE_ENV === 'development') {
+        const metrics = {
+            total: pool.totalCount,
+            idle: pool.idleCount,
+            waiting: pool.waitingCount
+        };
+        // Log if pool is under pressure
+        if (metrics.waiting > 0) {
+            console.warn('PostgreSQL pool contention:', metrics);
+        }
     }
+});
 
-    const columns = getTableColumns(tableName);
-    if (columns.has(columnName)) {
-        return;
+export const db = drizzle(pool, { schema });
+
+let shutdownHookRegistered = false;
+
+function registerShutdownHook(): void {
+    if (shutdownHookRegistered) return;
+    shutdownHookRegistered = true;
+
+    const shutdown = async () => {
+        await pool.end().catch((error) => {
+            console.error('Error closing PostgreSQL pool:', error);
+        });
+    };
+
+    process.once('SIGINT', () => {
+        void shutdown().finally(() => process.exit(0));
+    });
+
+    process.once('SIGTERM', () => {
+        void shutdown().finally(() => process.exit(0));
+    });
+}
+
+registerShutdownHook();
+
+// 🎯 PERFORMANCE FIX: Pool health check function
+export async function checkPoolHealth(): Promise<{ healthy: boolean; metrics: PoolMetrics }> {
+    try {
+        const client = await pool.connect();
+        await client.query('SELECT 1');
+        client.release();
+
+        return {
+            healthy: true,
+            metrics: getPoolMetrics()
+        };
+    } catch (error) {
+        console.error('Pool health check failed:', error);
+        return {
+            healthy: false,
+            metrics: getPoolMetrics()
+        };
     }
-
-    sqlite.exec(addColumnSql);
 }
 
-function runCompatibilityMigrations(): void {
-    // Legacy compatibility: older instances may have command_config without max_limit.
-    ensureColumn(
-        'command_config',
-        'max_limit',
-        'ALTER TABLE command_config ADD COLUMN max_limit INTEGER;'
-    );
+// 🎯 PERFORMANCE FIX: Pool metrics for monitoring
+export interface PoolMetrics {
+    total: number;
+    idle: number;
+    waiting: number;
 }
 
-runCompatibilityMigrations();
+export function getPoolMetrics(): PoolMetrics {
+    return {
+        total: pool.totalCount,
+        idle: pool.idleCount,
+        waiting: pool.waitingCount
+    };
+}
 
-// Create Drizzle instance
-export const db = drizzle(sqlite, { schema });
+// 🎯 PERFORMANCE FIX: Query wrapper with timeout and logging
+export async function executeWithTimeout<T>(
+    queryFn: () => Promise<T>,
+    timeoutMs: number = 30000,
+    operationName: string = 'query'
+): Promise<T> {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+            reject(new Error(`Query timeout: ${operationName} exceeded ${timeoutMs}ms`));
+        }, timeoutMs);
+    });
 
+    return Promise.race([queryFn(), timeoutPromise]);
+}
+
+// Default export for convenience
 export default db;

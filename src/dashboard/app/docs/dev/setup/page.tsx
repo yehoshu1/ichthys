@@ -31,7 +31,7 @@ const envRows = [
     {
         key: "DATABASE_URL",
         required: "Yes",
-        description: "SQLite DSN. Default local path: file:./data/ixoye.db.",
+        description: "PostgreSQL DSN (for example: postgresql://ixoye:change_me@localhost:5432/ixoye).",
     },
     {
         key: "GUILD_ID",
@@ -58,7 +58,7 @@ export default function DocsDevSetupPage() {
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                     <p>Recommended baseline: Node 22.x + npm 11.9.0.</p>
                     <p>Local dashboard URL: <code>http://localhost:4000</code>.</p>
-                    <p>Primary bootstrap flow: copy env, install deps, push DB schema, start dev processes.</p>
+                    <p>Primary bootstrap flow: copy env, install deps, apply DB migrations, start dev processes.</p>
                 </CardContent>
             </Card>
 

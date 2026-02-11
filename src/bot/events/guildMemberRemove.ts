@@ -5,6 +5,7 @@ import { db } from '../../shared/database/client';
 import { guildConfig, userJoin } from '../../shared/database/schema';
 import { eq, and } from 'drizzle-orm';
 import { buildMessage } from '../utils/embeds';
+import { emitGuildNotificationSafe } from '../services/notificationEmitter';
 
 const event: Event<Events.GuildMemberRemove> = {
     name: Events.GuildMemberRemove,
@@ -57,6 +58,20 @@ const event: Event<Events.GuildMemberRemove> = {
                     }
                 } catch (msgError) {
                     logger.error(`Failed to send leave message:`, msgError);
+                    await emitGuildNotificationSafe({
+                        guildId: member.guild.id,
+                        eventType: 'WELCOME_LEAVE_MESSAGE_FAILED',
+                        severity: 'ERROR',
+                        source: 'BOT_EVENT',
+                        title: `Failed to send leave message in ${member.guild.name}`,
+                        body: msgError instanceof Error ? msgError.message : 'Unknown error',
+                        targetUserId: member.id,
+                        metadata: {
+                            channelId: config.leaveMessageChannelId,
+                        },
+                        dedupeKey: `welcome-leave-message-failed:${config.leaveMessageChannelId ?? 'none'}`,
+                        dedupeWindowSeconds: 600,
+                    });
                 }
             }
 

@@ -2,6 +2,13 @@ import { eq, and } from 'drizzle-orm';
 import { db } from '../../shared/database/client';
 import { messageAlias, type MessageAlias, type NewMessageAlias } from '../../shared/database/schema';
 import type { APIEmbed } from 'discord.js';
+import logger from '../utils/logger';
+
+/**
+ * Maximum number of aliases per guild to prevent performance issues
+ * This limit is enforced both at query time and with warnings
+ */
+const MAX_ALIASES_PER_GUILD = 100;
 
 /**
  * Service for managing message aliases (auto-responders)
@@ -14,20 +21,59 @@ export class MessageAliasService {
         return await db
             .select()
             .from(messageAlias)
-            .where(eq(messageAlias.guildId, guildId));
+            .where(eq(messageAlias.guildId, guildId))
+            .limit(MAX_ALIASES_PER_GUILD);
     }
 
     /**
      * Get all enabled aliases for a guild (for the bot event handler)
+     * 🎯 PERFORMANCE FIX: Added limit to prevent memory issues with large alias lists
      */
     async getEnabledAliases(guildId: string): Promise<MessageAlias[]> {
-        return await db
+        const aliases = await db
             .select()
             .from(messageAlias)
             .where(and(
                 eq(messageAlias.guildId, guildId),
                 eq(messageAlias.enabled, true)
-            ));
+            ))
+            .limit(MAX_ALIASES_PER_GUILD + 1); // Fetch one extra to detect if limit is exceeded
+
+        // 🎯 PERFORMANCE FIX: Warn if guild has more aliases than the limit
+        if (aliases.length > MAX_ALIASES_PER_GUILD) {
+            logger.warn(
+                `Guild ${guildId} has more than ${MAX_ALIASES_PER_GUILD} enabled aliases. ` +
+                `Only the first ${MAX_ALIASES_PER_GUILD} will be processed. ` +
+                `Consider removing unused aliases to improve performance.`
+            );
+            return aliases.slice(0, MAX_ALIASES_PER_GUILD);
+        }
+
+        return aliases;
+    }
+
+    /**
+     * Get alias count for a guild (useful for checking limits)
+     */
+    async getGuildAliasCount(guildId: string): Promise<number> {
+        const result = await db
+            .select({ count: db.$count(messageAlias) })
+            .from(messageAlias)
+            .where(eq(messageAlias.guildId, guildId));
+
+        return result[0]?.count || 0;
+    }
+
+    /**
+     * Check if adding another alias would exceed the limit
+     */
+    async canAddAlias(guildId: string): Promise<{ allowed: boolean; current: number; limit: number }> {
+        const current = await this.getGuildAliasCount(guildId);
+        return {
+            allowed: current < MAX_ALIASES_PER_GUILD,
+            current,
+            limit: MAX_ALIASES_PER_GUILD
+        };
     }
 
     /**
@@ -59,8 +105,19 @@ export class MessageAliasService {
 
     /**
      * Create a new message alias
+     * 🎯 PERFORMANCE FIX: Check limit before creating
      */
-    async createAlias(data: Omit<NewMessageAlias, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>): Promise<MessageAlias> {
+    async createAlias(data: Omit<NewMessageAlias, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>): Promise<MessageAlias | null> {
+        // Check limit before creating
+        const limitCheck = await this.canAddAlias(data.guildId);
+        if (!limitCheck.allowed) {
+            logger.warn(
+                `Cannot create alias for guild ${data.guildId}: ` +
+                `limit of ${MAX_ALIASES_PER_GUILD} aliases reached`
+            );
+            return null;
+        }
+
         const [alias] = await db
             .insert(messageAlias)
             .values({
@@ -128,54 +185,56 @@ export class MessageAliasService {
      */
     validateTrigger(trigger: string): { valid: boolean; error?: string } {
         const trimmed = trigger.trim();
-        
+
         if (!trimmed) {
             return { valid: false, error: 'Trigger cannot be empty' };
         }
-        
+
         if (trimmed.length > 50) {
             return { valid: false, error: 'Trigger must be 50 characters or less' };
         }
-        
+
         // Allow alphanumeric, hyphens, underscores, and common symbols
         const validPattern = /^[a-zA-Z0-9_\-\!\.\?\#\$\%]+$/;
         if (!validPattern.test(trimmed)) {
             return { valid: false, error: 'Trigger can only contain letters, numbers, and basic symbols' };
         }
-        
+
         return { valid: true };
     }
 
     /**
      * Parse allowed channels from string
      */
-    parseAllowedChannels(channelsStr: string | null): string[] {
-        if (!channelsStr) return [];
-        return channelsStr.split(',').map(id => id.trim()).filter(Boolean);
+    parseAllowedChannels(channels: string[] | string | null): string[] {
+        if (!channels) return [];
+        if (Array.isArray(channels)) return channels.filter(Boolean);
+        return channels.split(',').map(id => id.trim()).filter(Boolean);
     }
 
     /**
      * Parse allowed roles from string
      */
-    parseAllowedRoles(rolesStr: string | null): string[] {
-        if (!rolesStr) return [];
-        return rolesStr.split(',').map(id => id.trim()).filter(Boolean);
+    parseAllowedRoles(roles: string[] | string | null): string[] {
+        if (!roles) return [];
+        if (Array.isArray(roles)) return roles.filter(Boolean);
+        return roles.split(',').map(id => id.trim()).filter(Boolean);
     }
 
     /**
      * Serialize channels array to string
      */
-    serializeAllowedChannels(channels: string[]): string | null {
+    serializeAllowedChannels(channels: string[]): string[] | null {
         if (channels.length === 0) return null;
-        return channels.join(',');
+        return channels;
     }
 
     /**
      * Serialize roles array to string
      */
-    serializeAllowedRoles(roles: string[]): string | null {
+    serializeAllowedRoles(roles: string[]): string[] | null {
         if (roles.length === 0) return null;
-        return roles.join(',');
+        return roles;
     }
 
     /**
@@ -210,7 +269,7 @@ export class MessageAliasService {
     validateEmbed(embedStr: string): { valid: boolean; embed?: APIEmbed; error?: string } {
         try {
             const parsed = JSON.parse(embedStr) as APIEmbed;
-            
+
             // Basic validation - ensure it has at least one property
             if (Object.keys(parsed).length === 0) {
                 return { valid: false, error: 'Embed cannot be empty' };

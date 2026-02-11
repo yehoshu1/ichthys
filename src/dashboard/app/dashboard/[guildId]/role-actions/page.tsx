@@ -12,6 +12,7 @@ import { PlusCircle, Pencil, Trash2, X } from "lucide-react";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
 import { Switch } from "../../../../components/ui/switch";
 import { useDiscordData } from "../../../../components/useDiscordData";
+import { ExampleBox, HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
 
 interface RoleAction {
     id: string;
@@ -103,6 +104,12 @@ export default function RoleActionsPage() {
 
     return (
         <div className="container mx-auto p-6 max-w-5xl">
+            <ExampleBox>
+                When someone receives the <strong>@Muted</strong> role (ADD), immediately send them a DM explaining why. 
+                Or when <strong>@Temporary Access</strong> is removed (REMOVE), log it to #audit-log. 
+                You can also set a delay - useful for sending reminders before kicking inactive users.
+            </ExampleBox>
+
             <div className="flex items-center justify-between mb-8">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Automated Role Actions</h1>
@@ -231,7 +238,10 @@ export default function RoleActionsPage() {
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label>Trigger</Label>
+                                    <LabelWithTooltip
+                                        label="Trigger"
+                                        tooltip="Choose whether the action runs when a role is ADDED or REMOVED from a user."
+                                    />
                                     <Select
                                         value={editingAction?.triggerType || "ADD"}
                                         onValueChange={(value) => setEditingAction({ ...editingAction!, triggerType: value as any })}
@@ -246,7 +256,10 @@ export default function RoleActionsPage() {
                                     </Select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Role</Label>
+                                    <LabelWithTooltip
+                                        label="Role"
+                                        tooltip="The role to watch. When this role is added or removed, the action will trigger."
+                                    />
                                     <RoleSelect
                                         guildId={guildId}
                                         value={editingAction?.roleId || ""}
@@ -257,7 +270,10 @@ export default function RoleActionsPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Action Type</Label>
+                                <LabelWithTooltip
+                                    label="Action Type"
+                                    tooltip="DM = Private message to user. MSG = Public channel post. KICK = Remove user from server. LOG = Silent audit log entry."
+                                />
                                 <Select
                                     value={editingAction?.actionType || "DM"}
                                     onValueChange={(value) => setEditingAction({ ...editingAction!, actionType: value as any })}
@@ -275,14 +291,17 @@ export default function RoleActionsPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Delay (Minutes)</Label>
+                                <LabelWithTooltip
+                                    label="Delay (Minutes)"
+                                    tooltip="Wait this many minutes before executing the action. Useful for grace periods or reminders."
+                                />
                                 <Input
                                     type="number"
                                     value={editingAction?.actionDelay || 0}
                                     onChange={(e) => setEditingAction({ ...editingAction!, actionDelay: parseInt(e.target.value) })}
                                     min={0}
                                 />
-                                <p className="text-[0.8rem] text-muted-foreground">0 for immediate action.</p>
+                                <HelperText>Set to 0 for immediate action, or use 60 to wait 1 hour.</HelperText>
                             </div>
 
                             {(editingAction?.actionType === "DM" || editingAction?.actionType === "LOG" || editingAction?.actionType === "KICK" || editingAction?.actionType === "MSG") && (
@@ -318,7 +337,10 @@ export default function RoleActionsPage() {
 
                             {editingAction?.actionType === "KICK" && (
                                 <div className="space-y-2">
-                                    <Label>Kick Reason (Internal)</Label>
+                                    <LabelWithTooltip
+                                        label="Kick Reason (Internal)"
+                                        tooltip="This reason appears in Discord's audit log. Users will see this if they try to rejoin."
+                                    />
                                     <Input
                                         value={editingAction?.kickReason || ""}
                                         onChange={(e) => setEditingAction({ ...editingAction!, kickReason: e.target.value })}

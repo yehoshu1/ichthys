@@ -16,17 +16,6 @@ const nextConfig = {
             },
         ],
     },
-    
-    // API Configuration
-    api: {
-        // Limit request body size to prevent DoS
-        bodyParser: {
-            sizeLimit: "1mb",
-        },
-        // Response size limit
-        responseLimit: "4mb",
-    },
-
     // Experimental features
     experimental: {
         // Server Actions configuration

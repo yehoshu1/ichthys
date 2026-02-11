@@ -63,13 +63,16 @@ async function syncGuildMemberSnapshot(guildId: string, verificationRoleId: stri
         await db.insert(userJoin)
             .values(chunk)
             .onConflictDoUpdate({
-                target: [userJoin.userId, userJoin.guildId],
+                target: [userJoin.guildId, userJoin.userId],
                 set: {
                     joinedAt: sql`excluded.joined_at`,
                     isVerified: sql`excluded.is_verified`,
                     isBot: sql`excluded.is_bot`,
                     updatedAt: new Date(),
                 },
+                where: sql`${userJoin.joinedAt} IS DISTINCT FROM excluded.joined_at
+                    OR ${userJoin.isVerified} IS DISTINCT FROM excluded.is_verified
+                    OR ${userJoin.isBot} IS DISTINCT FROM excluded.is_bot`,
             });
     }
 

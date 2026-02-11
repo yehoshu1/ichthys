@@ -3,8 +3,8 @@ import { defineConfig } from 'drizzle-kit';
 export default defineConfig({
     schema: './src/shared/database/schema.ts',
     out: './drizzle',
-    dialect: 'sqlite',
+    dialect: 'postgresql',
     dbCredentials: {
-        url: process.env.DATABASE_URL || 'file:./data/ixoye.db',
+        url: process.env.DATABASE_URL || 'postgresql://ixoye:ixoye@localhost:5432/ixoye',
     },
 });

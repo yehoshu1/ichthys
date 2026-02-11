@@ -79,6 +79,10 @@ export default function startGrowthTrackingJob() {
                                 joinedToday,
                                 leftToday,
                             },
+                            where: sql`${guildGrowth.memberCount} IS DISTINCT FROM excluded.member_count
+                                OR ${guildGrowth.verifiedCount} IS DISTINCT FROM excluded.verified_count
+                                OR ${guildGrowth.joinedToday} IS DISTINCT FROM excluded.joined_today
+                                OR ${guildGrowth.leftToday} IS DISTINCT FROM excluded.left_today`,
                         });
 
                     logger.debug(`Tracked growth for ${guild.name}: ${memberCount} members, ${joinedToday} joins, ${leftToday} leaves`);

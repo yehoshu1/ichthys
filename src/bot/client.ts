@@ -1,7 +1,18 @@
-import { Client, GatewayIntentBits, Events, Collection, Partials } from 'discord.js';
+import { Client, GatewayIntentBits, Events, Collection, Partials, Options } from 'discord.js';
 import logger from './utils/logger';
 import { guildConfigService } from './services/guildConfigService';
 import { setBotClient } from '../dashboard/lib/bot-client';
+
+function getPositiveInt(value: string | undefined, fallback: number): number {
+    const parsed = Number.parseInt(value ?? '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const MESSAGE_CACHE_LIMIT = getPositiveInt(process.env.DISCORD_MESSAGE_CACHE_LIMIT, 150);
+const REACTION_CACHE_LIMIT = getPositiveInt(process.env.DISCORD_REACTION_CACHE_LIMIT, 100);
+const REACTION_USER_CACHE_LIMIT = getPositiveInt(process.env.DISCORD_REACTION_USER_CACHE_LIMIT, 100);
+const MESSAGE_SWEEP_INTERVAL_SEC = getPositiveInt(process.env.DISCORD_MESSAGE_SWEEP_INTERVAL_SEC, 300);
+const MESSAGE_SWEEP_LIFETIME_SEC = getPositiveInt(process.env.DISCORD_MESSAGE_SWEEP_LIFETIME_SEC, 600);
 
 // Create Discord client with required intents
 export const client = new Client({
@@ -12,7 +23,6 @@ export const client = new Client({
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildPresences,
     ],
     partials: [
         Partials.Message,
@@ -20,6 +30,20 @@ export const client = new Client({
         Partials.Reaction,
         Partials.User,
     ],
+    makeCache: Options.cacheWithLimits({
+        ...Options.DefaultMakeCacheSettings,
+        MessageManager: MESSAGE_CACHE_LIMIT,
+        PresenceManager: 0,
+        ReactionManager: REACTION_CACHE_LIMIT,
+        ReactionUserManager: REACTION_USER_CACHE_LIMIT,
+    }),
+    sweepers: {
+        ...Options.DefaultSweeperSettings,
+        messages: {
+            interval: MESSAGE_SWEEP_INTERVAL_SEC,
+            lifetime: MESSAGE_SWEEP_LIFETIME_SEC,
+        },
+    },
 });
 
 // Store commands in a collection

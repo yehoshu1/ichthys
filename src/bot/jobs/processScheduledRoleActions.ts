@@ -6,6 +6,7 @@ import logger from "../utils/logger";
 import { buildMessage } from "../utils/embeds";
 import { db } from "../../shared/database/client";
 import { scheduledRoleAction, roleAction, actionLog } from "../../shared/database/schema";
+import { emitGuildNotificationSafe } from "../services/notificationEmitter";
 
 const MAX_PER_RUN = 100;
 let isRunning = false;
@@ -24,6 +25,21 @@ async function executeScheduledAction(entry: typeof scheduledRoleAction.$inferSe
                 updatedAt: new Date(),
             })
             .where(eq(scheduledRoleAction.id, entry.id));
+        await emitGuildNotificationSafe({
+            guildId: entry.guildId,
+            eventType: 'SCHEDULED_ROLE_ACTION_CANCELLED',
+            severity: 'WARNING',
+            source: 'BOT_JOB',
+            title: `Scheduled role action cancelled`,
+            body: 'Action missing or disabled',
+            targetUserId: entry.userId,
+            metadata: {
+                scheduledId: entry.id,
+                actionId: entry.actionId,
+            },
+            dedupeKey: `scheduled-role-action-cancelled:${entry.id}`,
+            dedupeWindowSeconds: 1800,
+        });
         return;
     }
 
@@ -36,6 +52,21 @@ async function executeScheduledAction(entry: typeof scheduledRoleAction.$inferSe
                 updatedAt: new Date(),
             })
             .where(eq(scheduledRoleAction.id, entry.id));
+        await emitGuildNotificationSafe({
+            guildId: entry.guildId,
+            eventType: 'SCHEDULED_ROLE_ACTION_FAILED',
+            severity: 'ERROR',
+            source: 'BOT_JOB',
+            title: `Scheduled role action failed`,
+            body: 'Guild unavailable',
+            targetUserId: entry.userId,
+            metadata: {
+                scheduledId: entry.id,
+                actionId: entry.actionId,
+            },
+            dedupeKey: `scheduled-role-action-failed:${entry.id}`,
+            dedupeWindowSeconds: 1800,
+        });
         return;
     }
 
@@ -48,6 +79,21 @@ async function executeScheduledAction(entry: typeof scheduledRoleAction.$inferSe
                 updatedAt: new Date(),
             })
             .where(eq(scheduledRoleAction.id, entry.id));
+        await emitGuildNotificationSafe({
+            guildId: entry.guildId,
+            eventType: 'SCHEDULED_ROLE_ACTION_CANCELLED',
+            severity: 'WARNING',
+            source: 'BOT_JOB',
+            title: `Scheduled role action cancelled`,
+            body: 'Member not found',
+            targetUserId: entry.userId,
+            metadata: {
+                scheduledId: entry.id,
+                actionId: entry.actionId,
+            },
+            dedupeKey: `scheduled-role-action-cancelled:${entry.id}`,
+            dedupeWindowSeconds: 1800,
+        });
         return;
     }
 
@@ -59,6 +105,22 @@ async function executeScheduledAction(entry: typeof scheduledRoleAction.$inferSe
                 updatedAt: new Date(),
             })
             .where(eq(scheduledRoleAction.id, entry.id));
+        await emitGuildNotificationSafe({
+            guildId: entry.guildId,
+            eventType: 'SCHEDULED_ROLE_ACTION_CANCELLED',
+            severity: 'WARNING',
+            source: 'BOT_JOB',
+            title: `Scheduled role action cancelled`,
+            body: 'Role removed before execution',
+            targetUserId: entry.userId,
+            metadata: {
+                scheduledId: entry.id,
+                actionId: entry.actionId,
+                roleId: action.roleId,
+            },
+            dedupeKey: `scheduled-role-action-cancelled:${entry.id}`,
+            dedupeWindowSeconds: 1800,
+        });
         return;
     }
 
@@ -137,6 +199,25 @@ async function executeScheduledAction(entry: typeof scheduledRoleAction.$inferSe
             updatedAt: new Date(),
         })
         .where(eq(scheduledRoleAction.id, entry.id));
+
+    if (!success) {
+        await emitGuildNotificationSafe({
+            guildId: entry.guildId,
+            eventType: 'SCHEDULED_ROLE_ACTION_FAILED',
+            severity: 'ERROR',
+            source: 'BOT_JOB',
+            title: `Scheduled role action failed`,
+            body: errorMessage,
+            targetUserId: entry.userId,
+            metadata: {
+                scheduledId: entry.id,
+                actionId: entry.actionId,
+                roleId: action.roleId,
+            },
+            dedupeKey: `scheduled-role-action-failed:${entry.id}`,
+            dedupeWindowSeconds: 1800,
+        });
+    }
 }
 
 export async function processScheduledRoleActionsOnce(): Promise<void> {
@@ -176,6 +257,21 @@ export async function processScheduledRoleActionsOnce(): Promise<void> {
                     updatedAt: new Date(),
                 })
                 .where(eq(scheduledRoleAction.id, entry.id));
+            await emitGuildNotificationSafe({
+                guildId: entry.guildId,
+                eventType: 'SCHEDULED_ROLE_ACTION_FAILED',
+                severity: 'ERROR',
+                source: 'BOT_JOB',
+                title: `Scheduled role action processing failed`,
+                body: error instanceof Error ? error.message : 'Unknown error',
+                targetUserId: entry.userId,
+                metadata: {
+                    scheduledId: entry.id,
+                    actionId: entry.actionId,
+                },
+                dedupeKey: `scheduled-role-action-failed:${entry.id}`,
+                dedupeWindowSeconds: 1800,
+            });
         }
     }
 }

@@ -10,7 +10,12 @@ const REACTION_TYPES = [
     { name: 'Add Only', value: 'ADD_ONLY' },
     { name: 'Remove Only', value: 'REMOVE_ONLY' },
     { name: 'Unique (Only one role)', value: 'UNIQUE' },
-];
+] as const;
+type ReactionRoleType = (typeof REACTION_TYPES)[number]['value'];
+
+function isReactionRoleType(value: string): value is ReactionRoleType {
+    return REACTION_TYPES.some((reactionType) => reactionType.value === value);
+}
 
 const command: Command = {
     data: new SlashCommandBuilder()
@@ -170,7 +175,10 @@ async function handleAdd(interaction: ChatInputCommandInteraction) {
     const channel = interaction.options.getChannel('channel', true);
     const role = interaction.options.getRole('role', true);
     const emoji = interaction.options.getString('emoji', true);
-    const type = interaction.options.getString('type') || 'TOGGLE';
+    const requestedType = interaction.options.getString('type');
+    const type: ReactionRoleType = requestedType && isReactionRoleType(requestedType)
+        ? requestedType
+        : 'TOGGLE';
     const description = interaction.options.getString('description') || undefined;
 
     // Validate emoji format
@@ -318,8 +326,10 @@ async function handleList(interaction: ChatInputCommandInteraction) {
 
         const lines = Object.entries(grouped).map(([messageId, roles]) => {
             const roleList = roles.map(r => {
-                const emoji = r.emoji.length > 10 ? `<:emoji:${r.emoji}>` : r.emoji;
-                return `${emoji} → <#${r.channelId}> <@&${r.roleId}> (${r.type})`;
+                const emojiDisplay = r.emoji
+                    ? (r.emoji.length > 10 ? `<:emoji:${r.emoji}>` : r.emoji)
+                    : (r.label || '🔘');
+                return `${emojiDisplay} → <#${r.channelId}> <@&${r.roleId}> (${r.type})`;
             }).join('\n   ');
             return `**Message:** \`${messageId}\`\n   ${roleList}`;
         });

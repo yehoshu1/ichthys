@@ -6,8 +6,15 @@ import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Switch } from "./ui/switch";
-import { Eye, Code } from "lucide-react";
+import { Eye, Code, HelpCircle } from "lucide-react";
 import { ColorPicker } from "./ui/color-picker";
+import { useTooltipsEnabled } from "./TooltipContext";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "./ui/tooltip";
 
 export interface EmbedData {
     title?: string;
@@ -67,12 +74,7 @@ export function MessageEditor({
                             placeholder={placeholder}
                             className="min-h-[100px] font-mono text-sm"
                         />
-                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                            <span>Variables:</span>
-                            {variables.map(v => (
-                                <code key={v} className="bg-muted px-1 rounded">{v}</code>
-                            ))}
-                        </div>
+                        <VariableHelp variables={variables} />
                     </div>
 
                     {/* Embed Toggle */}
@@ -166,6 +168,82 @@ export function MessageEditor({
                 </TabsContent>
             </Tabs>
         </div>
+    );
+}
+
+// Variable explanations map
+const variableExplanations: Record<string, string> = {
+    "{user}": "Mentions the user (@username)",
+    "{username}": "The user's display name",
+    "{server}": "Your server name",
+    "{memberCount}": "Total number of members in the server",
+    "{level}": "The user's current level",
+    "{xp}": "The user's total XP",
+    "{user.mention}": "Mentions the user (@username)",
+    "{user.username}": "The user's username",
+    "{user.displayname}": "The user's display name",
+    "{user.nickname}": "The user's nickname in this server",
+    "{user.id}": "The user's Discord ID",
+    "{age}": "The user's age (if birth year is set)",
+    "{server.name}": "Your server name",
+    "{server.id}": "Your server's Discord ID",
+    "{server.members}": "Total member count",
+    "{boostCount}": "Total number of server boosts",
+    "{boostLevel}": "Current server boost level (1-3)",
+};
+
+function VariableHelp({ variables }: { variables: string[] }) {
+    const tooltipsEnabled = useTooltipsEnabled();
+
+    if (!tooltipsEnabled) {
+        return (
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span>Variables:</span>
+                {variables.map(v => (
+                    <code key={v} className="bg-muted px-1 rounded">{v}</code>
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <TooltipProvider delayDuration={100}>
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground items-center">
+                <span className="flex items-center gap-1">
+                    Variables:
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button type="button" className="text-muted-foreground hover:text-foreground">
+                                <HelpCircle className="h-3 w-3" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                            <p>Click on variables to copy them. Hover over each variable to see what it does.</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </span>
+                {variables.map(v => {
+                    const explanation = variableExplanations[v] || "Custom variable";
+                    return (
+                        <Tooltip key={v}>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    onClick={() => navigator.clipboard.writeText(v)}
+                                    className="bg-muted px-1.5 py-0.5 rounded hover:bg-muted/80 transition-colors cursor-pointer"
+                                >
+                                    {v}
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{explanation}</p>
+                                <p className="text-xs text-muted-foreground mt-1">Click to copy</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    );
+                })}
+            </div>
+        </TooltipProvider>
     );
 }
 

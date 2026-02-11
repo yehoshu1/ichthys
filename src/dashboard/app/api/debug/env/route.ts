@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 
+/**
+ * Health check endpoint
+ * Returns sanitized environment status information
+ */
 export async function GET() {
     return NextResponse.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        nodeEnv: process.env.NODE_ENV,
         hasDiscordToken: !!process.env.DISCORD_TOKEN,
         hasDiscordClientId: !!process.env.DISCORD_CLIENT_ID,
-        tokenPrefix: process.env.DISCORD_TOKEN?.substring(0, 10) + '...',
-        clientId: process.env.DISCORD_CLIENT_ID,
-        nodeEnv: process.env.NODE_ENV,
+        // Note: Token prefix removed for security - prevents credential enumeration attacks
     });
 }
