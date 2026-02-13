@@ -1,13 +1,13 @@
 # ΙΧΘΥΣ Bot - Implementation Status
 
-**Last Updated:** 2026-02-08  
-**Status:** Production Ready (v1.0)
+**Last Updated:** 2026-02-11  
+**Status:** Production Ready (v2.0)
 
 ---
 
 ## Overview
 
-This document reflects the actual implementation status of the ΙΧΘΥΣ Discord bot and dashboard. All 7 phases have been completed.
+This document reflects the actual implementation status of the ΙΧΘΥΣ Discord bot and dashboard. All phases have been completed, including the new Events, Polls, and Webhooks/API integrations.
 
 ---
 
@@ -21,7 +21,7 @@ This document reflects the actual implementation status of the ΙΧΘΥΣ Discor
 | UI | React | v19.2.4 |
 | Styling | Tailwind CSS | v4.1.18 |
 | Components | shadcn/ui | Latest |
-| Database | SQLite | 3.x |
+| Database | PostgreSQL | 17 |
 | ORM | Drizzle ORM | v0.45.1 |
 | Auth | NextAuth.js | v4.24.13 |
 | Jobs | node-cron | v4.2.1 |
@@ -40,7 +40,7 @@ This document reflects the actual implementation status of the ΙΧΘΥΣ Discor
 | Discord.js setup with intents | ✅ | `src/bot/client.ts` |
 | TypeScript configuration | ✅ | `tsconfig.json`, `tsconfig.bot.json` |
 | Winston logger setup | ✅ | `src/bot/utils/logger.ts` |
-| Drizzle ORM + SQLite | ✅ | `src/shared/database/schema.ts`, `client.ts` |
+| Drizzle ORM + PostgreSQL | ✅ | `src/shared/database/schema.ts`, `client.ts` |
 | Guild config service | ✅ | `src/bot/services/guildConfigService.ts` |
 | Command loader | ✅ | `src/bot/utils/commandLoader.ts` |
 | Event loader | ✅ | `src/bot/utils/eventLoader.ts` |
@@ -63,7 +63,7 @@ This document reflects the actual implementation status of the ΙΧΘΥΣ Discor
 | Join tracking | ✅ | `src/bot/events/guildMemberAdd.ts` |
 | Leave messages | ✅ | `src/bot/events/guildMemberRemove.ts` |
 | Auto-role assignment | ✅ | `guildMemberAdd.ts` |
-| Dashboard UI | ✅ | `welcome/page.tsx` (613 lines) |
+| Dashboard UI | ✅ | `welcome/page.tsx` |
 | API routes | ✅ | `/api/guilds/[guildId]/welcome/*` |
 | Template editor | ✅ | `MessageEditor.tsx` with preview |
 
@@ -88,8 +88,8 @@ This document reflects the actual implementation status of the ΙΧΘΥΣ Discor
 | Cleanup cron job | ✅ | `src/bot/jobs/cleanupUnverified.ts` |
 | Auto-kick unverified | ✅ | Hourly cron at :00 |
 | Grace period config | ✅ | `verificationGraceDays` field |
-| Verification command | ✅ | `src/bot/commands/verify.ts` (226 lines) |
-| Dashboard UI | ✅ | `verification/page.tsx` (714 lines) |
+| Verification command | ✅ | `src/bot/commands/verify.ts` |
+| Dashboard UI | ✅ | `verification/page.tsx` |
 | API routes | ✅ | `/api/guilds/[guildId]/verification/*` |
 | Kick DM notifications | ✅ | `verificationKickDmEnabled` option |
 | Verification profiles | ✅ | `verificationMessageRule` table |
@@ -119,7 +119,7 @@ This document reflects the actual implementation status of the ΙΧΘΥΣ Discor
 | Role assignment | ✅ | Automatic on boost |
 | 30-day tracking | ✅ | `boostEndsAt` field |
 | Auto-removal cron | ✅ | `src/bot/jobs/cleanupBoosts.ts` (daily 3 AM) |
-| Boost command | ✅ | `src/bot/commands/boost.ts` (277 lines) |
+| Boost command | ✅ | `src/bot/commands/boost.ts` |
 | Dashboard UI | ✅ | `boosts/page.tsx` |
 | API routes | ✅ | `/api/guilds/[guildId]/boosts/*` |
 | Claim system | ✅ | `/boost claim` subcommand |
@@ -152,7 +152,7 @@ This document reflects the actual implementation status of the ΙΧΘΥΣ Discor
 | Role rewards | ✅ | `level_reward` table + assignment |
 | Rank command | ✅ | `src/bot/commands/rank.ts` |
 | Leaderboard command | ✅ | `src/bot/commands/leaderboard.ts` |
-| Dashboard UI | ✅ | `leveling/page.tsx` (451 lines) |
+| Dashboard UI | ✅ | `leveling/page.tsx` |
 | API routes | ✅ | `/api/guilds/[guildId]/leveling/*` |
 
 **Features:**
@@ -183,7 +183,7 @@ This document reflects the actual implementation status of the ΙΧΘΥΣ Discor
 | MSG action | ✅ | `actionType: 'MSG'` |
 | Delay system | ✅ | `actionDelay` field + setTimeout |
 | Action logging | ✅ | `action_log` table |
-| Dashboard UI | ✅ | `role-actions/page.tsx` (353 lines) |
+| Dashboard UI | ✅ | `role-actions/page.tsx` |
 | API routes | ✅ | `/api/guilds/[guildId]/role-actions/route.ts` |
 
 **Features:**
@@ -196,27 +196,147 @@ This document reflects the actual implementation status of the ΙΧΘΥΣ Discor
 
 ---
 
-### ✅ PHASE 7: Polish & Analytics (COMPLETED)
+### ✅ PHASE 7: Birthdays (COMPLETED)
 
-**Status:** 95% Complete (growth chart stubbed)
+**Status:** 100% Complete
 
 | Task | Status | Files |
 |------|--------|-------|
-| Analytics dashboard | ✅ | `analytics/page.tsx` (191 lines) |
-| Activity heatmap | ✅ | 7x24 hour grid visualization |
-| Member statistics | ✅ | Stats cards with live data |
-| Leaderboard display | ✅ | Top 5 with avatars |
-| Voice hours tracking | ✅ | Aggregated from profiles |
-| Retention rate | ✅ | 7-day retention calculation |
-| Config export | ✅ | JSON download |
-| Config import | ✅ | JSON upload/restore |
-| Mobile optimization | ✅ | Responsive design |
-| Error handling | ✅ | Try-catch throughout |
-| Database backups | ✅ | `scripts/backup-db.ts` |
-| Documentation | ✅ | `docs/*.md` |
+| Birthday schema | ✅ | `birthday_config`, `birthday_entry` tables |
+| Timezone support | ✅ | 400+ timezones supported |
+| Daily cron job | ✅ | `src/bot/jobs/birthdayJob.ts` |
+| Announcement messages | ✅ | Custom templates with variables |
+| Birthday role assignment | ✅ | Auto-assign and remove |
+| Birthday commands | ✅ | `/birthday set`, `/birthday remove`, etc. |
+| Dashboard UI | ✅ | `birthdays/page.tsx` |
+| API routes | ✅ | `/api/guilds/[guildId]/birthdays/*` |
+| Admin commands | ✅ | `/birthday admin-set`, `/birthday test` |
 
-**Partial/Missing:**
-- ⚠️ Growth chart (component exists, data stubbed)
+**Features:**
+- ✅ User timezone selection
+- ✅ Age calculation (optional year)
+- ✅ Hour-configurable announcements
+- ✅ Role mention support
+- ✅ Auto-remove birthday role
+- ✅ Upcoming birthday list
+- ✅ Birthday statistics
+
+---
+
+### ✅ PHASE 8: Reaction Roles (COMPLETED)
+
+**Status:** 100% Complete
+
+| Task | Status | Files |
+|------|--------|-------|
+| Reaction role schema | ✅ | `reaction_role_message`, `reaction_role` tables |
+| Message creation | ✅ | `/reactionrole create` command |
+| Role mapping | ✅ | `/reactionrole add` command |
+| Toggle mode | ✅ | Add/remove on click |
+| Add-only mode | ✅ | Can only add role |
+| Remove-only mode | ✅ | Can only remove role |
+| Unique mode | ✅ | Only one role from group |
+| Button support | ✅ | Discord Button components |
+| Dropdown support | ✅ | Discord SelectMenu components |
+| Dashboard UI | ✅ | `reaction-roles/page.tsx` |
+| API routes | ✅ | `/api/guilds/[guildId]/reaction-roles/*` |
+
+**Features:**
+- ✅ Multiple component types (reaction, button, dropdown)
+- ✅ Four assignment modes
+- ✅ Custom descriptions per role
+- ✅ Message editing support
+- ✅ Role removal on unreact
+
+---
+
+### ✅ PHASE 9: Events System (COMPLETED)
+
+**Status:** 100% Complete
+
+| Task | Status | Files |
+|------|--------|-------|
+| Event schema | ✅ | `event`, `event_rsvp`, `event_template` tables |
+| Event creation | ✅ | Dashboard + API routes |
+| RSVP tracking | ✅ | Yes/No/Maybe/Waitlist |
+| Recurring events | ✅ | Daily, weekly, bi-weekly, monthly, yearly |
+| Role restrictions | ✅ | Required/blocked/attendee roles |
+| Event color themes | ✅ | 10 Discord-themed colors |
+| Event templates | ✅ | Reusable configurations |
+| Event reminders | ✅ | Scheduled notifications |
+| Event log | ✅ | Audit trail |
+| Dashboard UI | ✅ | `events/page.tsx` (500+ lines) |
+| API routes | ✅ | `/api/guilds/[guildId]/events/*` |
+
+**Features:**
+- ✅ Visual event cards with color coding
+- ✅ RSVP counts and waitlist management
+- ✅ Recurring schedules with end dates
+- ✅ Role-based access control
+- ✅ Mention on create/start
+- ✅ Duration presets (15m - 4h)
+- ✅ Event duplication
+
+---
+
+### ✅ PHASE 10: Polls System (COMPLETED)
+
+**Status:** 100% Complete
+
+| Task | Status | Files |
+|------|--------|-------|
+| Poll schema | ✅ | `poll`, `poll_option`, `poll_vote` tables |
+| Standard polls | ✅ | Multiple choice voting |
+| Time polls | ✅ | When2meet-style scheduling |
+| Anonymous polls | ✅ | Hidden voter identities |
+| Multiple votes | ✅ | Vote for multiple options |
+| Custom options | ✅ | Users can add options |
+| Poll templates | ✅ | Reusable configurations |
+| Auto-close | ✅ | Time-based closing |
+| Visual results | ✅ | Bar charts with percentages |
+| Dashboard UI | ✅ | `polls/page.tsx` (600+ lines) |
+| API routes | ✅ | `/api/guilds/[guildId]/polls/*` |
+
+**Features:**
+- ✅ 3 poll types (standard, time, anonymous)
+- ✅ Time slot generation for time polls
+- ✅ Multiple votes per user (configurable)
+- ✅ Max votes limit
+- ✅ Anonymous voting mode
+- ✅ Role restrictions
+- ✅ Visual results with winner highlighting
+
+---
+
+### ✅ PHASE 11: Webhooks & API (COMPLETED)
+
+**Status:** 100% Complete
+
+| Task | Status | Files |
+|------|--------|-------|
+| Webhook schema | ✅ | `webhook_endpoint`, `webhook_delivery` tables |
+| Webhook management | ✅ | Create, edit, enable/disable |
+| Event types | ✅ | 10 event types (events, polls, rsvps, etc.) |
+| Secret signatures | ✅ | HMAC-SHA256 verification |
+| Delivery logs | ✅ | Status codes, timing, errors |
+| API key schema | ✅ | `api_key` table |
+| API key generation | ✅ | Secure random key generation |
+| Permissions system | ✅ | 8 granular permissions |
+| Key expiration | ✅ | Optional expiration dates |
+| Usage tracking | ✅ | Use count and last used |
+| Calendar integration schema | ✅ | `user_calendar_integration` table |
+| Dashboard UI | ✅ | `webhooks/page.tsx` (500+ lines) |
+| API routes | ✅ | `/api/guilds/[guildId]/webhooks/*`, `/api/guilds/[guildId]/api-keys/*` |
+
+**Features:**
+- ✅ 10 webhook event types
+- ✅ HMAC-SHA256 signature verification
+- ✅ Delivery log history
+- ✅ Webhook health monitoring
+- ✅ Granular API permissions
+- ✅ API key expiration
+- ✅ Calendar sync support (Google, Outlook, Apple)
+- ✅ Bidirectional sync
 
 ---
 
@@ -227,7 +347,8 @@ guild_config (10+ configuration fields)
 ├── welcome settings (enabled, channel, messages)
 ├── verification settings (enabled, roles, grace days)
 ├── boost settings (enabled, role, messages, grace period)
-└── leveling settings (enabled, XP rates, cooldowns)
+├── leveling settings (enabled, XP rates, cooldowns)
+└── moderation settings (mute role, log channel)
 
 welcome_trigger
 ├── guildId, roleId, channelId, templateId
@@ -262,6 +383,76 @@ action_log
 
 message_activity
 ├── guildId, hour, day, date, messageCount
+
+message_alias
+├── guildId, trigger, response, embed
+├── cooldown, requirePrefix, caseSensitive
+
+birthday_config
+├── guildId, enabled, channelId, roleId
+├── messageTemplate, hourOfDay, showAge, mentionRoleId
+
+birthday_entry
+├── guildId, userId, day, month, year
+├── timezone, nextBirthday
+
+reaction_role_message
+├── guildId, channelId, messageId
+├── componentType, style, title, description
+
+reaction_role
+├── messageId, roleId, emoji, description, type
+
+moderation_case
+├── guildId, userId, moderatorId, type
+├── reason, duration, expiresAt, active
+
+event
+├── guildId, creatorId, title, description
+├── startTime, endTime, timezone, color
+├── maxAttendees, enableWaitlist, repeatFrequency
+├── mentionRoleIds, requiredRoleIds, attendeeRoleId
+
+event_rsvp
+├── eventId, userId, status, note
+
+event_template
+├── guildId, name, defaultTitle, defaultDescription
+├── defaultDuration, defaultColor
+
+poll
+├── guildId, creatorId, question, description
+├── type (STANDARD/TIME/ANONYMOUS), allowMultipleVotes
+├── maxVotesPerUser, allowCustomOptions, isAnonymous
+├── endTime, allowedRoleIds, mentionRoleIds
+
+poll_option
+├── pollId, text, emoji, order
+
+poll_vote
+├── pollId, optionId, userId
+
+poll_template
+├── guildId, name, type, question
+├── defaultOptions, allowMultipleVotes
+
+webhook_endpoint
+├── guildId, name, url, secret
+├── eventTypes, enabled, failureCount
+├── lastFailureAt, lastSuccessAt
+
+webhook_delivery
+├── webhookId, eventType, payload
+├── statusCode, success, error, createdAt
+
+api_key
+├── guildId, name, keyHash, permissions
+├── createdBy, enabled, useCount, expiresAt
+
+user_calendar_integration
+├── userId, provider, providerAccountId
+├── accessToken, refreshToken, syncEnabled
+├── syncDirection, includeGuildIds, excludeGuildIds
 ```
 
 ---
@@ -322,12 +513,76 @@ message_activity
 | POST | `/api/guilds/[guildId]/boosts/config` | Update settings |
 | GET | `/api/guilds/[guildId]/boosts/stats` | Get statistics |
 
-### Role Actions
+### Birthdays
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/guilds/[guildId]/role-actions` | List actions |
-| POST | `/api/guilds/[guildId]/role-actions` | Create/update |
-| DELETE | `/api/guilds/[guildId]/role-actions?id=` | Delete action |
+| GET | `/api/guilds/[guildId]/birthdays/config` | Get settings |
+| POST | `/api/guilds/[guildId]/birthdays/config` | Update settings |
+| GET | `/api/guilds/[guildId]/birthdays/entries` | List entries |
+| DELETE | `/api/guilds/[guildId]/birthdays/entries?id=` | Delete entry |
+
+### Reaction Roles
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/guilds/[guildId]/reaction-roles` | List messages |
+| POST | `/api/guilds/[guildId]/reaction-roles` | Create message |
+| DELETE | `/api/guilds/[guildId]/reaction-roles?id=` | Delete message |
+| GET | `/api/guilds/[guildId]/reaction-roles/messages` | List with roles |
+| POST | `/api/guilds/[guildId]/reaction-roles/messages` | Create full message |
+
+### Moderation
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/guilds/[guildId]/moderation/config` | Get settings |
+| POST | `/api/guilds/[guildId]/moderation/config` | Update settings |
+
+### Events
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/guilds/[guildId]/events` | List events |
+| POST | `/api/guilds/[guildId]/events` | Create event |
+| GET | `/api/guilds/[guildId]/events/[eventId]` | Get event details |
+| PATCH | `/api/guilds/[guildId]/events/[eventId]` | Update event |
+| DELETE | `/api/guilds/[guildId]/events/[eventId]` | Delete event |
+| GET | `/api/guilds/[guildId]/events/templates` | List templates |
+| POST | `/api/guilds/[guildId]/events/settings` | Update settings |
+
+### Polls
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/guilds/[guildId]/polls` | List polls |
+| POST | `/api/guilds/[guildId]/polls` | Create poll |
+| GET | `/api/guilds/[guildId]/polls/[pollId]` | Get poll details |
+| PATCH | `/api/guilds/[guildId]/polls/[pollId]` | Update poll |
+| DELETE | `/api/guilds/[guildId]/polls/[pollId]` | Delete poll |
+| GET | `/api/guilds/[guildId]/polls/[pollId]/results` | Get results |
+| GET | `/api/guilds/[guildId]/polls/templates` | List templates |
+| POST | `/api/guilds/[guildId]/polls/templates` | Create template |
+
+### Webhooks
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/guilds/[guildId]/webhooks` | List webhooks |
+| POST | `/api/guilds/[guildId]/webhooks` | Create webhook |
+| PATCH | `/api/guilds/[guildId]/webhooks/[webhookId]` | Update webhook |
+| DELETE | `/api/guilds/[guildId]/webhooks/[webhookId]` | Delete webhook |
+| GET | `/api/guilds/[guildId]/webhooks/[webhookId]/logs` | Get delivery logs |
+| POST | `/api/guilds/[guildId]/webhooks/[webhookId]/test` | Send test webhook |
+
+### API Keys
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/guilds/[guildId]/api-keys` | List API keys |
+| POST | `/api/guilds/[guildId]/api-keys` | Create API key |
+| PATCH | `/api/guilds/[guildId]/api-keys/[keyId]` | Update key |
+| DELETE | `/api/guilds/[guildId]/api-keys/[keyId]` | Delete key |
+
+### Calendar Integrations
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/guilds/[guildId]/calendar-integrations` | List integrations |
+| PATCH | `/api/guilds/[guildId]/calendar-integrations/[id]` | Update sync |
+| DELETE | `/api/guilds/[guildId]/calendar-integrations/[id]` | Disconnect |
 
 ### Analytics
 | Method | Endpoint | Description |
@@ -338,36 +593,84 @@ message_activity
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/guilds/[guildId]/discord-data` | Get roles/channels |
+| GET | `/api/guilds/[guildId]/members` | Get members (paginated) |
+| GET | `/api/guilds/[guildId]/channels` | Get channels |
 
 ---
 
 ## Bot Commands Summary
 
-### Public Commands (5)
+### Public Commands (Anyone)
 - `/rank [user]` - Check level and XP
 - `/leaderboard [type]` - View leaderboard
+- `/top [period]` - View top members
 - `/boost status` - Check boost status
+- `/boost claim` - Claim booster role
+- `/birthday set` - Set your birthday
+- `/birthday view` - View birthday info
+- `/birthday list` - List upcoming birthdays
+- `/birthday next` - Show next birthday
+- `/birthday stats` - Birthday statistics
 - `/ping` - Check latency
 - `/info` - Server overview
+- `/user [user]` - User information
+- `/avatar [user]` - Show avatar
+- `/server` - Server information
+- `/roles` - List roles
+- `/dashboard` - Get dashboard link
+- `/moveme` - Move to voice channel
 
-### Admin Commands (4)
+### Moderator Commands
+- `/warn add` - Warn a user
+- `/warn remove` - Remove warning
+- `/warn list` - List warnings
+- `/kick` - Kick user
+- `/ban` - Ban user
+- `/unban` - Unban user
+- `/mute text` - Mute from text
+- `/mute voice` - Mute from voice
+- `/unmute text` - Unmute text
+- `/unmute voice` - Unmute voice
+- `/timeout` - Apply timeout
+- `/untimeout` - Remove timeout
+- `/clear` - Bulk delete messages
+- `/cases` - View moderation cases
+- `/vkick` - Voice kick
+- `/move` - Move user
+- `/lock` - Lock channel
+- `/unlock` - Unlock channel
+- `/slowmode` - Set slowmode
+- `/setnick` - Change nickname
+- `/role give` - Give role
+- `/role remove` - Remove role
+- `/birthday admin-set` - Set user's birthday
+- `/birthday admin-remove` - Remove user's birthday
+
+### Admin Commands
 - `/setup` - Interactive setup panel
-- `/config <subcommand>` - Configuration management
-- `/welcome test <role>` - Test welcome messages
-- `/boost <subcommand>` - Boost management
-- `/verify <user> [profile]` - Manual verification
+- `/config view` - View configuration
+- `/config toggle` - Toggle features
+- `/config sync` - Sync members
+- `/welcome test` - Test welcome message
+- `/verify` - Manually verify user
+- `/boost setup` - Configure boost rewards
+- `/birthday test` - Test birthday message
+- `/setxp` - Set user XP
+- `/setlevel` - Set user level
+- `/reactionrole create` - Create reaction role message
+- `/reactionrole add` - Add role to message
+- `/reactionrole remove` - Remove role from message
+- `/reactionrole list` - List reaction roles
+- `/reactionrole delete` - Delete reaction role message
 
 ---
 
 ## Known Limitations
 
 1. **Growth Chart**: Historical growth data not fully implemented
-2. **Logs Page**: Navigation link exists but page not created
-3. **Rate Limiting**: No API rate limiting implemented
-4. **Permission Validation**: API routes check auth but not guild permissions
-5. **Large Guilds**: Member sync limited to 1000 users
-
-See `AUDIT_REPORT.md` for detailed analysis and recommendations.
+2. **Rate Limiting**: No API rate limiting implemented
+3. **Permission Validation**: API routes check auth but not guild permissions
+4. **Large Guilds**: Member sync limited to 1000 users
 
 ---
 

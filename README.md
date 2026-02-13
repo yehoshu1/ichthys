@@ -11,6 +11,17 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 - **🚀 Boost Management**: Track server boosts, reward boosters with roles, and send custom thank-you messages.
 - **⭐ Leveling System**: XP tracking for text and voice, customizable level-up messages, leaderboards, and role rewards.
 - **🤖 Role Actions**: Automate actions (DM, Kick, Log) when members gain or lose specific roles.
+- **🎂 Birthdays**: Automatic birthday announcements with timezone support and age calculation.
+- **📅 Events**: Create and manage server events with RSVP tracking, recurring schedules, and role restrictions.
+- **📊 Polls**: Standard polls, time polls (When2meet-style), and anonymous voting.
+- **🎭 Reaction Roles**: Self-assignable roles via reactions, buttons, or dropdowns.
+- **🔧 Moderation**: Warnings, mutes, kicks, bans, timeouts, and case tracking.
+- **📝 Message Aliases**: Auto-responder system with custom triggers.
+
+### Integration & API
+- **🔗 Webhooks**: Receive real-time event notifications via HTTP POST requests.
+- **🔑 API Keys**: Programmatic access to your server data with granular permissions.
+- **📆 Calendar Sync**: Connect Google, Outlook, or Apple Calendar for 2-way event sync.
 
 ### Tech Stack
 - **Bot**: [Discord.js](https://discord.js.org/) v14, TypeScript, Node.js
@@ -28,8 +39,8 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 
 - **[Setup Guide](docs/SETUP.md)**: How to install, configure, and run the bot locally or in production.
 - **[Dashboard Guide](docs/DASHBOARD.md)**: A walkthrough of the web dashboard features and configuration.
-- **[Commands Reference](docs/COMMANDS.md)**: complete npm and slash command catalog with options and examples.
-- **[Module Docs](docs/MODULES.md)**: deep-dive pages for each module and subsystem.
+- **[Commands Reference](docs/COMMANDS.md)**: Complete npm and slash command catalog with options and examples.
+- **[Module Docs](docs/MODULES.md)**: Deep-dive pages for each module and subsystem.
 
 ## 🛠️ Quick Start
 

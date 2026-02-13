@@ -791,7 +791,9 @@ export const event = pgTable('event', {
     title: text('title').notNull(),
     description: text('description'),
     location: text('location'),
+    locationChannelId: text('location_channel_id'),
     imageUrl: text('image_url'),
+    color: text('color'),
     
     // Timing
     startTime: timestamp('start_time', { withTimezone: true, mode: 'date' }).notNull(),
@@ -822,6 +824,10 @@ export const event = pgTable('event', {
     repeatFrequency: repeatFrequencyEnum('repeat_frequency').default('NONE').notNull(),
     repeatUntil: timestamp('repeat_until', { withTimezone: true, mode: 'date' }),
     parentEventId: uuid('parent_event_id'),
+    
+    // Discord Scheduled Event mirroring
+    mirrorToDiscord: boolean('mirror_to_discord').default(true).notNull(),
+    discordScheduledEventId: text('discord_scheduled_event_id'),
     
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
@@ -871,6 +877,7 @@ export const eventTemplate = pgTable('event_template', {
     description: text('description'),
     title: text('title'),
     location: text('location'),
+    defaultColor: text('default_color'),
     durationMinutes: integer('duration_minutes'),
     maxAttendees: integer('max_attendees'),
     enableWaitlist: boolean('enable_waitlist').default(false).notNull(),
@@ -911,6 +918,7 @@ export const poll = pgTable('poll', {
     // Poll details
     question: text('question').notNull(),
     description: text('description'),
+    color: text('color'), // Custom embed color
     
     // Poll type and settings
     type: pollTypeEnum('type').default('STANDARD').notNull(),
@@ -920,6 +928,10 @@ export const poll = pgTable('poll', {
     
     // Role restrictions
     allowedRoleIds: text('allowed_role_ids').array(),
+    
+    // Mentions
+    mentionRoleIds: text('mention_role_ids').array(),
+    mentionOnCreate: boolean('mention_on_create').default(false).notNull(),
     
     // End settings
     endTime: timestamp('end_time', { withTimezone: true, mode: 'date' }),
@@ -937,7 +949,7 @@ export const poll = pgTable('poll', {
 export const pollOption = pgTable('poll_option', {
     id: uuid('id').defaultRandom().primaryKey(),
     pollId: uuid('poll_id').notNull().references(() => poll.id, { onDelete: 'cascade' }),
-    optionIndex: integer('option_index').notNull(),
+    order: integer('order').default(0).notNull(),
     text: text('text').notNull(),
     emoji: text('emoji'),
     
@@ -946,7 +958,7 @@ export const pollOption = pgTable('poll_option', {
     
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
 }, (table) => ({
-    pollIndexUnique: uniqueIndex('poll_option_poll_index_unique').on(table.pollId, table.optionIndex),
+    pollOrderUnique: uniqueIndex('poll_option_poll_order_unique').on(table.pollId, table.order),
     pollIdIdx: index('poll_option_poll_id_idx').on(table.pollId),
 }));
 
@@ -963,57 +975,27 @@ export const pollVote = pgTable('poll_vote', {
     userIdIdx: index('poll_vote_user_id_idx').on(table.userId),
 }));
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// AVAILABILITY FINDER TABLES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export const availabilityFinder = pgTable('availability_finder', {
+export const pollTemplate = pgTable('poll_template', {
     id: uuid('id').defaultRandom().primaryKey(),
     guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
     creatorId: text('creator_id').notNull(),
-    messageId: text('message_id'),
-    channelId: text('channel_id').notNull(),
     
-    title: text('title').notNull(),
+    name: text('name').notNull(),
     description: text('description'),
     
-    // Date range for availability
-    startDate: timestamp('start_date', { withTimezone: true, mode: 'date' }).notNull(),
-    endDate: timestamp('end_date', { withTimezone: true, mode: 'date' }).notNull(),
-    
-    // Time range each day
-    dailyStartHour: integer('daily_start_hour').default(9).notNull(),
-    dailyEndHour: integer('daily_end_hour').default(17).notNull(),
-    
-    // Settings
-    isPublic: boolean('is_public').default(true).notNull(),
-    closed: boolean('closed').default(false).notNull(),
-    
-    // Convert to event on completion
-    convertToEvent: boolean('convert_to_event').default(false).notNull(),
-    createdEventId: uuid('created_event_id').references(() => event.id),
+    // Template content
+    question: text('question'),
+    pollDescription: text('poll_description'),
+    type: pollTypeEnum('type').default('STANDARD').notNull(),
+    allowMultipleVotes: boolean('allow_multiple_votes').default(false).notNull(),
+    maxVotesPerUser: integer('max_votes_per_user'),
+    allowCustomOptions: boolean('allow_custom_options').default(false).notNull(),
+    defaultOptions: text('default_options').array(),
     
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
 }, (table) => ({
-    guildIdIdx: index('availability_finder_guild_id_idx').on(table.guildId),
-    guildClosedIdx: index('availability_finder_guild_closed_idx').on(table.guildId, table.closed),
-}));
-
-export const availabilityResponse = pgTable('availability_response', {
-    id: uuid('id').defaultRandom().primaryKey(),
-    finderId: uuid('finder_id').notNull().references(() => availabilityFinder.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull(),
-    
-    // Store available slots as array of timestamps
-    availableSlots: timestamp('available_slots', { withTimezone: true, mode: 'date' }).array(),
-    
-    respondedAt: timestamp('responded_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
-}, (table) => ({
-    finderUserUnique: uniqueIndex('availability_response_finder_user_unique').on(table.finderId, table.userId),
-    finderIdIdx: index('availability_response_finder_id_idx').on(table.finderId),
+    guildIdIdx: index('poll_template_guild_id_idx').on(table.guildId),
 }));
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1043,10 +1025,125 @@ export const eventPollSettings = pgTable('event_poll_settings', {
     aiEnabled: boolean('ai_enabled').default(true).notNull(),
     aiRateLimitPerHour: integer('ai_rate_limit_per_hour').default(10).notNull(),
     
+    // Discord Integration
+    mirrorToDiscordEvents: boolean('mirror_to_discord_events').default(true).notNull(),
+    
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
 }, (table) => ({
     guildIdUnique: uniqueIndex('event_poll_settings_guild_unique').on(table.guildId),
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WEBHOOK & API TABLES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const webhookEndpoint = pgTable('webhook_endpoint', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    
+    // Webhook configuration
+    name: text('name').notNull(),
+    url: text('url').notNull(),
+    secret: text('secret'), // HMAC-SHA256 secret for signature verification
+    
+    // Event subscriptions (array of event types like 'event.created', 'rsvp.yes', etc.)
+    eventTypes: text('event_types').array().notNull(),
+    
+    // Status
+    enabled: boolean('enabled').default(true).notNull(),
+    
+    // Health tracking
+    failureCount: integer('failure_count').default(0).notNull(),
+    lastSuccessAt: timestamp('last_success_at', { withTimezone: true, mode: 'date' }),
+    lastFailureAt: timestamp('last_failure_at', { withTimezone: true, mode: 'date' }),
+    
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildIdIdx: index('webhook_endpoint_guild_id_idx').on(table.guildId),
+    guildEnabledIdx: index('webhook_endpoint_guild_enabled_idx').on(table.guildId, table.enabled),
+}));
+
+export const webhookDelivery = pgTable('webhook_delivery', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    webhookId: uuid('webhook_id').notNull().references(() => webhookEndpoint.id, { onDelete: 'cascade' }),
+    
+    // Delivery details
+    eventType: text('event_type').notNull(),
+    payload: jsonb('payload').notNull(),
+    
+    // Request/response tracking
+    requestStartedAt: timestamp('request_started_at', { withTimezone: true, mode: 'date' }),
+    requestCompletedAt: timestamp('request_completed_at', { withTimezone: true, mode: 'date' }),
+    statusCode: integer('status_code'),
+    responseBody: text('response_body'),
+    
+    // Result
+    success: boolean('success').default(false).notNull(),
+    error: text('error'),
+    
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    webhookIdIdx: index('webhook_delivery_webhook_id_idx').on(table.webhookId),
+    createdAtIdx: index('webhook_delivery_created_at_idx').on(table.createdAt),
+}));
+
+export const apiKey = pgTable('api_key', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    
+    // Key details
+    name: text('name').notNull(),
+    keyHash: text('key_hash').notNull(), // SHA-256 hash of the key
+    
+    // Permissions
+    permissions: text('permissions').array().notNull(), // e.g., ['events:read', 'polls:write']
+    
+    // Usage tracking
+    createdBy: text('created_by').notNull(),
+    enabled: boolean('enabled').default(true).notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'date' }),
+    useCount: integer('use_count').default(0).notNull(),
+    
+    // Expiration
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
+    
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildIdIdx: index('api_key_guild_id_idx').on(table.guildId),
+    keyHashIdx: index('api_key_key_hash_idx').on(table.keyHash),
+}));
+
+export const userCalendarIntegration = pgTable('user_calendar_integration', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').notNull(),
+    
+    // Provider details
+    provider: text('provider').notNull(), // 'google', 'outlook', 'apple'
+    providerAccountId: text('provider_account_id').notNull(),
+    accessToken: text('access_token'),
+    refreshToken: text('refresh_token'),
+    tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true, mode: 'date' }),
+    
+    // Sync settings
+    syncEnabled: boolean('sync_enabled').default(true).notNull(),
+    syncDirection: text('sync_direction').default('bidirectional').notNull(), // 'inbound', 'outbound', 'bidirectional'
+    
+    // Guild filtering
+    includeGuildIds: text('include_guild_ids').array(),
+    excludeGuildIds: text('exclude_guild_ids').array(),
+    
+    // Sync state
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true, mode: 'date' }),
+    lastSyncError: text('last_sync_error'),
+    
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    userIdIdx: index('calendar_integration_user_id_idx').on(table.userId),
+    userProviderUnique: uniqueIndex('calendar_integration_user_provider_unique').on(table.userId, table.provider),
 }));
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1077,11 +1174,17 @@ export type NewPollOption = typeof pollOption.$inferInsert;
 export type PollVote = typeof pollVote.$inferSelect;
 export type NewPollVote = typeof pollVote.$inferInsert;
 
-export type AvailabilityFinder = typeof availabilityFinder.$inferSelect;
-export type NewAvailabilityFinder = typeof availabilityFinder.$inferInsert;
-
-export type AvailabilityResponse = typeof availabilityResponse.$inferSelect;
-export type NewAvailabilityResponse = typeof availabilityResponse.$inferInsert;
-
 export type EventPollSettings = typeof eventPollSettings.$inferSelect;
 export type NewEventPollSettings = typeof eventPollSettings.$inferInsert;
+
+export type WebhookEndpoint = typeof webhookEndpoint.$inferSelect;
+export type NewWebhookEndpoint = typeof webhookEndpoint.$inferInsert;
+
+export type WebhookDelivery = typeof webhookDelivery.$inferSelect;
+export type NewWebhookDelivery = typeof webhookDelivery.$inferInsert;
+
+export type ApiKey = typeof apiKey.$inferSelect;
+export type NewApiKey = typeof apiKey.$inferInsert;
+
+export type UserCalendarIntegration = typeof userCalendarIntegration.$inferSelect;
+export type NewUserCalendarIntegration = typeof userCalendarIntegration.$inferInsert;

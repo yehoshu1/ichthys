@@ -9,12 +9,7 @@ import logger from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
     .setName('link')
-    .setDescription('Generate your personal calendar feed link')
-    .addChannelOption(option =>
-        option
-            .setName('channel')
-            .setDescription('Filter events by channel (optional)')
-    );
+    .setDescription('Generate your personal calendar feed link');
 
 export async function execute(interaction: ChatInputCommandInteraction) {
     try {

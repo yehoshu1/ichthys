@@ -4,9 +4,9 @@ import { eventService } from '../services/event-service';
 import { pollService } from '../services/poll-service';
 import { formatDiscordTimestamp } from '../utils/date-parser';
 
-export const name = Events.InteractionCreate;
+const name = Events.InteractionCreate;
 
-export async function execute(interaction: Interaction) {
+async function execute(interaction: Interaction) {
     try {
         // Handle slash commands
         if (interaction.isChatInputCommand()) {
@@ -17,16 +17,7 @@ export async function execute(interaction: Interaction) {
                 await command.execute(interaction);
             } catch (error) {
                 logger.error(`Error executing command ${interaction.commandName}:`, error);
-                if (interaction.deferred || interaction.replied) {
-                    await interaction.editReply({
-                        content: 'There was an error executing this command!',
-                    }).catch(() => {});
-                } else {
-                    await interaction.reply({
-                        content: 'There was an error executing this command!',
-                        ephemeral: true,
-                    }).catch(() => {});
-                }
+                await safeCommandErrorReply(interaction);
             }
         }
 
@@ -95,6 +86,12 @@ async function handleButtonInteraction(interaction: any) {
         return;
     }
 
+    // DM Reminder buttons: dm_reminder:{eventId}:{minutes}
+    if (customId.startsWith('dm_reminder:')) {
+        await handleDmReminder(interaction, customId);
+        return;
+    }
+
     // Custom reminder button: reminder:custom:{eventId}
     if (customId.startsWith('reminder:custom:')) {
         await handleCustomReminder(interaction, customId);
@@ -131,20 +128,28 @@ async function handleEventRsvp(interaction: any, customId: string) {
     const eventId = parts[2];
     const status = parts[3] as 'YES' | 'NO' | 'MAYBE';
 
+    // Defer reply immediately to prevent "interaction failed"
+    // Use try-catch because if interaction is already acknowledged, this will fail
+    try {
+        await interaction.deferReply({ ephemeral: true });
+    } catch (deferError) {
+        logger.warn('Failed to defer reply, interaction may already be acknowledged');
+    }
+
     try {
         const evt = await eventService.getEventById(eventId);
         if (!evt) {
-            await interaction.reply({ content: 'This event no longer exists.', ephemeral: true });
+            await safeEditReply(interaction, 'This event no longer exists.');
             return;
         }
 
         if (evt.status === 'CANCELLED') {
-            await interaction.reply({ content: 'This event has been cancelled.', ephemeral: true });
+            await safeEditReply(interaction, 'This event has been cancelled.');
             return;
         }
 
         if (evt.status === 'COMPLETED') {
-            await interaction.reply({ content: 'This event has already ended.', ephemeral: true });
+            await safeEditReply(interaction, 'This event has already ended.');
             return;
         }
 
@@ -154,10 +159,7 @@ async function handleEventRsvp(interaction: any, customId: string) {
         if (evt.requiredRoleIds?.length) {
             const hasRequiredRole = evt.requiredRoleIds.some(roleId => member.roles.cache.has(roleId));
             if (!hasRequiredRole) {
-                await interaction.reply({ 
-                    content: 'You do not have the required role to RSVP to this event.', 
-                    ephemeral: true 
-                });
+                await safeEditReply(interaction, 'You do not have the required role to RSVP to this event.');
                 return;
             }
         }
@@ -165,10 +167,7 @@ async function handleEventRsvp(interaction: any, customId: string) {
         if (evt.blockedRoleIds?.length) {
             const hasBlockedRole = evt.blockedRoleIds.some(roleId => member.roles.cache.has(roleId));
             if (hasBlockedRole) {
-                await interaction.reply({ 
-                    content: 'You cannot RSVP to this event due to role restrictions.', 
-                    ephemeral: true 
-                });
+                await safeEditReply(interaction, 'You cannot RSVP to this event due to role restrictions.');
                 return;
             }
         }
@@ -181,7 +180,7 @@ async function handleEventRsvp(interaction: any, customId: string) {
         });
 
         if (!result.success) {
-            await interaction.reply({ content: result.message || 'Could not update RSVP.', ephemeral: true });
+            await safeEditReply(interaction, result.message || 'Could not update RSVP.');
             return;
         }
 
@@ -203,8 +202,18 @@ async function handleEventRsvp(interaction: any, customId: string) {
             }
         }
 
-        // Update the embed with new counts
-        await updateEventEmbed(interaction, evt);
+        // Update the Discord message with new RSVP counts
+        if (interaction.guild) {
+            try {
+                // Dynamic import to avoid circular dependency issues
+                const { eventDiscordService } = await import('../services/event-discord-service');
+                if (eventDiscordService) {
+                    await eventDiscordService.updateEventMessage(evt, interaction.guild);
+                }
+            } catch (error) {
+                logger.warn('Could not update event Discord message:', error);
+            }
+        }
 
         const statusMessages: Record<string, string> = {
             'YES': '✅ You are now going to this event!',
@@ -217,13 +226,13 @@ async function handleEventRsvp(interaction: any, customId: string) {
             message = '⏳ You have been added to the waitlist. You will be notified if a spot opens up.';
         }
 
-        await interaction.reply({ content: message, ephemeral: true });
+        await safeEditReply(interaction, message);
 
-        // Send DM confirmation
+        // Send DM confirmation with reminder button
         try {
             const dmEmbed = new EmbedBuilder()
                 .setTitle('📅 RSVP Confirmation')
-                .setColor('#5865F2')
+                .setColor(evt.color ? parseInt(evt.color.replace('#', ''), 16) : 0x5865F2)
                 .setDescription(`You RSVP'd **${status}** for **${evt.title}**`)
                 .addFields(
                     { name: 'Event', value: evt.title, inline: false },
@@ -231,14 +240,83 @@ async function handleEventRsvp(interaction: any, customId: string) {
                     { name: 'Server', value: interaction.guild?.name || 'Unknown', inline: false }
                 );
 
-            await interaction.user.send({ embeds: [dmEmbed] });
-        } catch {
-            // DM failed, ignore
+            // Add reminder button row
+            const reminderRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`dm_reminder:${eventId}:0`)
+                    .setLabel('On event start')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId(`dm_reminder:${eventId}:10`)
+                    .setLabel('10 minutes before')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId(`dm_reminder:${eventId}:60`)
+                    .setLabel('1 hour before')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId(`dm_reminder:${eventId}:1440`)
+                    .setLabel('1 day before')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId(`dm_reminder:${eventId}:10080`)
+                    .setLabel('1 week before')
+                    .setStyle(ButtonStyle.Secondary)
+            );
+
+            await interaction.user.send({ 
+                embeds: [dmEmbed], 
+                components: [reminderRow] 
+            });
+        } catch (dmError) {
+            logger.warn(`Could not send DM to ${interaction.user.id}:`, dmError);
         }
 
     } catch (error) {
         logger.error('Error handling event RSVP:', error);
-        await interaction.reply({ content: 'An error occurred. Please try again.', ephemeral: true });
+        await safeEditReply(interaction, 'An error occurred. Please try again.');
+    }
+}
+
+// Helper function to safely edit reply
+async function safeEditReply(interaction: any, content: string) {
+    try {
+        if (interaction.deferred) {
+            await interaction.editReply({ content });
+        } else if (!interaction.replied) {
+            await interaction.reply({ content, ephemeral: true });
+        }
+    } catch (error) {
+        logger.warn('Failed to send reply:', error);
+    }
+}
+
+async function safeCommandErrorReply(interaction: any) {
+    const payload = {
+        content: 'There was an error executing this command!',
+        ephemeral: true,
+    };
+
+    if (interaction.deferred || interaction.replied) {
+        try {
+            await interaction.editReply({ content: payload.content });
+            return;
+        } catch (editError) {
+            logger.warn('Failed to edit command error reply, attempting fallback reply:', editError);
+        }
+    }
+
+    try {
+        await interaction.reply(payload);
+        return;
+    } catch (replyError) {
+        logger.warn('Failed to send command error reply, attempting follow-up:', replyError);
+    }
+
+    try {
+        await interaction.followUp(payload);
+    } catch (followUpError) {
+        logger.warn('Failed to send command error follow-up:', followUpError);
     }
 }
 
@@ -260,12 +338,12 @@ async function handleEventReminder(interaction: any, customId: string) {
 
         const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder()
-                .setCustomId(`reminder:preset:${eventId}:10`)
-                .setLabel('10 minutes before')
+                .setCustomId(`reminder:preset:${eventId}:0`)
+                .setLabel('On event start')
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
-                .setCustomId(`reminder:preset:${eventId}:30`)
-                .setLabel('30 minutes before')
+                .setCustomId(`reminder:preset:${eventId}:10`)
+                .setLabel('10 minutes before')
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
                 .setCustomId(`reminder:preset:${eventId}:60`)
@@ -277,6 +355,10 @@ async function handleEventReminder(interaction: any, customId: string) {
             new ButtonBuilder()
                 .setCustomId(`reminder:preset:${eventId}:1440`)
                 .setLabel('1 day before')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`reminder:preset:${eventId}:10080`)
+                .setLabel('1 week before')
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                 .setCustomId(`reminder:custom:${eventId}`)
@@ -329,33 +411,6 @@ async function handleEventDetails(interaction: any, customId: string) {
     }
 }
 
-async function updateEventEmbed(interaction: any, evt: any) {
-    try {
-        const rsvpCounts = await eventService.getRsvpCounts(evt.id);
-        const message = interaction.message;
-
-        if (!message || !message.embeds || message.embeds.length === 0) return;
-
-        const oldEmbed = message.embeds[0];
-        const newEmbed = EmbedBuilder.from(oldEmbed);
-
-        // Update the attendees field
-        const attendeesFieldIndex = oldEmbed.fields?.findIndex((f: any) => f.name === 'Attendees');
-        if (attendeesFieldIndex !== undefined && attendeesFieldIndex >= 0) {
-            const attendeesValue = `✅ ${rsvpCounts.yes} going | 🤔 ${rsvpCounts.maybe} maybe | ❌ ${rsvpCounts.no} not going`;
-            newEmbed.spliceFields(attendeesFieldIndex, 1, {
-                name: 'Attendees',
-                value: attendeesValue,
-                inline: false,
-            });
-        }
-
-        await message.edit({ embeds: [newEmbed] });
-    } catch (error) {
-        logger.error('Error updating event embed:', error);
-    }
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // POLL HANDLERS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -365,15 +420,17 @@ async function handlePollVote(interaction: any, customId: string) {
     const pollId = parts[2];
     const optionIndex = parseInt(parts[3]);
 
+    await interaction.deferReply({ ephemeral: true });
+
     try {
         const pollData = await pollService.getPollWithOptions(pollId);
         if (!pollData) {
-            await interaction.reply({ content: 'This poll no longer exists.', ephemeral: true });
+            await interaction.editReply({ content: 'This poll no longer exists.' });
             return;
         }
 
         if (pollData.poll.closed) {
-            await interaction.reply({ content: 'This poll is closed.', ephemeral: true });
+            await interaction.editReply({ content: 'This poll is closed.' });
             return;
         }
 
@@ -382,9 +439,8 @@ async function handlePollVote(interaction: any, customId: string) {
         if (pollData.poll.allowedRoleIds?.length) {
             const hasAllowedRole = pollData.poll.allowedRoleIds.some(roleId => member.roles.cache.has(roleId));
             if (!hasAllowedRole) {
-                await interaction.reply({
+                await interaction.editReply({
                     content: 'You do not have permission to vote in this poll.',
-                    ephemeral: true,
                 });
                 return;
             }
@@ -392,7 +448,7 @@ async function handlePollVote(interaction: any, customId: string) {
 
         const option = pollData.options[optionIndex];
         if (!option) {
-            await interaction.reply({ content: 'Invalid option.', ephemeral: true });
+            await interaction.editReply({ content: 'Invalid option.' });
             return;
         }
 
@@ -403,38 +459,51 @@ async function handlePollVote(interaction: any, customId: string) {
         });
 
         if (!result.success) {
-            await interaction.reply({ content: result.message || 'Could not cast vote.', ephemeral: true });
+            await interaction.editReply({ content: result.message || 'Could not cast vote.' });
             return;
         }
 
-        // Update poll embed
-        await updatePollEmbed(interaction, pollData.poll);
+        // Update Discord message with new vote counts
+        if (interaction.guild) {
+            try {
+                const { pollDiscordService } = await import('../services/poll-discord-service');
+                if (pollDiscordService) {
+                    await pollDiscordService.updateVoteDisplay(pollId, interaction.guild);
+                }
+            } catch (error) {
+                logger.warn('Could not update poll Discord message:', error);
+            }
+        }
 
         const message = result.message === 'Vote removed'
             ? `Your vote for "${option.text}" has been removed.`
             : `You voted for "${option.text}"`;
 
-        await interaction.reply({ content: message, ephemeral: true });
+        await interaction.editReply({ content: message });
 
     } catch (error) {
         logger.error('Error handling poll vote:', error);
-        await interaction.reply({ content: 'An error occurred. Please try again.', ephemeral: true });
+        await interaction.editReply({ content: 'An error occurred. Please try again.' });
     }
 }
 
 async function handlePollVoteSelect(interaction: any, customId: string) {
     const pollId = customId.split(':')[2];
-    const selectedOptions = interaction.values.map((v: string) => parseInt(v));
+    const selectedOptions = interaction.values
+        .map((v: string) => parseInt(v, 10))
+        .filter((v: number) => !Number.isNaN(v));
+
+    await interaction.deferReply({ ephemeral: true });
 
     try {
         const pollData = await pollService.getPollWithOptions(pollId);
         if (!pollData) {
-            await interaction.reply({ content: 'This poll no longer exists.', ephemeral: true });
+            await interaction.editReply({ content: 'This poll no longer exists.' });
             return;
         }
 
         if (pollData.poll.closed) {
-            await interaction.reply({ content: 'This poll is closed.', ephemeral: true });
+            await interaction.editReply({ content: 'This poll is closed.' });
             return;
         }
 
@@ -443,44 +512,75 @@ async function handlePollVoteSelect(interaction: any, customId: string) {
         if (pollData.poll.allowedRoleIds?.length) {
             const hasAllowedRole = pollData.poll.allowedRoleIds.some(roleId => member.roles.cache.has(roleId));
             if (!hasAllowedRole) {
-                await interaction.reply({
+                await interaction.editReply({
                     content: 'You do not have permission to vote in this poll.',
-                    ephemeral: true,
                 });
                 return;
             }
         }
 
         // Remove all existing votes first
-        await pollService.removeAllUserVotes(pollId, interaction.user.id);
+        await pollService.removeAllUserVotes(pollId, interaction.user.id, pollData.poll.type === 'ANONYMOUS');
+
+        if (selectedOptions.length === 0) {
+            // Empty submit means user cleared all selections and wants to remove votes.
+            if (interaction.guild) {
+                try {
+                    const { pollDiscordService } = await import('../services/poll-discord-service');
+                    if (pollDiscordService) {
+                        await pollDiscordService.updateVoteDisplay(pollId, interaction.guild);
+                    }
+                } catch (error) {
+                    logger.warn('Could not update poll Discord message:', error);
+                }
+            }
+
+            await interaction.editReply({
+                content: 'Your poll responses have been removed.',
+            });
+            return;
+        }
 
         // Cast new votes
         for (const optionIndex of selectedOptions) {
             const option = pollData.options[optionIndex];
             if (option) {
-                await pollService.castVote({
+                const result = await pollService.castVote({
                     pollId,
                     optionId: option.id,
                     userId: interaction.user.id,
                 });
+
+                if (!result.success) {
+                    await interaction.editReply({ content: result.message || 'Could not cast vote.' });
+                    return;
+                }
             }
         }
 
-        // Update poll embed
-        await updatePollEmbed(interaction, pollData.poll);
+        // Update Discord message with new vote counts
+        if (interaction.guild) {
+            try {
+                const { pollDiscordService } = await import('../services/poll-discord-service');
+                if (pollDiscordService) {
+                    await pollDiscordService.updateVoteDisplay(pollId, interaction.guild);
+                }
+            } catch (error) {
+                logger.warn('Could not update poll Discord message:', error);
+            }
+        }
 
         const selectedTexts = selectedOptions
             .map((idx: number) => pollData.options[idx]?.text)
             .filter(Boolean);
 
-        await interaction.reply({
+        await interaction.editReply({
             content: `You voted for: ${selectedTexts.join(', ')}`,
-            ephemeral: true,
         });
 
     } catch (error) {
         logger.error('Error handling poll vote select:', error);
-        await interaction.reply({ content: 'An error occurred. Please try again.', ephemeral: true });
+        await interaction.editReply({ content: 'An error occurred. Please try again.' });
     }
 }
 
@@ -502,12 +602,36 @@ async function handlePollResults(interaction: any, customId: string) {
             .setColor('#5865F2')
             .setFooter({ text: `${results.totalVotes} total vote${results.totalVotes !== 1 ? 's' : ''}` });
 
+        const showVoters = pollData.poll.type !== 'ANONYMOUS';
         const resultsText = results.options.map((opt, i) => {
             const bar = '█'.repeat(Math.round(opt.percentage / 5)) + '░'.repeat(20 - Math.round(opt.percentage / 5));
-            return `${i + 1}. ${opt.option.text}\n\`${bar}\` ${opt.percentage}% (${opt.voteCount})`;
+            if (!showVoters || !opt.voters || opt.voters.length === 0) {
+                return `${i + 1}. ${opt.option.text}\n\`${bar}\` ${opt.percentage}% (${opt.voteCount})`;
+            }
+
+            const maxVisible = 10;
+            const visibleVoters = opt.voters.slice(0, maxVisible).map((userId: string) => `<@${userId}>`);
+            const remaining = opt.voters.length - visibleVoters.length;
+            const voterText = remaining > 0
+                ? `${visibleVoters.join(', ')} +${remaining} more`
+                : visibleVoters.join(', ');
+
+            return `${i + 1}. ${opt.option.text}\n\`${bar}\` ${opt.percentage}% (${opt.voteCount})\n👥 ${voterText}`;
         }).join('\n\n');
 
-        embed.addFields({ name: 'Results', value: resultsText || 'No votes yet', inline: false });
+        embed.addFields({
+            name: showVoters ? 'Results (With Voters)' : 'Results',
+            value: truncatePollResults(resultsText || 'No votes yet'),
+            inline: false,
+        });
+
+        if (!showVoters) {
+            embed.addFields({
+                name: 'Privacy',
+                value: '🕵️ This is an anonymous poll. Voter identities are hidden.',
+                inline: false,
+            });
+        }
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
 
@@ -515,6 +639,15 @@ async function handlePollResults(interaction: any, customId: string) {
         logger.error('Error handling poll results:', error);
         await interaction.reply({ content: 'An error occurred. Please try again.', ephemeral: true });
     }
+}
+
+function truncatePollResults(value: string): string {
+    const maxLength = 1024;
+    if (value.length <= maxLength) {
+        return value;
+    }
+
+    return `${value.slice(0, maxLength - 15)}\n…(truncated)`;
 }
 
 async function handlePollClose(interaction: any, customId: string) {
@@ -541,18 +674,18 @@ async function handlePollClose(interaction: any, customId: string) {
             return;
         }
 
-        await pollService.closePoll(pollId);
+        const updatedPoll = await pollService.closePoll(pollId);
 
-        // Update the message to show it's closed
-        const message = interaction.message;
-        if (message) {
-            const oldEmbed = message.embeds[0];
-            const newEmbed = EmbedBuilder.from(oldEmbed)
-                .setTitle(`🔒 ${oldEmbed.title}`)
-                .setColor('#999999')
-                .setFooter({ text: 'This poll is closed' });
-
-            await message.edit({ embeds: [newEmbed], components: [] });
+        // Update the Discord message
+        if (interaction.guild && updatedPoll) {
+            try {
+                const { pollDiscordService } = await import('../services/poll-discord-service');
+                if (pollDiscordService) {
+                    await pollDiscordService.updatePollMessage(updatedPoll, interaction.guild);
+                }
+            } catch (syncError) {
+                logger.warn('Could not sync closed poll Discord message:', syncError);
+            }
         }
 
         await interaction.reply({ content: 'Poll closed successfully.', ephemeral: true });
@@ -560,40 +693,6 @@ async function handlePollClose(interaction: any, customId: string) {
     } catch (error) {
         logger.error('Error handling poll close:', error);
         await interaction.reply({ content: 'An error occurred. Please try again.', ephemeral: true });
-    }
-}
-
-async function updatePollEmbed(interaction: any, poll: any) {
-    try {
-        const results = await pollService.getResults(poll.id);
-        const message = interaction.message;
-
-        if (!message || !message.embeds || message.embeds.length === 0) return;
-
-        const oldEmbed = message.embeds[0];
-        const newEmbed = EmbedBuilder.from(oldEmbed);
-
-        // Update the options field
-        const optionsFieldIndex = oldEmbed.fields?.findIndex((f: any) => f.name === 'Options');
-        if (optionsFieldIndex !== undefined && optionsFieldIndex >= 0) {
-            const optionsText = results.options.map((opt, i) => {
-                const emoji = opt.option.emoji || `${i + 1}.`;
-                return `${emoji} ${opt.option.text} - ${opt.voteCount} votes (${opt.percentage}%)`;
-            }).join('\n');
-
-            newEmbed.spliceFields(optionsFieldIndex, 1, {
-                name: 'Options',
-                value: optionsText || 'No options',
-                inline: false,
-            });
-        }
-
-        // Update footer
-        newEmbed.setFooter({ text: `Poll by @${poll.creatorId} • ${results.totalVotes} votes` });
-
-        await message.edit({ embeds: [newEmbed] });
-    } catch (error) {
-        logger.error('Error updating poll embed:', error);
     }
 }
 
@@ -619,21 +718,21 @@ async function handleReminderPreset(interaction: any, customId: string) {
             return;
         }
 
-        const success = await eventService.setReminder(eventId, interaction.user.id, minutes);
+        const reminderResult = await eventService.upsertReminder(eventId, interaction.user.id, minutes);
 
-        if (!success) {
+        if (reminderResult.status === 'unchanged') {
             await interaction.reply({ content: 'You already have a reminder set for that time.', ephemeral: true });
             return;
         }
 
-        const timeLabel = minutes < 60 
-            ? `${minutes} minutes` 
-            : minutes < 1440 
-                ? `${minutes / 60} hours` 
-                : `${minutes / 1440} days`;
+        const timeLabel = formatReminderLabel(minutes);
+        const reminderPrefix = reminderResult.status === 'updated' ? '✅ Reminder updated!' : '✅ Reminder set!';
+        const reminderMessage = minutes === 0
+            ? `${reminderPrefix} You will be notified when the event starts.`
+            : `${reminderPrefix} You will be notified **${timeLabel}** before the event starts.`;
 
         await interaction.reply({
-            content: `✅ Reminder set! You will be notified **${timeLabel}** before the event starts.`,
+            content: reminderMessage,
             ephemeral: true,
         });
 
@@ -672,7 +771,7 @@ async function handleReminderModalSubmit(interaction: any, customId: string) {
     const minutesStr = interaction.fields.getTextInputValue('reminder_time');
     const minutes = parseInt(minutesStr);
 
-    if (isNaN(minutes) || minutes <= 0) {
+    if (isNaN(minutes) || minutes < 0) {
         await interaction.reply({ content: 'Invalid number of minutes.', ephemeral: true });
         return;
     }
@@ -690,15 +789,19 @@ async function handleReminderModalSubmit(interaction: any, customId: string) {
             return;
         }
 
-        const success = await eventService.setReminder(eventId, interaction.user.id, minutes);
+        const reminderResult = await eventService.upsertReminder(eventId, interaction.user.id, minutes);
 
-        if (!success) {
+        if (reminderResult.status === 'unchanged') {
             await interaction.reply({ content: 'You already have a reminder set for that time.', ephemeral: true });
             return;
         }
+        const reminderPrefix = reminderResult.status === 'updated' ? '✅ Reminder updated!' : '✅ Reminder set!';
+        const reminderMessage = minutes === 0
+            ? `${reminderPrefix} You will be notified when the event starts.`
+            : `${reminderPrefix} You will be notified **${formatReminderLabel(minutes)}** before the event starts.`;
 
         await interaction.reply({
-            content: `✅ Reminder set! You will be notified **${minutes} minutes** before the event starts.`,
+            content: reminderMessage,
             ephemeral: true,
         });
 
@@ -707,3 +810,62 @@ async function handleReminderModalSubmit(interaction: any, customId: string) {
         await interaction.reply({ content: 'An error occurred. Please try again.', ephemeral: true });
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DM REMINDER HANDLER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function handleDmReminder(interaction: any, customId: string) {
+    const parts = customId.split(':');
+    const eventId = parts[1];
+    const minutes = parseInt(parts[2]);
+
+    try {
+        // Defer update to prevent "interaction failed"
+        await interaction.deferUpdate();
+
+        const evt = await eventService.getEventById(eventId);
+        if (!evt) {
+            await interaction.followUp({ content: 'This event no longer exists.', ephemeral: true });
+            return;
+        }
+
+        const reminderTime = new Date(evt.startTime.getTime() - minutes * 60000);
+        if (reminderTime < new Date()) {
+            await interaction.followUp({ content: 'That reminder time has already passed.', ephemeral: true });
+            return;
+        }
+
+        const reminderResult = await eventService.upsertReminder(eventId, interaction.user.id, minutes);
+
+        if (reminderResult.status === 'unchanged') {
+            await interaction.followUp({ content: 'You already have a reminder set for that time.', ephemeral: true });
+            return;
+        }
+
+        const timeLabel = formatReminderLabel(minutes);
+        const reminderPrefix = reminderResult.status === 'updated' ? '✅ Reminder updated!' : '✅ Reminder set!';
+
+        await interaction.editReply({
+            content: minutes === 0
+                ? `${reminderPrefix} I'll DM you when the event starts.`
+                : `${reminderPrefix} I'll DM you **${timeLabel}** before the event starts.`,
+            components: interaction.message.components,
+            embeds: interaction.message.embeds,
+        });
+
+    } catch (error) {
+        logger.error('Error handling DM reminder:', error);
+        await interaction.followUp({ content: 'An error occurred. Please try again.', ephemeral: true });
+    }
+}
+
+function formatReminderLabel(minutes: number): string {
+    if (minutes === 0) return 'on event start';
+    if (minutes < 60) return `${minutes} minutes`;
+    if (minutes < 1440) return `${minutes / 60} hours`;
+    if (minutes < 10080) return `${minutes / 1440} days`;
+    return `${minutes / 10080} weeks`;
+}
+
+export default { name, execute };

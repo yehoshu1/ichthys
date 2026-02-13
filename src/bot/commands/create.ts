@@ -48,6 +48,12 @@ export const data = new SlashCommandBuilder()
             .setDescription('Location of the event')
             .setMaxLength(200)
     )
+    .addChannelOption(option =>
+        option
+            .setName('location_voice_channel')
+            .setDescription('Voice/Stage channel to use as event location')
+            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
+    )
     .addStringOption(option =>
         option
             .setName('image')
@@ -113,15 +119,22 @@ export const data = new SlashCommandBuilder()
         option
             .setName('repeat_until')
             .setDescription('When to stop repeating (e.g., "3 months", "2026-12-31")')
+    )
+    .addBooleanOption(option =>
+        option
+            .setName('mirror_to_discord')
+            .setDescription('Mirror this event to Discord native events (defaults to server setting)')
     );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
     try {
-        await interaction.deferReply({ ephemeral: true });
+        if (!(await ensureCreateAcknowledged(interaction))) {
+            return;
+        }
 
         const guild = interaction.guild;
         if (!guild) {
-            await interaction.editReply('This command can only be used in a server.');
+            await sendCreateResponse(interaction, 'This command can only be used in a server.');
             return;
         }
 
@@ -130,13 +143,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         const channel = channelOption || interaction.channel;
         
         if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
-            await interaction.editReply('Please specify a valid text channel.');
+            await sendCreateResponse(interaction, 'Please specify a valid text channel.');
             return;
         }
 
         // Check permissions - only check if we're posting to a different channel
         if (channelOption && !member.permissionsIn(channel as TextChannel).has(PermissionFlagsBits.SendMessages)) {
-            await interaction.editReply('You do not have permission to send messages in that channel.');
+            await sendCreateResponse(interaction, 'You do not have permission to send messages in that channel.');
             return;
         }
 
@@ -145,7 +158,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         const startTime = parseNaturalLanguageDate(dateTimeInput);
 
         if (!startTime || startTime < new Date()) {
-            await interaction.editReply('Invalid date/time. Please use a future date/time (e.g., "tomorrow 6pm", "in 3 hours").');
+            await sendCreateResponse(interaction, 'Invalid date/time. Please use a future date/time (e.g., "tomorrow 6pm", "in 3 hours").');
             return;
         }
 
@@ -170,7 +183,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             const parsedRepeatUntil = parseNaturalLanguageDate(repeatUntilInput);
             repeatUntil = parsedRepeatUntil ?? undefined;
             if (!repeatUntil || repeatUntil <= startTime) {
-                await interaction.editReply('Invalid repeat until date. It must be after the event start time.');
+                await sendCreateResponse(interaction, 'Invalid repeat until date. It must be after the event start time.');
                 return;
             }
         }
@@ -186,6 +199,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             endTime,
             durationMinutes,
             location: interaction.options.getString('location') || undefined,
+            locationChannelId: interaction.options.getChannel('location_voice_channel')?.id || undefined,
             imageUrl: interaction.options.getString('image') || undefined,
             maxAttendees: interaction.options.getInteger('max_attendees') || undefined,
             enableWaitlist: interaction.options.getBoolean('enable_waitlist') || false,
@@ -204,9 +218,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             attendeeRoleId: interaction.options.getRole('attendee_role')?.id || undefined,
             repeatFrequency: repeatInput as any,
             repeatUntil,
+            mirrorToDiscord: interaction.options.getBoolean('mirror_to_discord') ?? undefined,
         };
 
-        const createdEvent = await eventService.createEvent(eventData);
+        const createdEvent = await eventService.createEvent(eventData, guild);
 
         // Build the event embed
         const embed = buildEventEmbed(createdEvent);
@@ -243,32 +258,119 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         const content = mentionRole ? `<@&${mentionRole.id}>` : undefined;
 
         // Send the event message
-        const message = await (channel as TextChannel).send({
-            content,
-            embeds: [embed],
-            components: [row1, row2],
-        });
+        let postedEventMessage = false;
+        try {
+            const message = await (channel as TextChannel).send({
+                content,
+                embeds: [embed],
+                components: [row1, row2],
+            });
 
-        // Update event with message ID
-        await eventService.setEventMessageId(createdEvent.id, message.id);
+            // Update event with message ID
+            await eventService.setEventMessageId(createdEvent.id, message.id);
+            postedEventMessage = true;
+        } catch (sendError) {
+            logger.error('Failed to send created event message:', sendError);
+        }
 
         // Handle repeating events
+        const mirrorText = createdEvent.mirrorToDiscord 
+            ? (createdEvent.discordScheduledEventId ? '📅 Also created as Discord Scheduled Event' : '📅 (Discord Event creation failed)')
+            : '';
+        const messagePostWarning = postedEventMessage
+            ? ''
+            : ' ⚠️ Event was saved, but I could not post its embed in the target channel.';
+        
         if (repeatInput !== 'NONE' && repeatUntil) {
             const repeatingEvents = await eventService.createRepeatingEvents(createdEvent);
             
-            await interaction.editReply({
-                content: `✅ Event created successfully! ${repeatingEvents.length > 0 ? `+ ${repeatingEvents.length} repeating instances` : ''}`,
-            });
+            await sendCreateResponse(
+                interaction,
+                `✅ Event created successfully! ${repeatingEvents.length > 0 ? `+ ${repeatingEvents.length} repeating instances` : ''} ${mirrorText}${messagePostWarning}`
+            );
         } else {
-            await interaction.editReply('✅ Event created successfully!');
+            await sendCreateResponse(interaction, `✅ Event created successfully! ${mirrorText}${messagePostWarning}`);
         }
 
         logger.info(`Event created: ${createdEvent.id} by ${interaction.user.tag} in ${guild.name}`);
 
     } catch (error) {
         logger.error('Error creating event:', error);
-        await interaction.editReply('An error occurred while creating the event. Please try again.');
+        await sendCreateResponse(interaction, 'An error occurred while creating the event. Please try again.');
     }
+}
+
+async function ensureCreateAcknowledged(interaction: ChatInputCommandInteraction): Promise<boolean> {
+    if (interaction.deferred || interaction.replied) {
+        return true;
+    }
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            await interaction.deferReply({ ephemeral: true });
+            return true;
+        } catch (error) {
+            const retryable = isRetryableNetworkError(error);
+            logger.warn(`Failed to defer /create interaction (attempt ${attempt}/3):`, error);
+            if (!retryable || attempt === 3) {
+                break;
+            }
+            await delay(250 * attempt);
+        }
+    }
+
+    return sendCreateResponse(
+        interaction,
+        'I could not acknowledge this interaction in time. Please run `/create` again.'
+    );
+}
+
+async function sendCreateResponse(interaction: ChatInputCommandInteraction, content: string): Promise<boolean> {
+    if (interaction.deferred || interaction.replied) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                await interaction.editReply({ content });
+                return true;
+            } catch (editError) {
+                const retryable = isRetryableNetworkError(editError);
+                logger.warn(`Failed to edit /create interaction reply (attempt ${attempt}/2):`, editError);
+                if (!retryable || attempt === 2) {
+                    break;
+                }
+                await delay(250 * attempt);
+            }
+        }
+    }
+
+    try {
+        await interaction.reply({ content, ephemeral: true });
+        return true;
+    } catch (replyError) {
+        logger.warn('Failed to send /create interaction reply, attempting follow-up:', replyError);
+    }
+
+    try {
+        await interaction.followUp({ content, ephemeral: true });
+        return true;
+    } catch (followUpError) {
+        logger.error('Failed to send /create interaction response:', followUpError);
+        return false;
+    }
+}
+
+function isRetryableNetworkError(error: unknown): boolean {
+    const message = String((error as any)?.message ?? error ?? '');
+    return [
+        'EAI_AGAIN',
+        'ETIMEDOUT',
+        'ECONNRESET',
+        'ECONNREFUSED',
+        'ENOTFOUND',
+    ].some(code => message.includes(code));
+}
+
+function delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function buildEventEmbed(event: any): EmbedBuilder {
@@ -296,6 +398,10 @@ function buildEventEmbed(event: any): EmbedBuilder {
             value: formatDiscordTimestamp(event.endTime, 'F'),
             inline: false,
         });
+    }
+
+    if (event.locationChannelId) {
+        embed.addFields({ name: '📍 Voice Location', value: `<#${event.locationChannelId}>`, inline: true });
     }
 
     if (event.location) {

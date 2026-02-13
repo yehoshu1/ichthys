@@ -44,11 +44,11 @@ function ErrorDisplay({ error, className }: { error: string; className?: string 
 
 const NONE_OPTION = "__none__";
 
-function normalizeId(value: string): string {
-    return value.trim();
+function normalizeId(value: string | null | undefined): string {
+    return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeIdList(values: string[]): string[] {
+function normalizeIdList(values: Array<string | null | undefined>): string[] {
     const unique = new Set<string>();
     for (const value of values) {
         const normalized = normalizeId(value);
@@ -65,6 +65,19 @@ function toSelectValue(value: string): string {
 
 function fromSelectValue(value: string): string {
     return value === NONE_OPTION ? "" : normalizeId(value);
+}
+
+const TEXT_CHANNEL_TYPES = [0, 5, 10, 11, 12];
+const VOICE_CHANNEL_TYPES = [2, 13];
+
+function formatChannelLabel(channel: { name: string; type: number }): string {
+    if (channel.type === 13) {
+        return `🎤 ${channel.name}`;
+    }
+    if (VOICE_CHANNEL_TYPES.includes(channel.type)) {
+        return `🔊 ${channel.name}`;
+    }
+    return `#${channel.name}`;
 }
 
 interface RoleSelectProps {
@@ -133,6 +146,7 @@ interface ChannelSelectProps {
     guildId: string;
     value: string;
     onChange: (value: string) => void;
+    channelTypes?: number[];
     allowNone?: boolean;
     placeholder?: string;
     disabled?: boolean;
@@ -143,20 +157,21 @@ export function ChannelSelect({
     guildId,
     value,
     onChange,
+    channelTypes = TEXT_CHANNEL_TYPES,
     allowNone = true,
     placeholder = "Select a channel",
     disabled = false,
     className
 }: ChannelSelectProps) {
     const { data, loading, error, channelsById } = useDiscordData(guildId);
-    const channels = data.channels;
+    const channels = data.channels.filter((channel) => channelTypes.includes(channel.type));
     const normalizedValue = allowNone ? toSelectValue(value) : normalizeId(value);
 
     // Find the selected channel name for display
     const selectedChannel = channelsById.get(normalizedValue);
     const displayValue = normalizedValue === NONE_OPTION 
         ? "None" 
-        : selectedChannel ? `#${selectedChannel.name}` : undefined;
+        : selectedChannel ? formatChannelLabel(selectedChannel) : undefined;
 
     if (error) {
         return <ErrorDisplay error={error} className={className} />;
@@ -177,7 +192,7 @@ export function ChannelSelect({
                 {allowNone && <SelectItem value={NONE_OPTION}>None</SelectItem>}
                 {channels.map((channel) => (
                     <SelectItem key={channel.id} value={channel.id}>
-                        #{channel.name}
+                        {formatChannelLabel(channel)}
                     </SelectItem>
                 ))}
                 {channels.length === 0 && !loading && (
@@ -194,6 +209,7 @@ interface MultiSelectProps {
     guildId: string;
     values: string[];
     onChange: (values: string[]) => void;
+    channelTypes?: number[];
     placeholder?: string;
     disabled?: boolean;
     className?: string;
@@ -233,12 +249,15 @@ export function ChannelMultiSelect({
     guildId,
     values,
     onChange,
+    channelTypes = TEXT_CHANNEL_TYPES,
     placeholder = "Select channels",
     disabled = false,
     className,
 }: MultiSelectProps) {
     const { data, loading, error } = useDiscordData(guildId);
-    const options = data.channels.map((channel) => ({ value: channel.id, label: `#${channel.name}` }));
+    const options = data.channels
+        .filter((channel) => channelTypes.includes(channel.type))
+        .map((channel) => ({ value: channel.id, label: formatChannelLabel(channel) }));
 
     if (error) {
         return <ErrorDisplay error={error} className={className} />;
@@ -257,4 +276,8 @@ export function ChannelMultiSelect({
             className={className}
         />
     );
+}
+
+export function VoiceChannelSelect(props: Omit<ChannelSelectProps, "channelTypes">) {
+    return <ChannelSelect {...props} channelTypes={VOICE_CHANNEL_TYPES} />;
 }

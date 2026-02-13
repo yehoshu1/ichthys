@@ -3,6 +3,8 @@ services:
     image: postgres:17
     container_name: ixoye-postgres-dev
     restart: unless-stopped
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ixoye_dev}
       POSTGRES_USER: ${POSTGRES_USER:-ixoye}
@@ -48,6 +50,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-ixoye}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
       DATABASE_URL: postgresql://${POSTGRES_USER:-ixoye}:${POSTGRES_PASSWORD:-ixoye}@postgres:5432/${POSTGRES_DB:-ixoye_dev}
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     depends_on:
       postgres:
         condition: service_healthy

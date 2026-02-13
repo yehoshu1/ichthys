@@ -1,5 +1,7 @@
 import { eq, and, desc, asc, sql, lte } from 'drizzle-orm';
 import { db } from '@shared/database/client';
+import crypto from 'crypto';
+import { webhookService } from './webhook-service';
 import {
     poll,
     pollOption,
@@ -11,6 +13,20 @@ import {
     NewPollOption,
     NewPollVote,
 } from '@shared/database/schema';
+
+// Helper to anonymize user IDs for anonymous polls
+function anonymizeUserId(userId: string, pollId: string): string {
+    const secret = process.env.ANONYMIZE_SECRET;
+    if (!secret || secret.trim().length < 16) {
+        throw new Error('ANONYMIZE_SECRET is required and must be at least 16 characters');
+    }
+
+    // Create a deterministic hash that's unique per poll but can't be reversed
+    return crypto
+        .createHmac('sha256', secret)
+        .update(`${pollId}:${userId}`)
+        .digest('hex');
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // POLL SERVICE
@@ -75,13 +91,23 @@ export class PollService {
             const opt = data.options[i];
             const optionData: NewPollOption = {
                 pollId: createdPoll.id,
-                optionIndex: i,
+                order: i,
                 text: opt.text,
                 emoji: opt.emoji,
                 dateTimeValue: opt.dateTimeValue,
             };
             await db.insert(pollOption).values(optionData);
         }
+
+        await webhookService.triggerEvent(createdPoll.guildId, 'poll.created', {
+            pollId: createdPoll.id,
+            question: createdPoll.question,
+            type: createdPoll.type,
+            channelId: createdPoll.channelId,
+            endTime: createdPoll.endTime,
+            optionCount: data.options.length,
+            creatorId: createdPoll.creatorId,
+        });
 
         return createdPoll;
     }
@@ -99,7 +125,7 @@ export class PollService {
             .select()
             .from(pollOption)
             .where(eq(pollOption.pollId, pollId))
-            .orderBy(asc(pollOption.optionIndex));
+            .orderBy(asc(pollOption.order));
 
         return { poll: pollData, options };
     }
@@ -146,25 +172,27 @@ export class PollService {
     // VOTING
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    async getVote(pollId: string, userId: string, optionId: string): Promise<PollVote | undefined> {
+    async getVote(pollId: string, userId: string, optionId: string, isAnonymous: boolean = false): Promise<PollVote | undefined> {
+        const lookupUserId = isAnonymous ? anonymizeUserId(userId, pollId) : userId;
         const [result] = await db
             .select()
             .from(pollVote)
             .where(
                 and(
                     eq(pollVote.pollId, pollId),
-                    eq(pollVote.userId, userId),
+                    eq(pollVote.userId, lookupUserId),
                     eq(pollVote.optionId, optionId)
                 )
             );
         return result;
     }
 
-    async getUserVotes(pollId: string, userId: string): Promise<PollVote[]> {
+    async getUserVotes(pollId: string, userId: string, isAnonymous: boolean = false): Promise<PollVote[]> {
+        const lookupUserId = isAnonymous ? anonymizeUserId(userId, pollId) : userId;
         return await db
             .select()
             .from(pollVote)
-            .where(and(eq(pollVote.pollId, pollId), eq(pollVote.userId, userId)));
+            .where(and(eq(pollVote.pollId, pollId), eq(pollVote.userId, lookupUserId)));
     }
 
     async getVotesByOption(optionId: string): Promise<(typeof pollVote.$inferSelect)[]> {
@@ -199,8 +227,11 @@ export class PollService {
             return { success: false, message: 'Invalid option' };
         }
 
+        const isAnonymous = pollData.type === 'ANONYMOUS';
+        const lookupUserId = isAnonymous ? anonymizeUserId(data.userId, data.pollId) : data.userId;
+
         // Check if user already voted for this option
-        const existingVote = await this.getVote(data.pollId, data.userId, data.optionId);
+        const existingVote = await this.getVote(data.pollId, data.userId, data.optionId, isAnonymous);
         if (existingVote) {
             // Remove vote (toggle)
             await db.delete(pollVote).where(eq(pollVote.id, existingVote.id));
@@ -210,14 +241,14 @@ export class PollService {
         // Check vote limits
         if (!pollData.allowMultipleVotes) {
             // Remove any existing votes first
-            const userVotes = await this.getUserVotes(data.pollId, data.userId);
+            const userVotes = await this.getUserVotes(data.pollId, data.userId, isAnonymous);
             if (userVotes.length > 0) {
                 for (const vote of userVotes) {
                     await db.delete(pollVote).where(eq(pollVote.id, vote.id));
                 }
             }
         } else if (pollData.maxVotesPerUser) {
-            const userVotes = await this.getUserVotes(data.pollId, data.userId);
+            const userVotes = await this.getUserVotes(data.pollId, data.userId, isAnonymous);
             if (userVotes.length >= pollData.maxVotesPerUser) {
                 return { success: false, message: `You can only vote for ${pollData.maxVotesPerUser} option(s)` };
             }
@@ -227,17 +258,27 @@ export class PollService {
         const voteData: NewPollVote = {
             pollId: data.pollId,
             optionId: data.optionId,
-            userId: data.userId,
+            userId: lookupUserId, // Use anonymized ID for anonymous polls
         };
         await db.insert(pollVote).values(voteData);
+
+        // Trigger webhook for poll vote
+        await webhookService.triggerEvent(pollData.guildId, 'poll.voted', {
+            pollId: data.pollId,
+            pollQuestion: pollData.question,
+            optionId: data.optionId,
+            userId: data.userId,
+            isAnonymous: isAnonymous,
+        });
 
         return { success: true };
     }
 
-    async removeAllUserVotes(pollId: string, userId: string): Promise<boolean> {
+    async removeAllUserVotes(pollId: string, userId: string, isAnonymous: boolean = false): Promise<boolean> {
+        const lookupUserId = isAnonymous ? anonymizeUserId(userId, pollId) : userId;
         const result = await db
             .delete(pollVote)
-            .where(and(eq(pollVote.pollId, pollId), eq(pollVote.userId, userId)));
+            .where(and(eq(pollVote.pollId, pollId), eq(pollVote.userId, lookupUserId)));
         return (result.rowCount ?? 0) > 0;
     }
 
@@ -302,12 +343,31 @@ export class PollService {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     async closePoll(pollId: string): Promise<Poll | undefined> {
+        const pollData = await this.getPollById(pollId);
+        if (!pollData) return undefined;
+
         const [updated] = await db
             .update(poll)
             .set({ closed: true, closedAt: new Date(), updatedAt: new Date() })
             .where(eq(poll.id, pollId))
             .returning();
+
+        // Trigger webhook for poll closure
+        await webhookService.triggerEvent(pollData.guildId, 'poll.closed', {
+            pollId: pollId,
+            pollQuestion: pollData.question,
+            totalVotes: await this.getTotalVoteCount(pollId),
+        });
+
         return updated;
+    }
+
+    private async getTotalVoteCount(pollId: string): Promise<number> {
+        const result = await db
+            .select({ count: sql<number>`count(*)`.mapWith(Number) })
+            .from(pollVote)
+            .where(eq(pollVote.pollId, pollId));
+        return result[0]?.count ?? 0;
     }
 
     async addCustomOption(pollId: string, text: string, emoji?: string): Promise<PollOption | undefined> {
@@ -321,7 +381,7 @@ export class PollService {
 
         const optionData: NewPollOption = {
             pollId,
-            optionIndex: existingOptions.length,
+            order: existingOptions.length,
             text,
             emoji,
         };

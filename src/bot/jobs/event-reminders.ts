@@ -35,7 +35,13 @@ export async function execute(client: Client) {
                     .addFields(
                         { name: 'Event', value: evt.title, inline: false },
                         { name: 'Starts', value: formatDiscordTimestamp(evt.startTime, 'R'), inline: false },
-                        { name: 'Location', value: evt.location || `<#${evt.channelId}>`, inline: false }
+                        {
+                            name: 'Location',
+                            value: evt.locationChannelId
+                                ? `<#${evt.locationChannelId}>${evt.location ? `\n${evt.location}` : ''}`
+                                : (evt.location || `<#${evt.channelId}>`),
+                            inline: false,
+                        }
                     );
 
                 if (evt.description) {

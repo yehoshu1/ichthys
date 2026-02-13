@@ -19,6 +19,14 @@ export interface CalendarEvent {
 }
 
 export class CalendarService {
+    private getCalendarSecret(): string {
+        const secret = process.env.CALENDAR_SECRET;
+        if (!secret || secret.trim().length < 16) {
+            throw new Error('CALENDAR_SECRET is required and must be at least 16 characters');
+        }
+        return secret;
+    }
+
     private generateUID(eventId: string, guildId: string): string {
         const hash = createHash('md5')
             .update(`${guildId}-${eventId}@ixoye-bot`)
@@ -167,7 +175,7 @@ export class CalendarService {
     // Generate a unique feed URL for a user
     generateFeedUrl(userId: string, baseUrl: string): string {
         const token = createHash('sha256')
-            .update(`${userId}-${process.env.CALENDAR_SECRET || 'default-secret'}`)
+            .update(`${userId}-${this.getCalendarSecret()}`)
             .digest('hex')
             .substring(0, 32);
         
@@ -175,12 +183,13 @@ export class CalendarService {
     }
 
     validateFeedToken(userId: string, token: string): boolean {
+        const normalizedToken = token.endsWith('.ics') ? token.slice(0, -4) : token;
         const expected = createHash('sha256')
-            .update(`${userId}-${process.env.CALENDAR_SECRET || 'default-secret'}`)
+            .update(`${userId}-${this.getCalendarSecret()}`)
             .digest('hex')
             .substring(0, 32);
         
-        return token === expected;
+        return normalizedToken === expected;
     }
 }
 

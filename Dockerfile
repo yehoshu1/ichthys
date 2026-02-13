@@ -8,8 +8,8 @@ RUN npm install -g npm@11.9.0
 # Dev stage (for watch mode)
 FROM base AS dev
 WORKDIR /app
-# Install build tools
-RUN apt-get update -y && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+# Install build tools and canvas dependencies
+RUN apt-get update -y && apt-get install -y python3 make g++ pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package.json package-lock.json ./
@@ -28,8 +28,8 @@ CMD ["sh", "/app/scripts/dev-start.sh"]
 FROM base AS builder
 WORKDIR /app
 
-# Install build dependencies for native modules
-RUN apt-get update -y && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+# Install build dependencies for native modules (including canvas)
+RUN apt-get update -y && apt-get install -y python3 make g++ pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package.json package-lock.json ./
