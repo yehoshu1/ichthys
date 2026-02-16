@@ -4,20 +4,36 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 
 ## 🚀 Features
 
+### Modular Architecture
+ΙΧΘΥΣ features a **flexible module system** that allows server administrators to enable/disable features per-guild. Each module is self-contained with:
+- **Runtime Command Guards**: Commands are automatically protected when their module is disabled
+- **Resource Authorization**: Cross-module access control and ownership validation
+- **Policy-Based Execution**: Centralized permission and authorization checks
+- **Module Lifecycle Management**: Full enable/disable/configure workflow through dashboard or commands
+
 ### Core Modules
-- **📊 Analytics Dashboard**: Visualize server growth, member retention, module usage, and more with interactive charts.
-- **👋 Welcome System**: Customizable welcome messages (text & embed) with role-based triggers and placeholder support.
+- **📊 Analytics**: Visualize server growth, member retention, module usage, message activity heatmaps, and more with interactive charts.
+- **👋 Welcome System**: Customizable welcome messages (text & embed) with role-based triggers, placeholder support, and image generation.
 - **🛡️ Verification**: Automated verification tracking, grace periods, and auto-kick for unverified members to keep your server safe.
 - **🚀 Boost Management**: Track server boosts, reward boosters with roles, and send custom thank-you messages.
 - **⭐ Leveling System**: XP tracking for text and voice, customizable level-up messages, leaderboards, and role rewards.
 - **🤖 Role Actions**: Automate actions (DM, Kick, Log) when members gain or lose specific roles.
+- **🎉 Events**: Create and manage server events with RSVP tracking, reminders, templates, and optional Discord Event mirroring.
+- **📊 Polls**: Interactive polls with multiple choice, ranked choice, and approval voting, plus templates and scheduled posting.
+- **🎂 Birthdays**: Track member birthdays with automated announcements and optional role assignments.
+- **📝 Message Aliases**: Auto-responder system with trigger words and custom responses.
+- **🪝 Webhooks**: Managed webhook system for event notifications and channel integrations.
+- **🔔 Notifications**: In-dashboard notification system with preferences and delivery tracking.
+- **🛠️ Moderation**: Comprehensive mod tools including warns, mutes, timeouts, kicks, bans, and audit logging.
 
 ### Tech Stack
-- **Bot**: [Discord.js](https://discord.js.org/) v14, TypeScript, Node.js
-- **Dashboard**: [Next.js](https://nextjs.org/) 16 (App Router), [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/)
+- **Bot**: [Discord.js](https://discord.js.org/) v14, TypeScript, [Bun](https://bun.sh/) 1.0+
+- **Dashboard**: [Next.js](https://nextjs.org/) 16 (App Router), [React](https://react.dev/) 19, [Tailwind CSS](https://tailwindcss.com/) 4
 - **Database**: [PostgreSQL 17](https://www.postgresql.org/) with [Drizzle ORM](https://orm.drizzle.team/)
+- **Authentication**: [NextAuth.js](https://next-auth.js.org/) v4 with Discord OAuth2
 - **UI Components**: [shadcn/ui](https://ui.shadcn.com/), [Lucide Icons](https://lucide.dev/)
 - **Charts**: [Recharts](https://recharts.org/)
+- **Process Management**: [PM2](https://pm2.keymetrics.io/) for production deployment
 
 ### Search Architecture
 - Dashboard global search is local/in-process and built from existing settings/doc sources.
@@ -28,8 +44,10 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 
 - **[Setup Guide](docs/SETUP.md)**: How to install, configure, and run the bot locally or in production.
 - **[Dashboard Guide](docs/DASHBOARD.md)**: A walkthrough of the web dashboard features and configuration.
-- **[Commands Reference](docs/COMMANDS.md)**: complete npm and slash command catalog with options and examples.
-- **[Module Docs](docs/MODULES.md)**: deep-dive pages for each module and subsystem.
+- **[Commands Reference](docs/COMMANDS.md)**: Complete npm and slash command catalog with options and examples.
+- **[Module Docs](docs/MODULES.md)**: Deep-dive pages for each module and subsystem.
+- **[Module Lifecycle](docs/modules/MODULE_LIFECYCLE.md)**: How to enable, disable, and manage modules per-guild.
+- **[Agent Guide](AGENTS.md)**: Essential information for AI coding agents working on this project.
 
 ## 🛠️ Quick Start
 
@@ -41,7 +59,7 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 
 2.  **Install dependencies**
     ```bash
-    npm ci
+    bun install
     ```
 
 3.  **Setup Environment**
@@ -52,17 +70,22 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 
 4.  **Apply Database Migrations**
     ```bash
-    npm run db:migrate
+    bun run db:migrate
     ```
 
-5.  **Run Development**
+5.  **Deploy Commands to Discord**
+    ```bash
+    bun run deploy
+    ```
+
+6.  **Run Development**
     ```bash
     # Run both bot and dashboard
-    npm run dev:all
+    bun run dev:all
 
     # Or run separately:
-    # npm run dev            # Bot only
-    # npm run dashboard:dev  # Dashboard only (http://localhost:4000)
+    # bun run dev            # Bot only
+    # bun run dashboard:dev  # Dashboard only (http://localhost:3000)
     ```
 
 ## 🐳 Docker
@@ -83,13 +106,16 @@ The project includes automatic backup functionality:
 
 ```bash
 # Manual backup
-npm run db:backup
+bun run db:backup
 
 # List backups
-npm run db:backup:list
+bun run db:backup:list
 
 # Restore from backup
-npm run db:restore
+bun run db:restore
+
+# Safe deployment with automatic backup
+bun run deploy:safe
 ```
 
 When running in Docker, backups are handled by the `ixoye-pg-backup` sidecar using `BACKUP_INTERVAL_SECONDS` and `BACKUP_RETENTION_COUNT`.
