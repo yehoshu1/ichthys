@@ -64,7 +64,7 @@ import { ChannelSelect } from "../../../../components/DiscordSelectors";
 import { toast } from "sonner";
 import { Badge } from "../../../../components/ui/badge";
 import { Textarea } from "../../../../components/ui/textarea";
-import { format, addDays, setHours, setMinutes } from "date-fns";
+import { format, addDays, addMinutes, setHours, setMinutes, startOfDay } from "date-fns";
 import { LabelWithTooltip, HelperText } from "../../../../components/HelpTooltip";
 
 import { DateTimePicker, DatePicker } from "../../../../components/ui/datetime-picker";
@@ -99,6 +99,7 @@ interface PollOption {
     text: string;
     emoji: string | null;
     order: number;
+    dateTimeValue?: string | null;
     voteCount?: number;
 }
 
@@ -122,6 +123,163 @@ const POLL_TYPES = [
     { value: "TIME", label: "Time Poll", icon: Clock, description: "Find the best time for everyone (like When2meet)" },
     { value: "ANONYMOUS", label: "Anonymous Poll", icon: EyeOff, description: "Votes are hidden from other users" },
 ];
+
+const TIME_SLOT_INTERVALS = [15, 30, 60, 90, 120];
+const WEEKDAY_OPTIONS = [
+    { value: 0, label: "Sun" },
+    { value: 1, label: "Mon" },
+    { value: 2, label: "Tue" },
+    { value: 3, label: "Wed" },
+    { value: 4, label: "Thu" },
+    { value: 5, label: "Fri" },
+    { value: 6, label: "Sat" },
+];
+const MAX_TIME_POLL_SLOTS = 400;
+
+interface DayTimeWindow {
+    enabled: boolean;
+    startHour: number;
+    startMinute: number;
+    endHour: number;
+    endMinute: number;
+}
+
+type DayTimeWindows = Record<number, DayTimeWindow>;
+
+function parseDiscordTimestampMarkup(value: string): Date | null {
+    const match = value.match(/<t:(\d+):[tTdDfFR]>/);
+    if (!match) return null;
+    const unix = Number.parseInt(match[1], 10);
+    if (!Number.isFinite(unix)) return null;
+    const parsed = new Date(unix * 1000);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseTimePollOptionDate(option: PollOption): Date | null {
+    if (option.dateTimeValue) {
+        const fromDateValue = new Date(option.dateTimeValue);
+        if (!Number.isNaN(fromDateValue.getTime())) {
+            return fromDateValue;
+        }
+    }
+
+    const fromMarkup = parseDiscordTimestampMarkup(option.text);
+    if (fromMarkup) return fromMarkup;
+
+    const fromText = new Date(option.text);
+    return Number.isNaN(fromText.getTime()) ? null : fromText;
+}
+
+function getTimePollOptionLabel(poll: Pick<Poll, "type">, option: PollOption): string {
+    if (poll.type !== "TIME") {
+        return option.text;
+    }
+
+    const parsed = parseTimePollOptionDate(option);
+    if (!parsed) {
+        return option.text;
+    }
+
+    return format(parsed, "EEE, MMM d h:mm a");
+}
+
+function parseTimeInput(value: string): { hour: number; minute: number } | null {
+    const match = value.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    const hour = Number.parseInt(match[1], 10);
+    const minute = Number.parseInt(match[2], 10);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return { hour, minute };
+}
+
+function formatTimeInput(hour: number, minute: number): string {
+    return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+}
+
+function createDefaultDayWindows(
+    startHour: number,
+    startMinute: number,
+    endHour: number,
+    endMinute: number
+): DayTimeWindows {
+    const windows: DayTimeWindows = {};
+    for (const weekday of WEEKDAY_OPTIONS) {
+        windows[weekday.value] = {
+            enabled: true,
+            startHour,
+            startMinute,
+            endHour,
+            endMinute,
+        };
+    }
+    return windows;
+}
+
+function inferDayWindowsFromSlots(slots: Date[], fallbackIntervalMinutes: number): DayTimeWindows {
+    const windows = createDefaultDayWindows(9, 0, 21, 0);
+    for (const weekday of WEEKDAY_OPTIONS) {
+        windows[weekday.value].enabled = false;
+    }
+
+    const grouped = new Map<number, Date[]>();
+    for (const slot of slots) {
+        const day = slot.getDay();
+        if (!grouped.has(day)) {
+            grouped.set(day, []);
+        }
+        grouped.get(day)?.push(slot);
+    }
+
+    for (const [day, daySlots] of grouped.entries()) {
+        if (!daySlots.length) continue;
+        daySlots.sort((a, b) => a.getTime() - b.getTime());
+        const first = daySlots[0];
+        const last = daySlots[daySlots.length - 1];
+        const inferredEnd = addMinutes(last, fallbackIntervalMinutes);
+        windows[day] = {
+            enabled: true,
+            startHour: first.getHours(),
+            startMinute: first.getMinutes(),
+            endHour: inferredEnd.getHours(),
+            endMinute: inferredEnd.getMinutes(),
+        };
+    }
+
+    return windows;
+}
+
+function inferIncludedWeekdaysFromSlots(slots: Date[]): number[] {
+    const weekdays = new Set<number>();
+    for (const slot of slots) {
+        weekdays.add(slot.getDay());
+    }
+    return [...weekdays].sort((a, b) => a - b);
+}
+
+function getEnabledDayWindows(windows: DayTimeWindows): DayTimeWindow[] {
+    return WEEKDAY_OPTIONS
+        .map((weekday) => windows[weekday.value])
+        .filter((window): window is DayTimeWindow => Boolean(window?.enabled));
+}
+
+function areEnabledDayWindowsUniform(windows: DayTimeWindows): boolean {
+    const enabled = getEnabledDayWindows(windows);
+    if (enabled.length <= 1) return true;
+    const [first] = enabled;
+    return enabled.every((window) =>
+        window.startHour === first.startHour &&
+        window.startMinute === first.startMinute &&
+        window.endHour === first.endHour &&
+        window.endMinute === first.endMinute
+    );
+}
+
+function formatTwelveHourTime(hour: number, minute: number): string {
+    const period = hour < 12 ? "am" : "pm";
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minute.toString().padStart(2, "0")}${period}`;
+}
 
 const POLL_TABS = ["active", "ended", "templates"] as const;
 type PollTab = (typeof POLL_TABS)[number];
@@ -656,18 +814,42 @@ function TimePollForm({
     onSuccess: () => void;
 }) {
     const [saving, setSaving] = useState(false);
+    const parsedDatesFromPoll = (poll?.options || [])
+        .map((option) => parseTimePollOptionDate(option))
+        .filter((value): value is Date => value instanceof Date)
+        .sort((a, b) => a.getTime() - b.getTime());
+    const firstPollSlot = parsedDatesFromPoll[0] ?? null;
+    const lastPollSlot = parsedDatesFromPoll[parsedDatesFromPoll.length - 1] ?? null;
+    const inferredEndForRange = lastPollSlot ? addDays(startOfDay(lastPollSlot), 1) : null;
+    const inferredWeekdays = parsedDatesFromPoll.length
+        ? inferIncludedWeekdaysFromSlots(parsedDatesFromPoll)
+        : [0, 1, 2, 3, 4, 5, 6];
+    const inferredDayWindows = parsedDatesFromPoll.length
+        ? inferDayWindowsFromSlots(parsedDatesFromPoll, 60)
+        : createDefaultDayWindows(9, 0, 21, 0);
+    const inferredUseCustomDailyWindows =
+        parsedDatesFromPoll.length > 0 && !areEnabledDayWindowsUniform(inferredDayWindows);
+
     const [formData, setFormData] = useState({
         question: poll?.question || "When works best for everyone?",
         description: poll?.description || "Select all times that work for you",
         channelId: poll?.channelId || "",
         durationMinutes: 60,
-        startDate: new Date(),
-        endDate: addDays(new Date(), 7),
-        startHour: 9,
-        endHour: 21,
+        startDate: firstPollSlot ? startOfDay(firstPollSlot) : new Date(),
+        endDate: inferredEndForRange || addDays(new Date(), 7),
+        startHour: firstPollSlot ? firstPollSlot.getHours() : 9,
+        startMinute: firstPollSlot ? firstPollSlot.getMinutes() : 0,
+        endHour: lastPollSlot ? addMinutes(lastPollSlot, 60).getHours() : 21,
+        endMinute: lastPollSlot ? addMinutes(lastPollSlot, 60).getMinutes() : 0,
+        slotIntervalMinutes: 60,
+        includeWeekdays: inferredWeekdays,
+        useCustomDailyWindows: inferredUseCustomDailyWindows,
+        dayWindows: inferredDayWindows as DayTimeWindows,
         timeSlots: [] as string[],
         allowMultipleVotes: true,
+        maxVotesPerUser: null as number | null,
         isAnonymous: false,
+        endTime: poll?.endTime ? new Date(poll.endTime) : null,
         mentionOnCreate: poll?.mentionOnCreate ?? false,
         mentionRoleIds: poll?.mentionRoleIds || [] as string[],
         allowedRoleIds: poll?.allowedRoleIds || [] as string[],
@@ -676,13 +858,46 @@ function TimePollForm({
     // Generate time slots based on settings
     function generateTimeSlots(): string[] {
         const slots: string[] = [];
-        const start = new Date(formData.startDate);
-        const end = new Date(formData.endDate);
-        
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            for (let hour = formData.startHour; hour < formData.endHour; hour++) {
-                const slotTime = setMinutes(setHours(new Date(d), hour), 0);
-                slots.push(slotTime.toISOString());
+        const start = startOfDay(formData.startDate);
+        const end = startOfDay(formData.endDate);
+
+        for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
+            const dayOfWeek = d.getDay();
+            let window: DayTimeWindow | null = null;
+
+            if (formData.useCustomDailyWindows) {
+                const configured = formData.dayWindows[dayOfWeek];
+                if (!configured?.enabled) {
+                    continue;
+                }
+                window = configured;
+            } else {
+                if (!formData.includeWeekdays.includes(dayOfWeek)) {
+                    continue;
+                }
+                window = {
+                    enabled: true,
+                    startHour: formData.startHour,
+                    startMinute: formData.startMinute,
+                    endHour: formData.endHour,
+                    endMinute: formData.endMinute,
+                };
+            }
+
+            const startMinutes = window.startHour * 60 + window.startMinute;
+            const endMinutes = window.endHour * 60 + window.endMinute;
+            if (endMinutes <= startMinutes) {
+                continue;
+            }
+
+            let cursor = setMinutes(setHours(new Date(d), window.startHour), window.startMinute);
+            const limit = setMinutes(setHours(new Date(d), window.endHour), window.endMinute);
+            while (cursor < limit) {
+                slots.push(cursor.toISOString());
+                if (slots.length >= MAX_TIME_POLL_SLOTS) {
+                    return slots;
+                }
+                cursor = addMinutes(cursor, formData.slotIntervalMinutes);
             }
         }
         return slots;
@@ -702,10 +917,49 @@ function TimePollForm({
             return;
         }
 
+        if (formData.useCustomDailyWindows) {
+            const enabledWindows = Object.values(formData.dayWindows).filter((window) => window.enabled);
+            if (enabledWindows.length === 0) {
+                toast.error("Enable at least one weekday window");
+                return;
+            }
+            const invalidWindow = enabledWindows.find((window) => {
+                const startMinutes = window.startHour * 60 + window.startMinute;
+                const endMinutes = window.endHour * 60 + window.endMinute;
+                return endMinutes <= startMinutes;
+            });
+            if (invalidWindow) {
+                toast.error("Each enabled weekday must have an end time after start time");
+                return;
+            }
+        } else {
+            if (formData.includeWeekdays.length === 0) {
+                toast.error("Select at least one day of the week");
+                return;
+            }
+
+            const startMinutes = formData.startHour * 60 + formData.startMinute;
+            const endMinutes = formData.endHour * 60 + formData.endMinute;
+            if (endMinutes <= startMinutes) {
+                toast.error("Latest time must be after earliest time");
+                return;
+            }
+        }
+
         setSaving(true);
 
         try {
             const timeSlots = generateTimeSlots();
+            if (timeSlots.length === 0) {
+                toast.error("No time slots generated. Adjust date/time settings.");
+                setSaving(false);
+                return;
+            }
+            if (timeSlots.length >= MAX_TIME_POLL_SLOTS) {
+                toast.error(`Too many slots generated (max ${MAX_TIME_POLL_SLOTS}). Narrow the range or increase interval.`);
+                setSaving(false);
+                return;
+            }
             
             const url = poll
                 ? `/api/guilds/${guildId}/polls/${poll.id}`
@@ -718,10 +972,12 @@ function TimePollForm({
                 channelId: formData.channelId,
                 type: "TIME",
                 allowMultipleVotes: formData.allowMultipleVotes,
+                maxVotesPerUser: formData.allowMultipleVotes ? formData.maxVotesPerUser || undefined : undefined,
                 isAnonymous: formData.isAnonymous,
                 mentionOnCreate: formData.mentionOnCreate,
                 mentionRoleIds: formData.mentionRoleIds.length > 0 ? formData.mentionRoleIds : undefined,
                 allowedRoleIds: formData.allowedRoleIds.length > 0 ? formData.allowedRoleIds : undefined,
+                endTime: formData.endTime?.toISOString() || undefined,
                 timeSlots,
                 durationMinutes: formData.durationMinutes,
             };
@@ -749,6 +1005,12 @@ function TimePollForm({
     }
 
     const previewSlots = generateTimeSlots();
+    const enabledCustomWindows = WEEKDAY_OPTIONS
+        .filter((weekday) => formData.dayWindows[weekday.value]?.enabled)
+        .map((weekday) => ({
+            label: weekday.label,
+            window: formData.dayWindows[weekday.value],
+        }));
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -860,54 +1122,263 @@ function TimePollForm({
                 </div>
             </div>
 
-            {/* Time Range */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label>Earliest Time</Label>
-                    <Select
-                        value={formData.startHour.toString()}
-                        onValueChange={(value) =>
-                            setFormData({
-                                ...formData,
-                                startHour: parseInt(value),
-                            })
-                        }
-                    >
-                        <SelectTrigger>
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {Array.from({ length: 24 }, (_, i) => (
-                                <SelectItem key={i} value={i.toString()}>
-                                    {i === 0 ? "12:00 AM" : i < 12 ? `${i}:00 AM` : i === 12 ? "12:00 PM" : `${i - 12}:00 PM`}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+            <div className="flex items-center justify-between rounded-md border p-3">
+                <div className="space-y-0.5">
+                    <Label>Different Times Per Day</Label>
+                    <HelperText>
+                        Configure separate time windows for each weekday.
+                    </HelperText>
                 </div>
+                <Switch
+                    checked={formData.useCustomDailyWindows}
+                    onCheckedChange={(checked) =>
+                        setFormData((prev) => ({
+                            ...prev,
+                            useCustomDailyWindows: checked,
+                            dayWindows: checked
+                                ? prev.dayWindows
+                                : createDefaultDayWindows(
+                                    prev.startHour,
+                                    prev.startMinute,
+                                    prev.endHour,
+                                    prev.endMinute
+                                ),
+                        }))
+                    }
+                />
+            </div>
+
+            {!formData.useCustomDailyWindows ? (
+                <>
+                    {/* Time Range */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Earliest Time</Label>
+                            <Select
+                                value={formData.startHour.toString()}
+                                onValueChange={(value) =>
+                                    setFormData({
+                                        ...formData,
+                                        startHour: parseInt(value, 10),
+                                    })
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {Array.from({ length: 24 }, (_, i) => (
+                                        <SelectItem key={i} value={i.toString()}>
+                                            {i === 0 ? "12:00 AM" : i < 12 ? `${i}:00 AM` : i === 12 ? "12:00 PM" : `${i - 12}:00 PM`}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Latest Time</Label>
+                            <Select
+                                value={formData.endHour.toString()}
+                                onValueChange={(value) =>
+                                    setFormData({
+                                        ...formData,
+                                        endHour: parseInt(value, 10),
+                                    })
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {Array.from({ length: 24 }, (_, i) => (
+                                        <SelectItem key={i} value={i.toString()}>
+                                            {i === 0 ? "12:00 AM" : i < 12 ? `${i}:00 AM` : i === 12 ? "12:00 PM" : `${i - 12}:00 PM`}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Start Minute</Label>
+                            <Select
+                                value={formData.startMinute.toString()}
+                                onValueChange={(value) =>
+                                    setFormData({
+                                        ...formData,
+                                        startMinute: parseInt(value, 10),
+                                    })
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="0">:00</SelectItem>
+                                    <SelectItem value="15">:15</SelectItem>
+                                    <SelectItem value="30">:30</SelectItem>
+                                    <SelectItem value="45">:45</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>End Minute</Label>
+                            <Select
+                                value={formData.endMinute.toString()}
+                                onValueChange={(value) =>
+                                    setFormData({
+                                        ...formData,
+                                        endMinute: parseInt(value, 10),
+                                    })
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="0">:00</SelectItem>
+                                    <SelectItem value="15">:15</SelectItem>
+                                    <SelectItem value="30">:30</SelectItem>
+                                    <SelectItem value="45">:45</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Days of Week</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {WEEKDAY_OPTIONS.map((weekday) => {
+                                const selected = formData.includeWeekdays.includes(weekday.value);
+                                return (
+                                    <Button
+                                        key={weekday.value}
+                                        type="button"
+                                        size="sm"
+                                        variant={selected ? "default" : "outline"}
+                                        onClick={() => {
+                                            const current = new Set(formData.includeWeekdays);
+                                            if (current.has(weekday.value)) {
+                                                current.delete(weekday.value);
+                                            } else {
+                                                current.add(weekday.value);
+                                            }
+                                            setFormData({
+                                                ...formData,
+                                                includeWeekdays: [...current].sort((a, b) => a - b),
+                                            });
+                                        }}
+                                    >
+                                        {weekday.label}
+                                    </Button>
+                                );
+                            })}
+                        </div>
+                        <HelperText>
+                            Pick which days should appear in the poll.
+                        </HelperText>
+                    </div>
+                </>
+            ) : (
                 <div className="space-y-2">
-                    <Label>Latest Time</Label>
-                    <Select
-                        value={formData.endHour.toString()}
-                        onValueChange={(value) =>
-                            setFormData({
-                                ...formData,
-                                endHour: parseInt(value),
-                            })
-                        }
-                    >
-                        <SelectTrigger>
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {Array.from({ length: 24 }, (_, i) => (
-                                <SelectItem key={i} value={i.toString()}>
-                                    {i === 0 ? "12:00 AM" : i < 12 ? `${i}:00 AM` : i === 12 ? "12:00 PM" : `${i - 12}:00 PM`}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <Label>Daily Time Windows</Label>
+                    <div className="space-y-2 rounded-md border p-3">
+                        {WEEKDAY_OPTIONS.map((weekday) => {
+                            const window = formData.dayWindows[weekday.value];
+                            return (
+                                <div key={weekday.value} className="grid grid-cols-[90px_1fr_1fr] items-center gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <Switch
+                                            checked={window.enabled}
+                                            onCheckedChange={(checked) =>
+                                                setFormData((prev) => ({
+                                                    ...prev,
+                                                    dayWindows: {
+                                                        ...prev.dayWindows,
+                                                        [weekday.value]: {
+                                                            ...prev.dayWindows[weekday.value],
+                                                            enabled: checked,
+                                                        },
+                                                    },
+                                                }))
+                                            }
+                                        />
+                                        <span className="text-sm font-medium">{weekday.label}</span>
+                                    </div>
+                                    <Input
+                                        type="time"
+                                        value={formatTimeInput(window.startHour, window.startMinute)}
+                                        disabled={!window.enabled}
+                                        onChange={(event) => {
+                                            const parsed = parseTimeInput(event.target.value);
+                                            if (!parsed) return;
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                dayWindows: {
+                                                    ...prev.dayWindows,
+                                                    [weekday.value]: {
+                                                        ...prev.dayWindows[weekday.value],
+                                                        startHour: parsed.hour,
+                                                        startMinute: parsed.minute,
+                                                    },
+                                                },
+                                            }));
+                                        }}
+                                    />
+                                    <Input
+                                        type="time"
+                                        value={formatTimeInput(window.endHour, window.endMinute)}
+                                        disabled={!window.enabled}
+                                        onChange={(event) => {
+                                            const parsed = parseTimeInput(event.target.value);
+                                            if (!parsed) return;
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                dayWindows: {
+                                                    ...prev.dayWindows,
+                                                    [weekday.value]: {
+                                                        ...prev.dayWindows[weekday.value],
+                                                        endHour: parsed.hour,
+                                                        endMinute: parsed.minute,
+                                                    },
+                                                },
+                                            }));
+                                        }}
+                                    />
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <HelperText>
+                        Example: Monday 21:00-22:00, Tuesday 20:00-23:00, Wednesday 17:00-19:00.
+                    </HelperText>
                 </div>
+            )}
+
+            <div className="space-y-2">
+                <Label>Slot Interval</Label>
+                <Select
+                    value={formData.slotIntervalMinutes.toString()}
+                    onValueChange={(value) =>
+                        setFormData({
+                            ...formData,
+                            slotIntervalMinutes: parseInt(value, 10),
+                        })
+                    }
+                >
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {TIME_SLOT_INTERVALS.map((interval) => (
+                            <SelectItem key={interval} value={interval.toString()}>
+                                Every {interval} min
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
 
             {/* Preview */}
@@ -921,15 +1392,63 @@ function TimePollForm({
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                     From {format(formData.startDate, "MMM d")} to{" "}
-                    {format(formData.endDate, "MMM d")}, {formData.startHour % 12 || 12}
-                    {formData.startHour < 12 ? "am" : "pm"} - {formData.endHour % 12 || 12}
-                    {formData.endHour < 12 ? "am" : "pm"}
+                    {format(formData.endDate, "MMM d")}
+                    {formData.useCustomDailyWindows
+                        ? `, custom weekday windows, every ${formData.slotIntervalMinutes} minutes`
+                        : `, ${formatTwelveHourTime(formData.startHour, formData.startMinute)} - ${formatTwelveHourTime(formData.endHour, formData.endMinute)}, every ${formData.slotIntervalMinutes} minutes`}
+                </p>
+                {formData.useCustomDailyWindows && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                        {enabledCustomWindows.length > 0
+                            ? enabledCustomWindows
+                                  .map(({ label, window }) =>
+                                      `${label} ${formatTwelveHourTime(window.startHour, window.startMinute)}-${formatTwelveHourTime(window.endHour, window.endMinute)}`
+                                  )
+                                  .join(" | ")
+                            : "No weekdays enabled"}
+                    </p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                    Discord timestamps are used in poll options so each viewer sees their own local time.
                 </p>
             </div>
 
             {/* Settings */}
             <div className="space-y-4 border-t pt-4">
                 <Label className="text-base">Settings</Label>
+
+                <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                        <Label>Allow Multiple Selections</Label>
+                        <HelperText>Let voters pick more than one time slot</HelperText>
+                    </div>
+                    <Switch
+                        checked={formData.allowMultipleVotes}
+                        onCheckedChange={(checked) =>
+                            setFormData({ ...formData, allowMultipleVotes: checked })
+                        }
+                    />
+                </div>
+
+                {formData.allowMultipleVotes && (
+                    <div className="space-y-2 pl-6">
+                        <Label>Max Votes Per User (optional)</Label>
+                        <Input
+                            type="number"
+                            min={1}
+                            max={25}
+                            value={formData.maxVotesPerUser || ""}
+                            onChange={(e) =>
+                                setFormData({
+                                    ...formData,
+                                    maxVotesPerUser: e.target.value ? parseInt(e.target.value, 10) : null,
+                                })
+                            }
+                            placeholder="Leave empty for unlimited"
+                            className="w-48"
+                        />
+                    </div>
+                )}
 
                 <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
@@ -970,6 +1489,22 @@ function TimePollForm({
                         />
                     </div>
                 )}
+            </div>
+
+            <div className="space-y-2 border-t pt-4">
+                <Label>
+                    <span className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Voting End Time (optional)
+                    </span>
+                </Label>
+                <DateTimePicker
+                    value={formData.endTime}
+                    onChange={(date) =>
+                        setFormData({ ...formData, endTime: date })
+                    }
+                    placeholder="Select end date and time"
+                />
             </div>
 
             <DialogFooter>
@@ -1239,12 +1774,12 @@ function PollCard({
                             </span>
                         </div>
 
-                        {poll.options && poll.options.length > 0 && (
+                            {poll.options && poll.options.length > 0 && (
                             <div className="flex flex-wrap gap-2 mt-3">
                                 {poll.options.slice(0, 3).map((option) => (
                                     <Badge key={option.id} variant="outline">
                                         {option.emoji && <span className="mr-1">{option.emoji}</span>}
-                                        {option.text}
+                                        {getTimePollOptionLabel(poll, option)}
                                     </Badge>
                                 ))}
                                 {poll.options.length > 3 && (
@@ -1343,7 +1878,7 @@ function PollResults({ poll }: { poll: Poll }) {
                             <div className="flex items-center justify-between text-sm">
                                 <span className="flex items-center gap-2">
                                     {result.option.emoji && <span>{result.option.emoji}</span>}
-                                    {result.option.text}
+                                    {getTimePollOptionLabel(poll, result.option)}
                                     {isWinner && <Badge className="ml-2">Winner</Badge>}
                                 </span>
                                 <span className="text-muted-foreground">

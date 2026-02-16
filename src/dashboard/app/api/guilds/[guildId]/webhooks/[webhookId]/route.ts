@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, webhookEndpoint } from '@/lib/db';
 import { eq, and } from 'drizzle-orm';
 import logger from '@/lib/logger';
+import { z } from 'zod';
 import { authorizeGuildApiRequest } from '@/lib/guild-api-auth';
+import { parseJsonBody } from '@/lib/validation';
 import {
     validateWebhookUrl,
     encryptWebhookSecret,
@@ -11,6 +13,29 @@ import {
 
 const MAX_WEBHOOK_NAME_LENGTH = 100;
 const MAX_WEBHOOK_URL_LENGTH = 500;
+const MAX_WEBHOOK_SECRET_LENGTH = 200;
+
+const webhookEventSchema = z.enum([
+    'event.created',
+    'event.updated',
+    'event.deleted',
+    'event.started',
+    'rsvp.yes',
+    'rsvp.no',
+    'rsvp.maybe',
+    'rsvp.waitlist',
+    'poll.created',
+    'poll.voted',
+    'poll.closed',
+]);
+
+const updateWebhookSchema = z.object({
+    name: z.string().trim().min(1).max(MAX_WEBHOOK_NAME_LENGTH).optional(),
+    url: z.string().trim().min(1).max(MAX_WEBHOOK_URL_LENGTH).optional(),
+    eventTypes: z.array(webhookEventSchema).min(1).max(30).optional(),
+    enabled: z.boolean().optional(),
+    secret: z.string().max(MAX_WEBHOOK_SECRET_LENGTH).optional(),
+}).strict();
 
 function toPublicWebhook(row: typeof webhookEndpoint.$inferSelect) {
     return {
@@ -30,7 +55,9 @@ export async function PATCH(
         if ('response' in auth) {
             return auth.response;
         }
-        const body = await request.json();
+        const parsed = await parseJsonBody(request, updateWebhookSchema);
+        if (!parsed.success) return parsed.response;
+        const body = parsed.data;
 
         // Check if webhook exists
         const [existing] = await db
@@ -45,26 +72,8 @@ export async function PATCH(
             return NextResponse.json({ error: 'Webhook not found' }, { status: 404 });
         }
 
-        // Validate name if provided
-        if (body.name !== undefined) {
-            if (body.name.length > MAX_WEBHOOK_NAME_LENGTH) {
-                return NextResponse.json(
-                    { error: `Name cannot exceed ${MAX_WEBHOOK_NAME_LENGTH} characters` },
-                    { status: 400 }
-                );
-            }
-        }
-
-        // Validate URL if provided
         if (body.url !== undefined) {
-            if (body.url.length > MAX_WEBHOOK_URL_LENGTH) {
-                return NextResponse.json(
-                    { error: `URL cannot exceed ${MAX_WEBHOOK_URL_LENGTH} characters` },
-                    { status: 400 }
-                );
-            }
-
-            const validation = await validateWebhookUrl(body.url as string);
+            const validation = await validateWebhookUrl(body.url);
             if (!validation.ok) {
                 return NextResponse.json({ error: validation.error }, { status: 400 });
             }

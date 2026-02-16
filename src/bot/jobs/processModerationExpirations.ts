@@ -5,6 +5,7 @@ import logger from "../utils/logger";
 import { db } from "../../shared/database/client";
 import { actionLog, moderationCase, moderationSettings } from "../../shared/database/schema";
 import { emitGuildNotificationSafe } from "../services/notificationEmitter";
+import { isModuleEnabled } from "@shared/modules/state";
 
 const MAX_CASES_PER_RUN = 100;
 const EXPIRABLE_ACTIONS = ["MUTE", "TIMEOUT", "BAN"] as const;
@@ -150,7 +151,19 @@ export async function processModerationExpirationsOnce(): Promise<void> {
 
     logger.info(`Processing ${expiringCases.length} expired moderation case(s).`);
 
+    const moduleEnabledCache = new Map<string, boolean>();
+
     for (const modCase of expiringCases) {
+        let moderationEnabled = moduleEnabledCache.get(modCase.guildId);
+        if (moderationEnabled === undefined) {
+            moderationEnabled = await isModuleEnabled(modCase.guildId, 'moderation');
+            moduleEnabledCache.set(modCase.guildId, moderationEnabled);
+        }
+
+        if (!moderationEnabled) {
+            continue;
+        }
+
         await processExpiredCase(modCase);
     }
 }

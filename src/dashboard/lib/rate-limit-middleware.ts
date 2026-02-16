@@ -62,7 +62,7 @@ export async function applyRateLimit(
     const identifier = await getRateLimitIdentifier(req);
     const config = getRateLimitConfig(endpointType);
 
-    const result = checkRateLimit(identifier, config);
+    const result = await checkRateLimit(identifier, config);
 
     if (!result.allowed) {
         logger.warn('Rate limit exceeded', {

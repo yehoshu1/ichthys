@@ -31,7 +31,17 @@ Run scripts with `npm run <script>`.
 | `db:migrate:delta` | Delta sync SQLite changes to PostgreSQL. | Near-zero cutover sync |
 | `db:migrate:verify` | Verify SQLite/PostgreSQL parity checksums and counts. | Cutover validation |
 | `deploy:safe` | Safe deployment with backup workflow. | Production deploy safety |
-| `guard:no-meili` | Fails if Meilisearch env keys/imports/dependencies are introduced. | Architecture guardrail |
+| `deploy:check` | Check slash command registration. | Verify command sync |
+| `guard:commands` | Validate command catalog completeness. | Pre-deployment check |
+| `guard:modules` | Check module-command ownership. | Development QA |
+| `guard:module-ownership` | Validate module ownership consistency. | Development QA |
+| `module:remove:dry-run` | Preview module removal impact. | Safe refactoring |
+| `test` | Run Vitest test suite. | Testing |
+| `test:watch` | Run tests in watch mode. | Development |
+| `test:coverage` | Run tests with coverage report. | CI/QA |
+| `typecheck` | Check TypeScript types without compiling. | Pre-commit validation |
+| `lint` | Run Next.js linter. | Code quality |
+| `validate` | Run all guards, typecheck, and tests. | Pre-push validation |
 
 ## Slash Command Overview
 
@@ -683,6 +693,122 @@ Current slash command files: `31`
 - Example: `/boost claim`
 - Notes:
   - Bot must have `Manage Roles`.
+
+---
+
+## Events & Poll Utility Commands
+
+### `/create`
+
+- Description: Create a new event from Discord.
+- Permission: Public (subject to server policy/runtime checks).
+- Options:
+  - `title` (string, required)
+  - `datetime` (string, required)
+  - `description` (string, optional)
+  - `duration` (string, optional)
+  - `channel` (channel, optional)
+- Example: `/create title:Movie Night datetime:"tomorrow 8pm" duration:2h`
+
+### `/list`
+
+- Description: List upcoming events or active polls.
+- Permission: Everyone.
+- Options:
+  - `type` (string, required): `events`, `polls`
+  - `channel` (channel, optional)
+  - `limit` (integer, optional, max 25)
+- Example: `/list type:events`
+- Example: `/list type:polls channel:#general`
+
+### `/delete`
+
+- Description: Delete an event or poll by ID.
+- Permission: Resource owner or elevated staff permissions.
+- Options:
+  - `type` (string, required): `event`, `poll`
+  - `id` (string, required)
+  - `reason` (string, optional)
+- Example: `/delete type:event id:... reason:Cancelled`
+
+### `/remind`
+
+- Description: Set/update your personal reminder for an event.
+- Permission: Everyone.
+- Options:
+  - `event_id` (string, required)
+  - `when` (string, required)
+- Example: `/remind event_id:... when:"30 minutes before"`
+
+### `/settings`
+
+- Description: Configure default event/poll settings for the server.
+- Permission: `Manage Server`.
+- Subcommands:
+  - `view`, `channel`, `timezone`, `mentions`, `permissions`, `ai`, `discord`
+- Example: `/settings view`
+- Example: `/settings timezone timezone:America/New_York`
+
+### `/poll`
+
+- Description: Create a standard, time, or anonymous poll.
+- Permission: Everyone (subject to server policy).
+- Options:
+  - `question` (string, required)
+  - `options` (string, required)
+  - `type` (string, optional): `STANDARD`, `TIME`, `ANONYMOUS`
+  - `end_time` (string, optional)
+- Example: `/poll question:"Best time?" options:"Mon 9pm, Tue 8pm" type:TIME`
+
+### `/timestamp`
+
+- Description: Generate Discord timestamp markup for a date/time.
+- Permission: Everyone.
+- Options:
+  - `datetime` (string, required)
+  - `timezone` (string, optional)
+- Example: `/timestamp datetime:"tomorrow 6pm" timezone:America/New_York`
+
+### `/module`
+
+- Description: Manage per-guild module enable/disable states.
+- Permission: `Manage Server`.
+- Subcommands:
+  - `list`, `enable`, `disable`
+- Example: `/module list`
+- Example: `/module disable module:polls`
+
+### `/moveall`
+
+- Description: Move all users from one voice channel to another.
+- Permission: `Move Members`.
+- Options:
+  - `from` (voice/stage channel, required)
+  - `to` (voice/stage channel, required)
+- Example: `/moveall from:#Lobby to:#General`
+
+### `/ping`
+
+- Description: Show API and gateway latency.
+- Permission: Everyone.
+- Options: None.
+- Example: `/ping`
+
+### `/profile`
+
+- Description: Alias for `/rank` with detailed profile formatting.
+- Permission: Everyone.
+- Options:
+  - `user` (user, optional)
+- Example: `/profile`
+
+### `/top`
+
+- Description: Alias-style leaderboard command with period filtering.
+- Permission: Everyone.
+- Options:
+  - `period` (string, optional): `all`, `day`, `week`, `month`
+- Example: `/top period:week`
 
 ---
 

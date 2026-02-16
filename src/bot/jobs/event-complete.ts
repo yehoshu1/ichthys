@@ -1,6 +1,7 @@
 import { Client } from 'discord.js';
 import { eventService } from '../services/event-service';
 import logger from '../utils/logger';
+import { isModuleEnabled } from '@shared/modules/state';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // EVENT COMPLETION JOB
@@ -31,6 +32,11 @@ export async function execute(_client: Client) {
         const activeEvents = await eventService.getActiveEvents();
 
         for (const evt of activeEvents) {
+            const eventsEnabled = await isModuleEnabled(evt.guildId, 'events');
+            if (!eventsEnabled) {
+                continue;
+            }
+
             const effectiveEndTime = getEffectiveEndTime(evt);
             if (effectiveEndTime <= now) {
                 await eventService.markEventAsCompleted(evt.id);

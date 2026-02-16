@@ -1,9 +1,23 @@
-import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ChatInputCommandInteraction, GuildMember } from 'discord.js';
 import { Command } from '../types/Command';
 import { db } from '../../shared/database/client';
 import { userBoost, guildConfig } from '../../shared/database/schema';
 import { eq, and } from 'drizzle-orm';
 import logger from '../utils/logger';
+
+async function resolveInteractionMember(
+    interaction: ChatInputCommandInteraction
+): Promise<GuildMember | null> {
+    if (!interaction.guild) {
+        return null;
+    }
+
+    if (interaction.member instanceof GuildMember) {
+        return interaction.member;
+    }
+
+    return interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+}
 
 export const boost: Command = {
     data: new SlashCommandBuilder()
@@ -43,22 +57,16 @@ export const boost: Command = {
         if (subcommand === 'setup') {
             await interaction.deferReply({ ephemeral: true });
 
-            // Check bot permissions
-            const botMember = interaction.guild?.members.me;
-            if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
-                await interaction.editReply('❌ I need **Manage Roles** permission to create and manage boost reward roles.');
+            if (!interaction.guildId || !interaction.guild) {
+                await interaction.editReply('This command can only be used in a server.');
                 return;
             }
 
-            const guildId = interaction.guildId!;
+            const guildId = interaction.guildId;
+            const guild = interaction.guild;
             const roleName = interaction.options.getString('role_name', true);
             const primaryColor = interaction.options.getString('primary_color', true);
             const secondaryColor = interaction.options.getString('secondary_color');
-            const hasPerms = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
-            if (!hasPerms) {
-                await interaction.editReply('❌ You need Manage Server permissions to configure boost rewards.');
-                return;
-            }
 
             const parseHex = (value: string) => {
                 const cleaned = value.replace('#', '');
@@ -73,7 +81,6 @@ export const boost: Command = {
             }
 
             try {
-                const guild = interaction.guild!;
                 const existingConfig = await db.query.guildConfig.findFirst({
                     where: eq(guildConfig.guildId, guildId)
                 });
@@ -130,18 +137,21 @@ export const boost: Command = {
         if (subcommand === 'claim') {
             await interaction.deferReply({ ephemeral: true });
 
-            // Check bot permissions
-            const botMember = interaction.guild?.members.me;
-            if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
-                await interaction.editReply('❌ I need **Manage Roles** permission to assign boost reward roles.');
+            if (!interaction.guildId || !interaction.guild) {
+                await interaction.editReply('This command can only be used in a server.');
                 return;
             }
 
             const guildId = interaction.guildId!;
-            const member = interaction.member as any;
             const guild = interaction.guild!;
-            const premiumRole = guild.roles.cache.find(role => role.tags?.premiumSubscriberRole);
-            const hasBoost = member?.premiumSince || (premiumRole && member.roles.cache.has(premiumRole.id));
+            const member = await resolveInteractionMember(interaction);
+            if (!member) {
+                await interaction.editReply('Unable to verify your server membership. Please try again.');
+                return;
+            }
+            const premiumRoleId = guild.roles.premiumSubscriberRole?.id;
+            const hasBoost = member.premiumSinceTimestamp !== null
+                || (premiumRoleId ? member.roles.cache.has(premiumRoleId) : false);
 
             if (!hasBoost) {
                 await interaction.editReply('❌ You must be an active Server Booster to claim rewards.');
@@ -190,14 +200,24 @@ export const boost: Command = {
         }
 
         if (subcommand === 'status') {
+            if (!interaction.guildId || !interaction.guild) {
+                await interaction.reply({ content: 'This command can only be used in a server.', ephemeral: true });
+                return;
+            }
+
             const guildId = interaction.guildId!;
             const userId = interaction.user.id;
-            const member = interaction.member as any;
 
             // Defer reply for database operations
             await interaction.deferReply({ ephemeral: true });
 
             try {
+                const member = await resolveInteractionMember(interaction);
+                if (!member) {
+                    await interaction.editReply({ content: 'Unable to verify your server membership. Please try again.' });
+                    return;
+                }
+
                 const config = await db.query.guildConfig.findFirst({
                     where: eq(guildConfig.guildId, guildId)
                 });
@@ -209,7 +229,7 @@ export const boost: Command = {
                     )
                 });
 
-                const isPremium = member.premiumSince !== null;
+                const isPremium = member.premiumSinceTimestamp !== null;
                 const premiumSince = member.premiumSince;
 
                 const embed = new EmbedBuilder()
@@ -270,9 +290,18 @@ export const boost: Command = {
                 await interaction.editReply({ embeds: [embed] });
 
             } catch (error) {
-                console.error('Error checking boost status:', error);
+                logger.error('Error checking boost status:', error);
                 await interaction.editReply({ content: 'An error occurred while checking your boost status.' });
             }
         }
+    },
+    policy: {
+        subcommandMemberPermissions: {
+            setup: [PermissionFlagsBits.ManageGuild],
+        },
+        subcommandBotPermissions: {
+            setup: [PermissionFlagsBits.ManageRoles],
+            claim: [PermissionFlagsBits.ManageRoles],
+        },
     }
 };

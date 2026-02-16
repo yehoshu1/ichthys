@@ -11,7 +11,7 @@ import {
     parseCsvList,
     serializeCsvList,
 } from '@shared/command-config';
-import { CANONICAL_COMMAND_IDS, CANONICAL_COMMAND_ID_SET } from '@shared/constants/commands';
+import { getCanonicalCommandIds, getCanonicalCommandIdSet } from '@shared/command-catalog';
 
 const updateCommandConfigSchema = z.object({
     commandId: z.string(),
@@ -91,13 +91,14 @@ export async function GET(
     if ('response' in auth) return auth.response;
 
     try {
+        const commandIds = getCanonicalCommandIds();
         const configs = await db
             .select()
             .from(commandConfig)
             .where(eq(commandConfig.guildId, guildId));
 
         return NextResponse.json({
-            commands: CANONICAL_COMMAND_IDS,
+            commands: commandIds,
             configs: configs.map(toApiConfig),
         });
     } catch (error) {
@@ -140,7 +141,7 @@ export async function PUT(
     }
 
     const commandId = payload.commandId.trim().toLowerCase();
-    if (!CANONICAL_COMMAND_ID_SET.has(commandId)) {
+    if (!getCanonicalCommandIdSet().has(commandId)) {
         return NextResponse.json(
             { error: `Unknown command "${payload.commandId}"` },
             { status: 400 }
@@ -272,7 +273,7 @@ export async function DELETE(
     }
 
     const commandId = commandIdRaw.trim().toLowerCase();
-    if (!CANONICAL_COMMAND_ID_SET.has(commandId)) {
+    if (!getCanonicalCommandIdSet().has(commandId)) {
         return NextResponse.json({ error: `Unknown command "${commandIdRaw}"` }, { status: 400 });
     }
 

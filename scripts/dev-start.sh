@@ -22,4 +22,6 @@ fi
 # Prevent stale chunk references between restarts/branch switches in dev.
 rm -rf /app/src/dashboard/.next
 
+npm run db:migrate
+
 exec npm run dev:all

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, event, eventRsvp, eventPollSettings } from '@/lib/db';
-import { eq, and, or, asc, desc, gte, lt } from 'drizzle-orm';
+import { db, event, eventRsvp } from '@/lib/db';
+import { eq, and, or, asc, desc, gte, lt, inArray } from 'drizzle-orm';
+import { z } from 'zod';
 import { getDiscordUsers } from '@/lib/discord-user-cache';
 import { authorizeGuildApiRequest } from '@/lib/guild-api-auth';
 import logger from '@/lib/logger';
-import { dispatchGuildWebhookEvent } from '@/lib/webhook-dispatch';
+import { requireGuildModuleEnabled } from '@/lib/module-gate';
+import { eventService } from '@shared/services/event-domain-service';
 
 // Validation constants
 const MAX_EVENT_TITLE_LENGTH = 100;
@@ -12,74 +14,31 @@ const MAX_EVENT_DESCRIPTION_LENGTH = 2000;
 const MAX_EVENT_LOCATION_LENGTH = 100;
 const MAX_RECURRING_INSTANCES = 52; // Max 1 year of weekly events
 
-async function createRecurringChildren(parent: typeof event.$inferSelect): Promise<void> {
-    if (parent.repeatFrequency === 'NONE' || !parent.repeatUntil) return;
+const repeatFrequencySchema = z.enum(['NONE', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'YEARLY']);
 
-    const created: Array<typeof event.$inferInsert> = [];
-    let currentDate = new Date(parent.startTime);
-    const endDate = parent.repeatUntil;
-
-    while (currentDate < endDate && created.length < MAX_RECURRING_INSTANCES) {
-        switch (parent.repeatFrequency) {
-            case 'DAILY':
-                currentDate.setDate(currentDate.getDate() + 1);
-                break;
-            case 'WEEKLY':
-                currentDate.setDate(currentDate.getDate() + 7);
-                break;
-            case 'BIWEEKLY':
-                currentDate.setDate(currentDate.getDate() + 14);
-                break;
-            case 'MONTHLY':
-                currentDate.setMonth(currentDate.getMonth() + 1);
-                break;
-            case 'YEARLY':
-                currentDate.setFullYear(currentDate.getFullYear() + 1);
-                break;
-            default:
-                currentDate = endDate;
-                break;
-        }
-
-        if (currentDate >= endDate) break;
-
-        created.push({
-            guildId: parent.guildId,
-            creatorId: parent.creatorId,
-            channelId: parent.channelId,
-            messageId: null,
-            title: parent.title,
-            description: parent.description,
-            location: parent.location,
-            locationChannelId: parent.locationChannelId,
-            imageUrl: parent.imageUrl,
-            color: parent.color,
-            startTime: new Date(currentDate),
-            endTime: parent.endTime
-                ? new Date(currentDate.getTime() + (parent.endTime.getTime() - parent.startTime.getTime()))
-                : null,
-            durationMinutes: parent.durationMinutes,
-            status: 'SCHEDULED',
-            maxAttendees: parent.maxAttendees,
-            enableWaitlist: parent.enableWaitlist,
-            mentionRoleIds: parent.mentionRoleIds,
-            mentionOnCreate: parent.mentionOnCreate,
-            mentionOnStart: parent.mentionOnStart,
-            requiredRoleIds: parent.requiredRoleIds,
-            blockedRoleIds: parent.blockedRoleIds,
-            attendeeRoleId: parent.attendeeRoleId,
-            repeatFrequency: parent.repeatFrequency,
-            repeatUntil: parent.repeatUntil,
-            parentEventId: parent.id,
-            mirrorToDiscord: false,
-            discordScheduledEventId: null,
-        });
-    }
-
-    if (created.length > 0) {
-        await db.insert(event).values(created);
-    }
-}
+const createEventSchema = z.object({
+    title: z.string().min(1).max(MAX_EVENT_TITLE_LENGTH),
+    startTime: z.string().datetime(),
+    channelId: z.string().min(1),
+    description: z.string().max(MAX_EVENT_DESCRIPTION_LENGTH).optional(),
+    location: z.string().max(MAX_EVENT_LOCATION_LENGTH).optional(),
+    locationChannelId: z.string().nullable().optional(),
+    imageUrl: z.string().max(2048).optional(),
+    color: z.string().max(32).optional(),
+    endTime: z.string().datetime().nullable().optional(),
+    durationMinutes: z.number().int().min(1).max(60 * 24 * 31).optional(),
+    maxAttendees: z.number().int().min(0).max(1000).optional(),
+    enableWaitlist: z.boolean().optional(),
+    mentionRoleIds: z.array(z.string()).optional(),
+    mentionOnCreate: z.boolean().optional(),
+    mentionOnStart: z.boolean().optional(),
+    requiredRoleIds: z.array(z.string()).optional(),
+    blockedRoleIds: z.array(z.string()).optional(),
+    attendeeRoleId: z.string().nullable().optional(),
+    repeatFrequency: repeatFrequencySchema.optional(),
+    repeatUntil: z.string().datetime().optional(),
+    mirrorToDiscord: z.boolean().optional(),
+}).strict();
 
 // GET /api/guilds/[guildId]/events - List all events for a guild
 export async function GET(
@@ -96,6 +55,8 @@ export async function GET(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'events');
+        if (moduleGuard) return moduleGuard;
         const { searchParams } = new URL(request.url);
         const status = searchParams.get('status');
         const upcoming = searchParams.get('upcoming') === 'true';
@@ -136,14 +97,28 @@ export async function GET(
             .where(whereClause)
             .orderBy(orderByClause);
 
-        const rsvpRowsByEvent = await Promise.all(
-            events.map((evt) =>
-                db.select().from(eventRsvp).where(eq(eventRsvp.eventId, evt.id))
-            )
-        );
-        const userMap = await getDiscordUsers(
-            rsvpRowsByEvent.flatMap((rows) => rows.map((rsvp) => rsvp.userId))
-        );
+        if (events.length === 0) {
+            return NextResponse.json([]);
+        }
+
+        const eventIds = events.map((evt) => evt.id);
+        const rsvpRows = await db
+            .select()
+            .from(eventRsvp)
+            .where(inArray(eventRsvp.eventId, eventIds));
+
+        const rsvpsByEvent = new Map<string, typeof rsvpRows>();
+        for (const rsvp of rsvpRows) {
+            const existing = rsvpsByEvent.get(rsvp.eventId);
+            if (existing) {
+                existing.push(rsvp);
+            } else {
+                rsvpsByEvent.set(rsvp.eventId, [rsvp]);
+            }
+        }
+
+        const userIds = new Set(rsvpRows.map((row) => row.userId));
+        const userMap = await getDiscordUsers(Array.from(userIds));
 
         const toUserSummary = (userId: string) => {
             const cached = userMap.get(userId);
@@ -155,8 +130,8 @@ export async function GET(
         };
 
         // Get RSVP counts and users for each event
-        const eventsWithCounts = events.map((evt, index) => {
-            const rsvps = rsvpRowsByEvent[index];
+        const eventsWithCounts = events.map((evt) => {
+            const rsvps = rsvpsByEvent.get(evt.id) ?? [];
 
             return {
                 ...evt,
@@ -197,48 +172,28 @@ export async function POST(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'events');
+        if (moduleGuard) return moduleGuard;
         
         const body = await request.json();
-
-        // Validate required fields
-        if (!body.title || !body.startTime || !body.channelId) {
+        const parsed = createEventSchema.safeParse(body);
+        if (!parsed.success) {
             return NextResponse.json(
-                { error: 'Missing required fields: title, startTime, channelId' },
+                { error: 'Invalid request body', details: parsed.error.issues },
                 { status: 400 }
             );
         }
-
-        // Validate field lengths
-        if (body.title.length > MAX_EVENT_TITLE_LENGTH) {
-            return NextResponse.json(
-                { error: `Title cannot exceed ${MAX_EVENT_TITLE_LENGTH} characters` },
-                { status: 400 }
-            );
-        }
-
-        if (body.description && body.description.length > MAX_EVENT_DESCRIPTION_LENGTH) {
-            return NextResponse.json(
-                { error: `Description cannot exceed ${MAX_EVENT_DESCRIPTION_LENGTH} characters` },
-                { status: 400 }
-            );
-        }
-
-        if (body.location && body.location.length > MAX_EVENT_LOCATION_LENGTH) {
-            return NextResponse.json(
-                { error: `Location cannot exceed ${MAX_EVENT_LOCATION_LENGTH} characters` },
-                { status: 400 }
-            );
-        }
+        const data = parsed.data;
 
         // Validate recurring event limits
-        if (body.repeatFrequency && body.repeatFrequency !== 'NONE' && body.repeatUntil) {
-            const startDate = new Date(body.startTime);
-            const endDate = new Date(body.repeatUntil);
+        if (data.repeatFrequency && data.repeatFrequency !== 'NONE' && data.repeatUntil) {
+            const startDate = new Date(data.startTime);
+            const endDate = new Date(data.repeatUntil);
             const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             
             let maxDays: number;
-            switch (body.repeatFrequency) {
+            switch (data.repeatFrequency) {
                 case 'DAILY': maxDays = MAX_RECURRING_INSTANCES; break;
                 case 'WEEKLY': maxDays = MAX_RECURRING_INSTANCES * 7; break;
                 case 'BIWEEKLY': maxDays = MAX_RECURRING_INSTANCES * 14; break;
@@ -255,74 +210,41 @@ export async function POST(
             }
         }
 
-        // Validate maxAttendees
-        if (body.maxAttendees !== undefined) {
-            const maxAttendees = Number(body.maxAttendees);
-            if (isNaN(maxAttendees) || maxAttendees < 0 || maxAttendees > 1000) {
-                return NextResponse.json(
-                    { error: 'maxAttendees must be between 0 and 1000' },
-                    { status: 400 }
-                );
-            }
-        }
-
-        let mirrorToDiscord = body.mirrorToDiscord as boolean | undefined;
-        if (mirrorToDiscord === undefined) {
-            const [settings] = await db
-                .select()
-                .from(eventPollSettings)
-                .where(eq(eventPollSettings.guildId, guildId));
-            mirrorToDiscord = settings?.mirrorToDiscordEvents ?? true;
-        }
-
-        const startTime = new Date(body.startTime);
-        const endTime = body.endTime ? new Date(body.endTime) : null;
-        const durationMinutes = body.durationMinutes as number | undefined;
+        const startTime = new Date(data.startTime);
+        const endTime = data.endTime ? new Date(data.endTime) : null;
+        const durationMinutes = data.durationMinutes as number | undefined;
         const normalizedDurationMinutes = durationMinutes
             ?? (endTime ? Math.max(1, Math.round((endTime.getTime() - startTime.getTime()) / 60000)) : 60);
 
-        const [created] = await db
-            .insert(event)
-            .values({
-                guildId: guildId as string,
-                creatorId: auth.userId,
-                title: body.title as string,
-                description: body.description as string | undefined,
-                location: body.location as string | undefined,
-                locationChannelId: body.locationChannelId as string | undefined,
-                imageUrl: body.imageUrl as string | undefined,
-                color: body.color as string | undefined,
-                channelId: body.channelId as string,
-                startTime,
-                endTime,
-                durationMinutes: normalizedDurationMinutes,
-                maxAttendees: body.maxAttendees as number | undefined,
-                enableWaitlist: (body.enableWaitlist ?? false) as boolean,
-                mentionRoleIds: body.mentionRoleIds as string[] | undefined,
-                mentionOnCreate: (body.mentionOnCreate ?? false) as boolean,
-                mentionOnStart: (body.mentionOnStart ?? false) as boolean,
-                requiredRoleIds: body.requiredRoleIds as string[] | undefined,
-                blockedRoleIds: body.blockedRoleIds as string[] | undefined,
-                attendeeRoleId: body.attendeeRoleId as string | undefined,
-                repeatFrequency: (body.repeatFrequency || 'NONE') as 'NONE' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'YEARLY',
-                repeatUntil: body.repeatUntil ? new Date(body.repeatUntil) : undefined,
-                mirrorToDiscord,
-                status: 'SCHEDULED',
-            })
-            .returning();
-
-        await createRecurringChildren(created);
-
-        await dispatchGuildWebhookEvent(guildId, 'event.created', {
-            eventId: created.id,
-            title: created.title,
-            creatorId: created.creatorId,
-            startTime: created.startTime,
-            channelId: created.channelId,
-            locationChannelId: created.locationChannelId,
-            mirrorToDiscord: created.mirrorToDiscord,
-            discordScheduledEventId: created.discordScheduledEventId,
+        const created = await eventService.createEvent({
+            guildId,
+            creatorId: auth.userId,
+            channelId: data.channelId,
+            title: data.title,
+            description: data.description,
+            location: data.location,
+            locationChannelId: data.locationChannelId ?? undefined,
+            imageUrl: data.imageUrl,
+            color: data.color,
+            startTime,
+            endTime,
+            durationMinutes: normalizedDurationMinutes,
+            maxAttendees: data.maxAttendees,
+            enableWaitlist: data.enableWaitlist ?? false,
+            mentionRoleIds: data.mentionRoleIds,
+            mentionOnCreate: data.mentionOnCreate ?? false,
+            mentionOnStart: data.mentionOnStart ?? false,
+            requiredRoleIds: data.requiredRoleIds,
+            blockedRoleIds: data.blockedRoleIds,
+            attendeeRoleId: data.attendeeRoleId ?? undefined,
+            repeatFrequency: data.repeatFrequency || 'NONE',
+            repeatUntil: data.repeatUntil ? new Date(data.repeatUntil) : undefined,
+            mirrorToDiscord: data.mirrorToDiscord,
         });
+
+        if (created.repeatFrequency !== 'NONE' && created.repeatUntil) {
+            await eventService.createRepeatingEvents(created);
+        }
 
         return NextResponse.json(created);
     } catch (error) {

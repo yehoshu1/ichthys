@@ -2,6 +2,7 @@ import { Client, EmbedBuilder, TextChannel } from 'discord.js';
 import { pollService } from '../services/poll-service';
 
 import logger from '../utils/logger';
+import { isModuleEnabled } from '@shared/modules/state';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // POLL END JOB
@@ -19,6 +20,11 @@ export async function execute(client: Client) {
 
         for (const poll of endingPolls) {
             try {
+                const pollsEnabled = await isModuleEnabled(poll.guildId, 'polls');
+                if (!pollsEnabled) {
+                    continue;
+                }
+
                 // Close the poll
                 await pollService.closePoll(poll.id);
 
@@ -51,7 +57,8 @@ export async function execute(client: Client) {
                                 if (optionsFieldIndex !== undefined && optionsFieldIndex >= 0) {
                                     const resultsText = results.options.map((opt, i) => {
                                         const bar = '█'.repeat(Math.round(opt.percentage / 5)) + '░'.repeat(20 - Math.round(opt.percentage / 5));
-                                        return `${i + 1}. ${opt.option.text}\n\`${bar}\` ${opt.percentage}% (${opt.voteCount})`;
+                                        const optionLabel = formatPollOptionLabel(opt.option.text, opt.option.dateTimeValue, poll.type);
+                                        return `${i + 1}. ${optionLabel}\n\`${bar}\` ${opt.percentage}% (${opt.voteCount})`;
                                     }).join('\n\n');
 
                                     newEmbed.spliceFields(optionsFieldIndex, 1, {
@@ -66,7 +73,7 @@ export async function execute(client: Client) {
                                 // Send final results
                                 const winnerNames = results.options
                                     .filter(o => o.voteCount === results.options[0]?.voteCount && o.voteCount > 0)
-                                    .map(o => o.option.text);
+                                    .map(o => formatPollOptionLabel(o.option.text, o.option.dateTimeValue, poll.type));
 
                                 if (winnerNames.length > 0 && results.totalVotes > 0) {
                                     const winnerText = winnerNames.length === 1
@@ -98,4 +105,23 @@ export async function execute(client: Client) {
     } catch (error) {
         logger.error('Error in poll end job:', error);
     }
+}
+
+function formatPollOptionLabel(text: string, dateTimeValue: Date | null, type: 'STANDARD' | 'TIME' | 'ANONYMOUS'): string {
+    if (type !== 'TIME') return text;
+
+    if (dateTimeValue) {
+        return `<t:${Math.floor(new Date(dateTimeValue).getTime() / 1000)}:F>`;
+    }
+
+    if (text.includes('<t:')) {
+        return text;
+    }
+
+    const parsed = new Date(text);
+    if (!Number.isNaN(parsed.getTime())) {
+        return `<t:${Math.floor(parsed.getTime() / 1000)}:F>`;
+    }
+
+    return text;
 }

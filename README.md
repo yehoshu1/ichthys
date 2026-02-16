@@ -19,9 +19,13 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 - **📝 Message Aliases**: Auto-responder system with custom triggers.
 
 ### Integration & API
-- **🔗 Webhooks**: Receive real-time event notifications via HTTP POST requests.
-- **🔑 API Keys**: Programmatic access to your server data with granular permissions.
-- **📆 Calendar Sync**: Connect Google, Outlook, or Apple Calendar for 2-way event sync.
+- **🔗 Webhooks**: Receive real-time event notifications via HTTP POST requests with HMAC signature verification and encryption at rest.
+- **🔑 API Keys**: Programmatic access to your server data with granular permissions and secure hash storage.
+- **🔔 Notifications**: In-app notification stream for operational events and user preferences.
+
+### Infrastructure
+- **🚀 Performance**: Optional Redis-backed distributed rate limiting for multi-instance deployments with automatic in-memory fallback.
+- **🔒 Security**: AES-256-GCM encryption for webhook secrets at rest, SSRF protection with DNS validation, and fail-fast secret validation.
 
 ### Tech Stack
 - **Bot**: [Discord.js](https://discord.js.org/) v14, TypeScript, Node.js
@@ -29,11 +33,6 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 - **Database**: [PostgreSQL 17](https://www.postgresql.org/) with [Drizzle ORM](https://orm.drizzle.team/)
 - **UI Components**: [shadcn/ui](https://ui.shadcn.com/), [Lucide Icons](https://lucide.dev/)
 - **Charts**: [Recharts](https://recharts.org/)
-
-### Search Architecture
-- Dashboard global search is local/in-process and built from existing settings/doc sources.
-- Ixoye does not currently depend on Meilisearch or external vector search services.
-- Decision record: [ADR 0001](docs/adr/0001-defer-meilisearch-integration.md).
 
 ## 📂 Documentation
 

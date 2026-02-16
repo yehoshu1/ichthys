@@ -15,7 +15,7 @@ RUN apt-get update -y && apt-get install -y python3 make g++ pkg-config libcairo
 COPY package.json package-lock.json ./
 # Install ALL dependencies (including devDeps)
 # Using npm install instead of npm ci to handle cases where package.json has newer packages
-RUN npm install || npm ci
+RUN npm install --legacy-peer-deps || npm ci --legacy-peer-deps
 
 # Copy source
 COPY . .
@@ -35,7 +35,7 @@ RUN apt-get update -y && apt-get install -y python3 make g++ pkg-config libcairo
 COPY package.json package-lock.json ./
 # Install ALL dependencies (including devDeps)
 # Using npm install instead of npm ci to handle cases where package.json has newer packages
-RUN npm install || npm ci
+RUN npm install --legacy-peer-deps || npm ci --legacy-peer-deps
 
 # Copy source
 COPY . .
@@ -63,7 +63,7 @@ RUN apt-get update && apt-get install -y procps && npm install -g pm2 && rm -rf 
 # Copy necessary files
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/package-lock.json ./
-RUN npm install || npm ci
+RUN npm install --legacy-peer-deps || npm ci --legacy-peer-deps
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/dashboard/.next ./src/dashboard/.next
 COPY --from=builder /app/src/dashboard/next.config.js ./src/dashboard/next.config.js

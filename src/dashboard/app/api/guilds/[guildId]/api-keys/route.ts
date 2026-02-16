@@ -3,7 +3,42 @@ import { db, apiKey } from '@/lib/db';
 import { eq, desc } from 'drizzle-orm';
 import logger from '@/lib/logger';
 import crypto from 'crypto';
+import { z } from 'zod';
 import { requireGuildManageAccess } from '@/lib/guild-auth';
+import { parseJsonBody } from '@/lib/validation';
+
+const apiPermissionSchema = z.union([
+    z.literal('*'),
+    z.literal('events:read'),
+    z.literal('events:write'),
+    z.literal('polls:read'),
+    z.literal('polls:write'),
+    z.literal('webhooks:read'),
+    z.literal('webhooks:write'),
+]);
+
+const createApiKeySchema = z.object({
+    name: z.string().trim().min(1).max(100),
+    permissions: z.array(apiPermissionSchema).min(1).max(50),
+    expiresAt: z.string().datetime().optional(),
+}).strict().superRefine((value, ctx) => {
+    const unique = new Set(value.permissions);
+    if (unique.size !== value.permissions.length) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["permissions"],
+            message: "permissions must not contain duplicates",
+        });
+    }
+
+    if (unique.has('*') && unique.size > 1) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["permissions"],
+            message: "'*' cannot be combined with other permissions",
+        });
+    }
+});
 
 // Generate a secure API key
 function generateApiKey(): string {
@@ -76,14 +111,9 @@ export async function POST(
             return auth.response;
         }
 
-        const body = await request.json();
-
-        if (!body.name || !body.permissions?.length) {
-            return NextResponse.json(
-                { error: 'Name and permissions are required' },
-                { status: 400 }
-            );
-        }
+        const parsed = await parseJsonBody(request, createApiKeySchema);
+        if (!parsed.success) return parsed.response;
+        const body = parsed.data;
 
         // Generate key (only shown once)
         const key = generateApiKey();
@@ -93,9 +123,9 @@ export async function POST(
             .insert(apiKey)
             .values({
                 guildId: guildId as string,
-                name: body.name as string,
+                name: body.name,
                 keyHash: keyHash,
-                permissions: body.permissions as string[],
+                permissions: body.permissions,
                 createdBy: auth.userId,
                 enabled: true,
                 expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,

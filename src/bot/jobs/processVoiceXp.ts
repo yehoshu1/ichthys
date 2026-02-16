@@ -6,6 +6,7 @@ import logger from '../utils/logger';
 import { db } from '../../shared/database/client';
 import { levelProfile, guildConfig, type GuildConfig } from '../../shared/database/schema';
 import { processVoiceXpForMember } from '../services/voiceXpService';
+import { isModuleEnabled } from '@shared/modules/state';
 
 const CHUNK_SIZE = 100;
 const VOICE_XP_CRON = '*/5 * * * *';
@@ -84,6 +85,7 @@ export async function processVoiceXpOnce(): Promise<void> {
     let cursorId: string | null = null;
     let hasMore = true;
     let chunksProcessed = 0;
+    const moduleEnabledCache = new Map<string, boolean>();
 
     while (hasMore) {
         chunksProcessed++;
@@ -133,6 +135,17 @@ export async function processVoiceXpOnce(): Promise<void> {
             try {
                 // 🎯 Use batch-fetched config instead of individual query
                 const config = guildConfigMap.get(activeProfile.guildId) ?? null;
+
+                let levelingModuleEnabled = moduleEnabledCache.get(activeProfile.guildId);
+                if (levelingModuleEnabled === undefined) {
+                    levelingModuleEnabled = await isModuleEnabled(activeProfile.guildId, 'leveling');
+                    moduleEnabledCache.set(activeProfile.guildId, levelingModuleEnabled);
+                }
+
+                if (!levelingModuleEnabled) {
+                    stats.skippedDisabled += 1;
+                    continue;
+                }
 
                 if (!config?.levelingEnabled) {
                     stats.skippedDisabled += 1;

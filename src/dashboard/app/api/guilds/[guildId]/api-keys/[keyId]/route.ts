@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, apiKey } from '@/lib/db';
 import { eq, and } from 'drizzle-orm';
 import logger from '@/lib/logger';
+import { z } from 'zod';
 import { requireGuildManageAccess } from '@/lib/guild-auth';
+import { parseJsonBody } from '@/lib/validation';
+
+const updateApiKeySchema = z.object({
+    enabled: z.boolean(),
+}).strict();
 
 function toPublicApiKey(row: typeof apiKey.$inferSelect) {
     return {
@@ -31,7 +37,9 @@ export async function PATCH(
         if ('response' in auth) {
             return auth.response;
         }
-        const body = await request.json();
+        const parsed = await parseJsonBody(request, updateApiKeySchema);
+        if (!parsed.success) return parsed.response;
+        const body = parsed.data;
 
         // Check if key exists
         const [existing] = await db

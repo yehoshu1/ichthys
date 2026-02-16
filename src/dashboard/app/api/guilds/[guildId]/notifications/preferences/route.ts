@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db, notificationPreference } from "@/lib/db";
 import { requireGuildManageAccess } from "@/lib/guild-auth";
 import logger from "@/lib/logger";
+import { parseJsonBody } from "@/lib/validation";
 import {
     type NotificationDigestMode,
     type NotificationSeverity,
@@ -23,7 +24,7 @@ const preferencePatchSchema = z.object({
     webhookEnabled: z.boolean().optional(),
     webhookUrl: z.string().url().nullable().optional(),
     digestMode: z.string().optional(),
-});
+}).strict();
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
@@ -55,13 +56,9 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ guildId
     const auth = await requireGuildManageAccess(guildId, req);
     if ("response" in auth) return auth.response;
 
-    let parsed: z.infer<typeof preferencePatchSchema>;
-    try {
-        const body = await req.json();
-        parsed = preferencePatchSchema.parse(body);
-    } catch {
-        return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-    }
+    const parsedResult = await parseJsonBody(req, preferencePatchSchema);
+    if (!parsedResult.success) return parsedResult.response;
+    const parsed = parsedResult.data;
 
     if (!isGuildNotificationEventType(parsed.eventType)) {
         return NextResponse.json({ error: "Invalid event type" }, { status: 400 });

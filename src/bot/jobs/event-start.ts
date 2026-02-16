@@ -2,6 +2,7 @@ import { Client, EmbedBuilder, TextChannel } from 'discord.js';
 import { eventService } from '../services/event-service';
 import { formatDiscordTimestamp } from '../utils/date-parser';
 import logger from '../utils/logger';
+import { isModuleEnabled } from '@shared/modules/state';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // EVENT START JOB
@@ -20,6 +21,11 @@ export async function execute(client: Client) {
 
         for (const evt of startingEvents) {
             try {
+                const eventsEnabled = await isModuleEnabled(evt.guildId, 'events');
+                if (!eventsEnabled) {
+                    continue;
+                }
+
                 // Mark event as active
                 await eventService.markEventAsStarted(evt.id);
 

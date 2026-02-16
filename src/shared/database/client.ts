@@ -3,13 +3,46 @@ import { Pool } from 'pg';
 import * as schema from './schema';
 import logger from '../../bot/utils/logger';
 
-const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://ixoye:ixoye@localhost:5432/ixoye';
+function buildDatabaseUrl(): string {
+    if (process.env.DATABASE_URL) {
+        return process.env.DATABASE_URL;
+    }
+
+    const host = process.env.POSTGRES_HOST ?? 'localhost';
+    const port = process.env.POSTGRES_PORT ?? '5432';
+    const db = process.env.POSTGRES_DB ?? 'ixoye';
+    const user = process.env.POSTGRES_USER ?? 'ixoye';
+    const password = process.env.POSTGRES_PASSWORD ?? 'ixoye';
+    const encodedUser = encodeURIComponent(user);
+    const encodedPassword = encodeURIComponent(password);
+
+    return `postgresql://${encodedUser}:${encodedPassword}@${host}:${port}/${db}`;
+}
+
+const databaseUrl = buildDatabaseUrl();
 
 function getNumericEnv(name: string, fallback: number): number {
     const raw = process.env[name];
     if (!raw) return fallback;
     const parsed = Number.parseInt(raw, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function resolveSslConfig(): false | { rejectUnauthorized: boolean } {
+    const pgSsl = process.env.PG_SSL?.toLowerCase();
+    if (pgSsl === 'true') {
+        return { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false' };
+    }
+
+    if (pgSsl === 'false') {
+        return false;
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+        return { rejectUnauthorized: true };
+    }
+
+    return false;
 }
 
 export const pool = new Pool({
@@ -19,11 +52,7 @@ export const pool = new Pool({
     connectionTimeoutMillis: getNumericEnv('PG_CONNECT_TIMEOUT_MS', 10_000),
     query_timeout: getNumericEnv('PG_QUERY_TIMEOUT_MS', 30_000),
     statement_timeout: getNumericEnv('PG_STATEMENT_TIMEOUT_MS', 30_000),
-    ssl: process.env.NODE_ENV === 'production'
-        ? { rejectUnauthorized: true }
-        : process.env.PG_SSL === 'true'
-            ? { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false' }
-            : false,
+    ssl: resolveSslConfig(),
 });
 
 pool.on('error', (error) => {

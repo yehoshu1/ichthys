@@ -42,12 +42,12 @@ const command: Command = {
         const currentPerms = channel.permissionsFor(everyoneRole);
 
         if (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildForum || channel.type === ChannelType.GuildAnnouncement) {
-            if (!currentPerms?.has('SendMessages')) {
+            if (!currentPerms?.has(PermissionFlagsBits.SendMessages)) {
                 await interaction.reply({ content: '❌ This channel is already locked.', ephemeral: true });
                 return;
             }
         } else if (channel.type === ChannelType.GuildVoice) {
-            if (!currentPerms?.has('Connect')) {
+            if (!currentPerms?.has(PermissionFlagsBits.Connect)) {
                 await interaction.reply({ content: '❌ This channel is already locked.', ephemeral: true });
                 return;
             }
@@ -80,7 +80,7 @@ const command: Command = {
                 // Disconnect non-staff users if needed
                 const members = channel.members;
                 for (const [, member] of members) {
-                    if (!member.permissions.has('ManageChannels')) {
+                    if (!member.permissions.has(PermissionFlagsBits.ManageChannels)) {
                         await member.voice.disconnect(`Channel locked by ${interaction.user.tag}: ${reason}`);
                     }
                 }

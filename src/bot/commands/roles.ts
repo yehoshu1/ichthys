@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { Command } from '../types/Command';
+import logger from '../utils/logger';
 
 const command: Command = {
     data: new SlashCommandBuilder()
@@ -133,7 +134,7 @@ const command: Command = {
             }
 
         } catch (error) {
-            console.error('Error fetching roles:', error);
+            logger.error('Error fetching roles:', error);
             await interaction.editReply({ content: 'There was an error fetching role information.' });
         }
     }

@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, webhookEndpoint } from '@/lib/db';
 import { eq, desc } from 'drizzle-orm';
 import logger from '@/lib/logger';
+import { z } from 'zod';
 import { authorizeGuildApiRequest } from '@/lib/guild-api-auth';
+import { parseJsonBody } from '@/lib/validation';
 import {
     validateWebhookUrl,
     encryptWebhookSecret,
@@ -12,6 +14,29 @@ import {
 // Max lengths for webhook fields
 const MAX_WEBHOOK_NAME_LENGTH = 100;
 const MAX_WEBHOOK_URL_LENGTH = 500;
+const MAX_WEBHOOK_SECRET_LENGTH = 200;
+
+const webhookEventSchema = z.enum([
+    'event.created',
+    'event.updated',
+    'event.deleted',
+    'event.started',
+    'rsvp.yes',
+    'rsvp.no',
+    'rsvp.maybe',
+    'rsvp.waitlist',
+    'poll.created',
+    'poll.voted',
+    'poll.closed',
+]);
+
+const createWebhookSchema = z.object({
+    name: z.string().trim().min(1).max(MAX_WEBHOOK_NAME_LENGTH),
+    url: z.string().trim().min(1).max(MAX_WEBHOOK_URL_LENGTH),
+    eventTypes: z.array(webhookEventSchema).min(1).max(30),
+    enabled: z.boolean().optional(),
+    secret: z.string().max(MAX_WEBHOOK_SECRET_LENGTH).optional(),
+}).strict();
 
 function toPublicWebhook(row: typeof webhookEndpoint.$inferSelect) {
     return {
@@ -65,32 +90,11 @@ export async function POST(
             return auth.response;
         }
 
-        const body = await request.json();
+        const parsed = await parseJsonBody(request, createWebhookSchema);
+        if (!parsed.success) return parsed.response;
+        const body = parsed.data;
 
-        if (!body.name || !body.url || !body.eventTypes?.length) {
-            return NextResponse.json(
-                { error: 'Missing required fields' },
-                { status: 400 }
-            );
-        }
-
-        // Validate name length
-        if (body.name.length > MAX_WEBHOOK_NAME_LENGTH) {
-            return NextResponse.json(
-                { error: `Name cannot exceed ${MAX_WEBHOOK_NAME_LENGTH} characters` },
-                { status: 400 }
-            );
-        }
-
-        // Validate URL length
-        if (body.url.length > MAX_WEBHOOK_URL_LENGTH) {
-            return NextResponse.json(
-                { error: `URL cannot exceed ${MAX_WEBHOOK_URL_LENGTH} characters` },
-                { status: 400 }
-            );
-        }
-
-        const validation = await validateWebhookUrl(body.url as string);
+        const validation = await validateWebhookUrl(body.url);
         if (!validation.ok) {
             return NextResponse.json({ error: validation.error }, { status: 400 });
         }
@@ -104,10 +108,10 @@ export async function POST(
             .insert(webhookEndpoint)
             .values({
                 guildId: guildId as string,
-                name: body.name as string,
-                url: body.url as string,
+                name: body.name,
+                url: body.url,
                 secret: encryptedSecret,
-                eventTypes: body.eventTypes as string[],
+                eventTypes: body.eventTypes,
                 enabled: body.enabled ?? true,
             })
             .returning();

@@ -3,6 +3,7 @@ import { Command } from '../types/Command';
 import { db } from '../../shared/database/client';
 import { moderationCase, levelProfile } from '../../shared/database/schema';
 import { eq, and, sql } from 'drizzle-orm';
+import logger from '../utils/logger';
 
 const command: Command = {
     data: new SlashCommandBuilder()
@@ -110,7 +111,7 @@ const command: Command = {
             await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
-            console.error('Error fetching user info:', error);
+            logger.error('Error fetching user info:', error);
             await interaction.editReply({ content: 'There was an error fetching user information.' });
         }
     }

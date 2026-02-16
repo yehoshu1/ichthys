@@ -3,6 +3,7 @@ import { Command } from '../types/Command';
 import { db } from '../../shared/database/client';
 import { welcomeTrigger, messageTemplate } from '../../shared/database/schema';
 import { eq, and } from 'drizzle-orm';
+import logger from '../utils/logger';
 
 export const welcome: Command = {
     data: new SlashCommandBuilder()
@@ -82,7 +83,7 @@ export const welcome: Command = {
                 await interaction.editReply({ embeds: [embed] });
 
             } catch (error) {
-                console.error('Error testing welcome:', error);
+                logger.error('Error testing welcome:', error);
                 await interaction.editReply({ content: 'An error occurred while testing.' });
             }
         }

@@ -1,43 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, event, eventRsvp } from '@/lib/db';
 import { eq, and } from 'drizzle-orm';
+import { z } from 'zod';
 import { authorizeGuildApiRequest } from '@/lib/guild-api-auth';
 import logger from '@/lib/logger';
-import { dispatchGuildWebhookEvent } from '@/lib/webhook-dispatch';
+import { requireGuildModuleEnabled } from '@/lib/module-gate';
+import { eventService } from '@shared/services/event-domain-service';
 
-async function deleteDiscordMessage(channelId: string | null | undefined, messageId: string | null | undefined): Promise<void> {
-    if (!channelId || !messageId) return;
-    const token = process.env.DISCORD_TOKEN;
-    if (!token) return;
+const MAX_EVENT_TITLE_LENGTH = 100;
+const MAX_EVENT_DESCRIPTION_LENGTH = 2000;
+const MAX_EVENT_LOCATION_LENGTH = 100;
 
-    try {
-        await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`, {
-            method: 'DELETE',
-            headers: {
-                Authorization: `Bot ${token}`,
-            },
-        });
-    } catch (error) {
-        logger.warn('Failed to delete Discord event message from dashboard route:', error);
-    }
-}
-
-async function deleteDiscordScheduledEvent(guildId: string, scheduledEventId: string | null | undefined): Promise<void> {
-    if (!scheduledEventId) return;
-    const token = process.env.DISCORD_TOKEN;
-    if (!token) return;
-
-    try {
-        await fetch(`https://discord.com/api/v10/guilds/${guildId}/scheduled-events/${scheduledEventId}`, {
-            method: 'DELETE',
-            headers: {
-                Authorization: `Bot ${token}`,
-            },
-        });
-    } catch (error) {
-        logger.warn('Failed to delete Discord scheduled event from dashboard route:', error);
-    }
-}
+const updateEventSchema = z.object({
+    title: z.string().min(1).max(MAX_EVENT_TITLE_LENGTH).optional(),
+    description: z.string().max(MAX_EVENT_DESCRIPTION_LENGTH).optional(),
+    location: z.string().max(MAX_EVENT_LOCATION_LENGTH).optional(),
+    locationChannelId: z.string().nullable().optional(),
+    imageUrl: z.string().max(2048).optional(),
+    color: z.string().max(32).optional(),
+    channelId: z.string().min(1).optional(),
+    startTime: z.string().datetime().optional(),
+    endTime: z.string().datetime().nullable().optional(),
+    durationMinutes: z.number().int().min(1).max(60 * 24 * 31).optional(),
+    status: z.enum(['SCHEDULED', 'ACTIVE', 'COMPLETED', 'CANCELLED']).optional(),
+    maxAttendees: z.number().int().min(0).max(1000).optional(),
+    enableWaitlist: z.boolean().optional(),
+    mentionRoleIds: z.array(z.string()).optional(),
+    mentionOnCreate: z.boolean().optional(),
+    mentionOnStart: z.boolean().optional(),
+    requiredRoleIds: z.array(z.string()).optional(),
+    blockedRoleIds: z.array(z.string()).optional(),
+    attendeeRoleId: z.string().nullable().optional(),
+    repeatFrequency: z.enum(['NONE', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'YEARLY']).optional(),
+    repeatUntil: z.string().datetime().nullable().optional(),
+    mirrorToDiscord: z.boolean().optional(),
+}).strict();
 
 // GET /api/guilds/[guildId]/events/[eventId] - Get a specific event
 export async function GET(
@@ -50,6 +47,8 @@ export async function GET(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'events');
+        if (moduleGuard) return moduleGuard;
 
         const [evt] = await db
             .select()
@@ -93,7 +92,17 @@ export async function PATCH(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'events');
+        if (moduleGuard) return moduleGuard;
         const body = await request.json();
+        const parsed = updateEventSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: 'Invalid request body', details: parsed.error.issues },
+                { status: 400 }
+            );
+        }
+        const data = parsed.data;
 
         // Check if event exists and belongs to guild
         const [existingEvent] = await db
@@ -110,46 +119,33 @@ export async function PATCH(
             updatedAt: new Date(),
         };
 
-        if (body.title !== undefined) updateData.title = body.title;
-        if (body.description !== undefined) updateData.description = body.description;
-        if (body.location !== undefined) updateData.location = body.location;
-        if (body.locationChannelId !== undefined) updateData.locationChannelId = body.locationChannelId || null;
-        if (body.imageUrl !== undefined) updateData.imageUrl = body.imageUrl;
-        if (body.color !== undefined) updateData.color = body.color;
-        if (body.channelId !== undefined) updateData.channelId = body.channelId;
-        if (body.startTime !== undefined) updateData.startTime = new Date(body.startTime);
-        if (body.endTime !== undefined) updateData.endTime = body.endTime ? new Date(body.endTime) : null;
-        if (body.durationMinutes !== undefined) updateData.durationMinutes = body.durationMinutes;
-        if (body.status !== undefined) updateData.status = body.status;
-        if (body.maxAttendees !== undefined) updateData.maxAttendees = body.maxAttendees;
-        if (body.enableWaitlist !== undefined) updateData.enableWaitlist = body.enableWaitlist;
-        if (body.mentionRoleIds !== undefined) updateData.mentionRoleIds = body.mentionRoleIds;
-        if (body.mentionOnCreate !== undefined) updateData.mentionOnCreate = body.mentionOnCreate;
-        if (body.mentionOnStart !== undefined) updateData.mentionOnStart = body.mentionOnStart;
-        if (body.requiredRoleIds !== undefined) updateData.requiredRoleIds = body.requiredRoleIds;
-        if (body.blockedRoleIds !== undefined) updateData.blockedRoleIds = body.blockedRoleIds;
-        if (body.attendeeRoleId !== undefined) updateData.attendeeRoleId = body.attendeeRoleId || null;
-        if (body.repeatFrequency !== undefined) updateData.repeatFrequency = body.repeatFrequency;
-        if (body.repeatUntil !== undefined) updateData.repeatUntil = body.repeatUntil ? new Date(body.repeatUntil) : null;
-        if (body.mirrorToDiscord !== undefined) updateData.mirrorToDiscord = body.mirrorToDiscord;
+        if (data.title !== undefined) updateData.title = data.title;
+        if (data.description !== undefined) updateData.description = data.description;
+        if (data.location !== undefined) updateData.location = data.location;
+        if (data.locationChannelId !== undefined) updateData.locationChannelId = data.locationChannelId || null;
+        if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl;
+        if (data.color !== undefined) updateData.color = data.color;
+        if (data.channelId !== undefined) updateData.channelId = data.channelId;
+        if (data.startTime !== undefined) updateData.startTime = new Date(data.startTime);
+        if (data.endTime !== undefined) updateData.endTime = data.endTime ? new Date(data.endTime) : null;
+        if (data.durationMinutes !== undefined) updateData.durationMinutes = data.durationMinutes;
+        if (data.status !== undefined) updateData.status = data.status;
+        if (data.maxAttendees !== undefined) updateData.maxAttendees = data.maxAttendees;
+        if (data.enableWaitlist !== undefined) updateData.enableWaitlist = data.enableWaitlist;
+        if (data.mentionRoleIds !== undefined) updateData.mentionRoleIds = data.mentionRoleIds;
+        if (data.mentionOnCreate !== undefined) updateData.mentionOnCreate = data.mentionOnCreate;
+        if (data.mentionOnStart !== undefined) updateData.mentionOnStart = data.mentionOnStart;
+        if (data.requiredRoleIds !== undefined) updateData.requiredRoleIds = data.requiredRoleIds;
+        if (data.blockedRoleIds !== undefined) updateData.blockedRoleIds = data.blockedRoleIds;
+        if (data.attendeeRoleId !== undefined) updateData.attendeeRoleId = data.attendeeRoleId || null;
+        if (data.repeatFrequency !== undefined) updateData.repeatFrequency = data.repeatFrequency;
+        if (data.repeatUntil !== undefined) updateData.repeatUntil = data.repeatUntil ? new Date(data.repeatUntil) : null;
+        if (data.mirrorToDiscord !== undefined) updateData.mirrorToDiscord = data.mirrorToDiscord;
 
-        const [updatedEvent] = await db
-            .update(event)
-            .set(updateData)
-            .where(eq(event.id, eventId))
-            .returning();
-
-        await dispatchGuildWebhookEvent(guildId, 'event.updated', {
-            eventId: updatedEvent.id,
-            title: updatedEvent.title,
-            status: updatedEvent.status,
-            startTime: updatedEvent.startTime,
-            endTime: updatedEvent.endTime,
-            channelId: updatedEvent.channelId,
-            locationChannelId: updatedEvent.locationChannelId,
-            mirrorToDiscord: updatedEvent.mirrorToDiscord,
-            discordScheduledEventId: updatedEvent.discordScheduledEventId,
-        });
+        const updatedEvent = await eventService.updateEvent(eventId, updateData);
+        if (!updatedEvent) {
+            return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+        }
 
         return NextResponse.json(updatedEvent);
     } catch (error) {
@@ -169,6 +165,8 @@ export async function DELETE(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'events');
+        if (moduleGuard) return moduleGuard;
 
         // Check if event exists and belongs to guild
         const [existingEvent] = await db
@@ -180,22 +178,7 @@ export async function DELETE(
             return NextResponse.json({ error: 'Event not found' }, { status: 404 });
         }
 
-        await deleteDiscordMessage(existingEvent.channelId, existingEvent.messageId);
-        if (existingEvent.mirrorToDiscord && existingEvent.discordScheduledEventId) {
-            await deleteDiscordScheduledEvent(guildId, existingEvent.discordScheduledEventId);
-        }
-
-        await dispatchGuildWebhookEvent(guildId, 'event.deleted', {
-            eventId: existingEvent.id,
-            title: existingEvent.title,
-            status: existingEvent.status,
-            startTime: existingEvent.startTime,
-            channelId: existingEvent.channelId,
-            discordScheduledEventId: existingEvent.discordScheduledEventId,
-        });
-
-        await db.delete(eventRsvp).where(eq(eventRsvp.eventId, eventId));
-        await db.delete(event).where(eq(event.id, eventId));
+        await eventService.deleteEvent(eventId);
 
         return NextResponse.json({ success: true });
     } catch (error) {

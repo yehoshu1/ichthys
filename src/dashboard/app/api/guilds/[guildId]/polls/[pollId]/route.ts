@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, poll, pollOption, pollVote } from '@/lib/db';
-import { eq, and, asc, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import logger from '@/lib/logger';
 import { authorizeGuildApiRequest } from '@/lib/guild-api-auth';
-import { dispatchGuildWebhookEvent } from '@/lib/webhook-dispatch';
+import { requireGuildModuleEnabled } from '@/lib/module-gate';
+import { pollService } from '@shared/services/poll-domain-service';
 
 // Validation constants
 const MAX_POLL_QUESTION_LENGTH = 200;
@@ -11,21 +13,31 @@ const MAX_POLL_DESCRIPTION_LENGTH = 1000;
 const MAX_POLL_OPTIONS = 20;
 const MAX_OPTION_TEXT_LENGTH = 100;
 
-async function deleteDiscordMessage(channelId: string | null | undefined, messageId: string | null | undefined): Promise<void> {
-    if (!channelId || !messageId) return;
-    const token = process.env.DISCORD_TOKEN;
-    if (!token) return;
+const updatePollSchema = z.object({
+    question: z.string().min(1).max(MAX_POLL_QUESTION_LENGTH).optional(),
+    description: z.string().max(MAX_POLL_DESCRIPTION_LENGTH).optional(),
+    channelId: z.string().min(1).optional(),
+    allowMultipleVotes: z.boolean().optional(),
+    maxVotesPerUser: z.number().int().min(1).max(20).optional(),
+    allowCustomOptions: z.boolean().optional(),
+    type: z.enum(['STANDARD', 'TIME', 'ANONYMOUS']).optional(),
+    isAnonymous: z.boolean().optional(),
+    allowedRoleIds: z.array(z.string()).optional(),
+    mentionRoleIds: z.array(z.string()).optional(),
+    mentionOnCreate: z.boolean().optional(),
+    endTime: z.string().datetime().nullable().optional(),
+    options: z.array(z.object({
+        text: z.string(),
+        emoji: z.string().optional(),
+    })).optional(),
+    timeSlots: z.array(z.string()).optional(),
+    closed: z.boolean().optional(),
+    isClosed: z.boolean().optional(),
+}).strict();
 
-    try {
-        await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`, {
-            method: 'DELETE',
-            headers: {
-                Authorization: `Bot ${token}`,
-            },
-        });
-    } catch (error) {
-        logger.warn('Failed to delete poll message from Discord:', error);
-    }
+function formatDiscordTimestampLabel(date: Date): string {
+    const unix = Math.floor(date.getTime() / 1000);
+    return `<t:${unix}:F>`;
 }
 
 // GET /api/guilds/[guildId]/polls/[pollId] - Get a specific poll
@@ -39,6 +51,8 @@ export async function GET(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'polls');
+        if (moduleGuard) return moduleGuard;
 
         const [pollData] = await db
             .select()
@@ -56,29 +70,37 @@ export async function GET(
             .where(eq(pollOption.pollId, pollId))
             .orderBy(pollOption.order);
 
-        const optionsWithVotes = await Promise.all(
-            options.map(async (opt) => {
-                const votes = await db
-                    .select()
-                    .from(pollVote)
-                    .where(eq(pollVote.optionId, opt.id));
-                return {
-                    ...opt,
-                    voteCount: votes.length,
-                };
-            })
-        );
+        const optionIds = options.map((opt) => opt.id);
+        const voteCounts = optionIds.length
+            ? await db
+                .select({
+                    optionId: pollVote.optionId,
+                    count: sql<number>`count(*)`,
+                })
+                .from(pollVote)
+                .where(inArray(pollVote.optionId, optionIds))
+                .groupBy(pollVote.optionId)
+            : [];
 
-        // Get all votes for this poll
-        const allVotes = await db
-            .select()
+        const votesByOption = new Map<string, number>();
+        for (const row of voteCounts) {
+            votesByOption.set(row.optionId, Number(row.count ?? 0));
+        }
+
+        const optionsWithVotes = options.map((opt) => ({
+            ...opt,
+            voteCount: votesByOption.get(opt.id) ?? 0,
+        }));
+
+        const [totalVotesRow] = await db
+            .select({ count: sql<number>`count(*)` })
             .from(pollVote)
             .where(eq(pollVote.pollId, pollId));
 
         return NextResponse.json({
             ...pollData,
             options: optionsWithVotes,
-            voteCount: allVotes.length,
+            voteCount: Number(totalVotesRow?.count ?? 0),
         });
     } catch (error) {
         logger.error('Error fetching poll:', error);
@@ -97,7 +119,17 @@ export async function PATCH(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'polls');
+        if (moduleGuard) return moduleGuard;
         const body = await request.json();
+        const parsed = updatePollSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: 'Invalid request body', details: parsed.error.issues },
+                { status: 400 }
+            );
+        }
+        const data = parsed.data;
 
         // Check if poll exists and belongs to guild
         const [existingPoll] = await db
@@ -110,42 +142,25 @@ export async function PATCH(
         }
 
         // Validate field lengths
-        if (body.question && body.question.length > MAX_POLL_QUESTION_LENGTH) {
-            return NextResponse.json(
-                { error: `Question cannot exceed ${MAX_POLL_QUESTION_LENGTH} characters` },
-                { status: 400 }
-            );
-        }
+        const closedInput = data.closed ?? data.isClosed;
 
-        if (body.description && body.description.length > MAX_POLL_DESCRIPTION_LENGTH) {
-            return NextResponse.json(
-                { error: `Description cannot exceed ${MAX_POLL_DESCRIPTION_LENGTH} characters` },
-                { status: 400 }
-            );
-        }
-
-        const closedInput = body.closed ?? body.isClosed;
-
-        const hasOptionsUpdate = Array.isArray(body.options) || Array.isArray(body.timeSlots);
+        const hasOptionsUpdate = Array.isArray(data.options) || Array.isArray(data.timeSlots);
         let normalizedOptions: Array<{ text: string; emoji?: string | null; dateTimeValue?: Date | null }> | undefined;
 
-        if (Array.isArray(body.timeSlots)) {
-            normalizedOptions = body.timeSlots.map((slot: string) => {
+        if (Array.isArray(data.timeSlots)) {
+            normalizedOptions = data.timeSlots.map((slot: string) => {
                 const date = new Date(slot);
+                if (Number.isNaN(date.getTime())) {
+                    throw new Error(`Invalid time slot: ${slot}`);
+                }
                 return {
-                    text: date.toLocaleString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                    }),
+                    text: formatDiscordTimestampLabel(date),
                     dateTimeValue: date,
                     emoji: null,
                 };
             });
-        } else if (Array.isArray(body.options)) {
-            normalizedOptions = body.options.map((option: { text: string; emoji?: string }) => ({
+        } else if (Array.isArray(data.options)) {
+            normalizedOptions = data.options.map((option: { text: string; emoji?: string }) => ({
                 text: option.text,
                 emoji: option.emoji || null,
                 dateTimeValue: null,
@@ -167,7 +182,7 @@ export async function PATCH(
                 );
             }
 
-            const nextType = body.type || (body.isAnonymous ? 'ANONYMOUS' : existingPoll.type);
+            const nextType = data.type || (data.isAnonymous ? 'ANONYMOUS' : existingPoll.type);
             if (nextType !== 'TIME' && normalizedOptions.length < 2) {
                 return NextResponse.json(
                     { error: 'At least 2 options are required' },
@@ -191,101 +206,54 @@ export async function PATCH(
             }
         }
 
-        // Build update object
         const updateData: Partial<typeof poll.$inferInsert> = {
             updatedAt: new Date(),
         };
 
-        if (body.question !== undefined) updateData.question = body.question;
-        if (body.description !== undefined) updateData.description = body.description;
-        if (body.channelId !== undefined) updateData.channelId = body.channelId;
-        if (body.allowMultipleVotes !== undefined) updateData.allowMultipleVotes = body.allowMultipleVotes;
-        if (body.maxVotesPerUser !== undefined) updateData.maxVotesPerUser = body.maxVotesPerUser;
-        if (body.allowCustomOptions !== undefined) updateData.allowCustomOptions = body.allowCustomOptions;
-        if (body.type !== undefined) updateData.type = body.type;
-        if (body.isAnonymous === true) updateData.type = 'ANONYMOUS';
-        if (body.allowedRoleIds !== undefined) updateData.allowedRoleIds = body.allowedRoleIds;
-        if (body.mentionRoleIds !== undefined) updateData.mentionRoleIds = body.mentionRoleIds;
-        if (body.mentionOnCreate !== undefined) updateData.mentionOnCreate = body.mentionOnCreate;
-        if (body.endTime !== undefined) updateData.endTime = body.endTime ? new Date(body.endTime) : null;
+        if (data.question !== undefined) updateData.question = data.question;
+        if (data.description !== undefined) updateData.description = data.description;
+        if (data.channelId !== undefined) updateData.channelId = data.channelId;
+        if (data.allowMultipleVotes !== undefined) updateData.allowMultipleVotes = data.allowMultipleVotes;
+        if (data.maxVotesPerUser !== undefined) updateData.maxVotesPerUser = data.maxVotesPerUser;
+        if (data.allowCustomOptions !== undefined) updateData.allowCustomOptions = data.allowCustomOptions;
+        if (data.type !== undefined) updateData.type = data.type;
+        if (data.isAnonymous === true) updateData.type = 'ANONYMOUS';
+        if (data.allowedRoleIds !== undefined) updateData.allowedRoleIds = data.allowedRoleIds;
+        if (data.mentionRoleIds !== undefined) updateData.mentionRoleIds = data.mentionRoleIds;
+        if (data.mentionOnCreate !== undefined) updateData.mentionOnCreate = data.mentionOnCreate;
+        if (data.endTime !== undefined) updateData.endTime = data.endTime ? new Date(data.endTime) : null;
+
         if (closedInput !== undefined) {
-            updateData.closed = closedInput;
-            if (closedInput) {
-                updateData.closedAt = new Date();
-            } else {
-                updateData.closedAt = null;
-            }
+            delete updateData.closed;
+            delete updateData.closedAt;
         }
 
-        const updatedPoll = await db.transaction(async (tx) => {
-            const [updated] = await tx
-                .update(poll)
-                .set(updateData)
-                .where(eq(poll.id, pollId))
-                .returning();
-
-            if (normalizedOptions) {
-                const existingOptions = await tx
-                    .select()
-                    .from(pollOption)
-                    .where(eq(pollOption.pollId, pollId))
-                    .orderBy(asc(pollOption.order));
-
-                for (let i = 0; i < normalizedOptions.length; i++) {
-                    const option = normalizedOptions[i];
-                    const existingOption = existingOptions[i];
-
-                    if (existingOption) {
-                        await tx
-                            .update(pollOption)
-                            .set({
-                                order: i,
-                                text: option.text,
-                                emoji: option.emoji ?? null,
-                                dateTimeValue: option.dateTimeValue ?? null,
-                            })
-                            .where(eq(pollOption.id, existingOption.id));
-                    } else {
-                        await tx.insert(pollOption).values({
-                            pollId,
-                            order: i,
-                            text: option.text,
-                            emoji: option.emoji ?? null,
-                            dateTimeValue: option.dateTimeValue ?? null,
-                        });
-                    }
-                }
-
-                if (existingOptions.length > normalizedOptions.length) {
-                    const optionsToRemove = existingOptions.slice(normalizedOptions.length);
-                    const optionIdsToRemove = optionsToRemove.map((option) => option.id);
-
-                    if (optionIdsToRemove.length > 0) {
-                        await tx.delete(pollVote).where(inArray(pollVote.optionId, optionIdsToRemove));
-                        await tx.delete(pollOption).where(inArray(pollOption.id, optionIdsToRemove));
-                    }
-                }
-            }
-
-            return updated;
-        });
+        const updatedPoll = await pollService.updatePollWithOptions(pollId, updateData, normalizedOptions);
+        if (!updatedPoll) {
+            return NextResponse.json({ error: 'Poll not found' }, { status: 404 });
+        }
 
         if (closedInput === true && !existingPoll.closed) {
-            const totalVotes = await db
-                .select()
-                .from(pollVote)
-                .where(eq(pollVote.pollId, pollId))
-                .then((rows) => rows.length);
+            const closedPoll = await pollService.closePoll(pollId);
+            if (!closedPoll) {
+                return NextResponse.json({ error: 'Poll not found' }, { status: 404 });
+            }
+            return NextResponse.json(closedPoll);
+        }
 
-            await dispatchGuildWebhookEvent(guildId, 'poll.closed', {
-                pollId,
-                pollQuestion: updatedPoll.question,
-                totalVotes,
-            });
+        if (closedInput === false && existingPoll.closed) {
+            const reopened = await pollService.updatePoll(pollId, { closed: false, closedAt: null });
+            if (!reopened) {
+                return NextResponse.json({ error: 'Poll not found' }, { status: 404 });
+            }
+            return NextResponse.json(reopened);
         }
 
         return NextResponse.json(updatedPoll);
     } catch (error) {
+        if (error instanceof Error && error.message.startsWith('Invalid time slot:')) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+        }
         logger.error('Error updating poll:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
@@ -302,6 +270,8 @@ export async function DELETE(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'polls');
+        if (moduleGuard) return moduleGuard;
 
         // Check if poll exists and belongs to guild
         const [existingPoll] = await db
@@ -313,16 +283,7 @@ export async function DELETE(
             return NextResponse.json({ error: 'Poll not found' }, { status: 404 });
         }
 
-        await deleteDiscordMessage(existingPoll.channelId, existingPoll.messageId);
-
-        // Delete votes first
-        await db.delete(pollVote).where(eq(pollVote.pollId, pollId));
-
-        // Delete options
-        await db.delete(pollOption).where(eq(pollOption.pollId, pollId));
-
-        // Delete poll
-        await db.delete(poll).where(eq(poll.id, pollId));
+        await pollService.deletePollWithArtifacts(pollId);
 
         return NextResponse.json({ success: true });
     } catch (error) {

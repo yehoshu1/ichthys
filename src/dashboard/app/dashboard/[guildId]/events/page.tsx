@@ -71,6 +71,7 @@ import { format } from "date-fns";
 import { LabelWithTooltip, HelperText } from "../../../../components/HelpTooltip";
 import { DateTimePicker, DatePicker } from "../../../../components/ui/datetime-picker";
 import { RoleMultiSelect } from "../../../../components/DiscordSelectors";
+import EventCalendar from "../../../../components/EventCalendar";
 
 // Types
 interface Event {
@@ -170,7 +171,7 @@ const EVENT_COLORS = [
     { value: "#E67E22", label: "Orange", class: "bg-[#E67E22]" },
 ];
 
-const EVENT_TABS = ["upcoming", "past", "templates", "settings"] as const;
+const EVENT_TABS = ["calendar", "upcoming", "past", "templates", "settings"] as const;
 type EventTab = (typeof EVENT_TABS)[number];
 
 export default function EventsPage() {
@@ -181,7 +182,7 @@ export default function EventsPage() {
     const resolvedTab: EventTab =
         requestedTab && EVENT_TABS.includes(requestedTab as EventTab)
             ? (requestedTab as EventTab)
-            : "upcoming";
+            : "calendar";
     const [activeTab, setActiveTab] = useState<EventTab>(resolvedTab);
 
     useEffect(() => {
@@ -207,14 +208,19 @@ export default function EventsPage() {
             >
                 <div className="flex items-center justify-between">
                     <TabsList>
+                        <TabsTrigger value="calendar">Calendar</TabsTrigger>
                         <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
                         <TabsTrigger value="past">Past Events</TabsTrigger>
                         <TabsTrigger value="templates">Templates</TabsTrigger>
                         <TabsTrigger value="settings">Settings</TabsTrigger>
                     </TabsList>
 
-                    {activeTab === "upcoming" && <CreateEventButton guildId={guildId} />}
+                    {(activeTab === "calendar" || activeTab === "upcoming") && <CreateEventButton guildId={guildId} />}
                 </div>
+
+                <TabsContent value="calendar" className="space-y-4">
+                    <CalendarTab guildId={guildId} />
+                </TabsContent>
 
                 <TabsContent value="upcoming" className="space-y-4">
                     <EventsList guildId={guildId} status="upcoming" />
@@ -263,21 +269,28 @@ function CreateEventButton({ guildId }: { guildId: string }) {
 function EventForm({
     guildId,
     event,
+    initialDate,
     onSuccess,
 }: {
     guildId: string;
     event?: Event;
+    initialDate?: Date | null;
     onSuccess: () => void;
 }) {
     const [saving, setSaving] = useState(false);
+    const [savingTemplate, setSavingTemplate] = useState(false);
     const [templates, setTemplates] = useState<EventTemplate[]>([]);
+    const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+    const [templateName, setTemplateName] = useState(
+        event?.title ? `${event.title} Template` : ""
+    );
     const [formData, setFormData] = useState<EventFormData>({
         title: event?.title || "",
         description: event?.description || "",
         location: event?.location || "",
         locationChannelId: event?.locationChannelId || "",
         channelId: event?.channelId || "",
-        startTime: event?.startTime ? new Date(event.startTime) : null,
+        startTime: event?.startTime ? new Date(event.startTime) : (initialDate || null),
         endTime: event?.endTime ? new Date(event.endTime) : null,
         durationMinutes: event?.durationMinutes || null,
         color: event?.color || "#5865F2",
@@ -341,6 +354,54 @@ function EventForm({
         }));
     }
 
+    function getTemplateDurationMinutes(): number | undefined {
+        if (formData.durationMinutes && formData.durationMinutes > 0) {
+            return formData.durationMinutes;
+        }
+
+        if (formData.startTime && formData.endTime) {
+            const minutes = Math.round((formData.endTime.getTime() - formData.startTime.getTime()) / 60000);
+            if (minutes > 0) {
+                return minutes;
+            }
+        }
+
+        return undefined;
+    }
+
+    async function saveCurrentAsTemplate() {
+        const allMentionRoleIds = Array.from(new Set([
+            ...(formData.mentionOnCreate ? formData.mentionRoleIdsOnCreate : []),
+            ...(formData.mentionOnStart ? formData.mentionRoleIdsOnStart : []),
+        ]));
+
+        const templatePayload = {
+            name: templateName.trim(),
+            defaultTitle: formData.title.trim(),
+            defaultDescription: formData.description || undefined,
+            defaultLocation: formData.location || undefined,
+            defaultColor: formData.color || undefined,
+            defaultDurationMinutes: getTemplateDurationMinutes(),
+            maxAttendees: formData.maxAttendees || undefined,
+            enableWaitlist: formData.enableWaitlist,
+            mentionRoleIds: allMentionRoleIds.length > 0 ? allMentionRoleIds : undefined,
+            requiredRoleIds: formData.requiredRoleIds.length > 0 ? formData.requiredRoleIds : undefined,
+            blockedRoleIds: formData.blockedRoleIds.length > 0 ? formData.blockedRoleIds : undefined,
+            attendeeRoleId: formData.attendeeRoleId || undefined,
+        };
+
+        const templateRes = await fetch(`/api/guilds/${guildId}/events/templates`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(templatePayload),
+        });
+
+        if (!templateRes.ok) {
+            const templateError = await templateRes.json().catch(() => ({} as { error?: string }));
+            throw new Error(templateError.error || "Failed to save template");
+        }
+    }
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setSaving(true);
@@ -359,6 +420,11 @@ function EventForm({
             }
             if (!formData.startTime) {
                 toast.error("Start time is required");
+                setSaving(false);
+                return;
+            }
+            if (saveAsTemplate && !templateName.trim()) {
+                toast.error("Template name is required when saving as template");
                 setSaving(false);
                 return;
             }
@@ -409,7 +475,20 @@ function EventForm({
                 return;
             }
 
-            toast.success(event ? "Event updated" : "Event created");
+            if (saveAsTemplate) {
+                try {
+                    setSavingTemplate(true);
+                    await saveCurrentAsTemplate();
+                    toast.success(event ? "Event updated and template saved" : "Event created and template saved");
+                } catch (templateError) {
+                    const message = templateError instanceof Error ? templateError.message : "Failed to save template";
+                    toast.error(`Event saved, but template was not saved: ${message}`);
+                } finally {
+                    setSavingTemplate(false);
+                }
+            } else {
+                toast.success(event ? "Event updated" : "Event created");
+            }
             onSuccess();
         } catch (error) {
             console.error("Error saving event:", error);
@@ -851,14 +930,49 @@ function EventForm({
                 )}
             </div>
 
+            {/* Save as Template */}
+            <div className="space-y-4 border-t pt-4">
+                <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                        <Label>Save as Template</Label>
+                        <HelperText>
+                            Save this event configuration as a reusable template
+                        </HelperText>
+                    </div>
+                    <Switch
+                        checked={saveAsTemplate}
+                        onCheckedChange={setSaveAsTemplate}
+                    />
+                </div>
+
+                {saveAsTemplate && (
+                    <div className="space-y-2">
+                        <Label htmlFor="templateName">
+                            Template Name <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                            id="templateName"
+                            value={templateName}
+                            onChange={(e) => setTemplateName(e.target.value)}
+                            placeholder="e.g., Weekly Community Meetup"
+                            required
+                        />
+                    </div>
+                )}
+            </div>
+
             <DialogFooter>
                 <DialogClose asChild>
                     <Button type="button" variant="outline">
                         Cancel
                     </Button>
                 </DialogClose>
-                <Button type="submit" disabled={saving}>
-                    {saving ? "Saving..." : event ? "Update Event" : "Create Event"}
+                <Button type="submit" disabled={saving || savingTemplate}>
+                    {saving || savingTemplate
+                        ? "Saving..."
+                        : event
+                            ? "Update Event"
+                            : "Create Event"}
                 </Button>
             </DialogFooter>
         </form>
@@ -1031,6 +1145,107 @@ function EventsList({
                     )}
                 </CardContent>
             </Card>
+
+            {/* Edit Dialog */}
+            <Dialog
+                open={!!editingEvent}
+                onOpenChange={(open) => !open && setEditingEvent(null)}
+            >
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Edit Event</DialogTitle>
+                        <DialogDescription>
+                            Update the event details.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {editingEvent && (
+                        <EventForm
+                            guildId={guildId}
+                            event={editingEvent}
+                            onSuccess={() => {
+                                setEditingEvent(null);
+                                fetchEvents();
+                            }}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
+        </>
+    );
+}
+
+function CalendarTab({ guildId }: { guildId: string }) {
+    const [events, setEvents] = useState<Event[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [creatingEvent, setCreatingEvent] = useState(false);
+    const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+    useEffect(() => {
+        fetchEvents();
+    }, [guildId]);
+
+    async function fetchEvents() {
+        try {
+            const res = await fetch(`/api/guilds/${guildId}/events`);
+            if (res.ok) {
+                const data = await res.json();
+                setEvents(data);
+            }
+        } catch (error) {
+            console.error("Error fetching events:", error);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function handleCreateEvent(date: Date) {
+        setSelectedDate(date);
+        setCreatingEvent(true);
+    }
+
+    function handleEventClick(event: Event) {
+        setEditingEvent(event);
+    }
+
+    if (loading) {
+        return (
+            <Card>
+                <CardContent className="p-12 text-center">
+                    <p className="text-muted-foreground">Loading calendar...</p>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <>
+            <EventCalendar
+                events={events}
+                onEventClick={handleEventClick}
+                onCreateEvent={handleCreateEvent}
+            />
+
+            {/* Create Dialog */}
+            <Dialog open={creatingEvent} onOpenChange={setCreatingEvent}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Create New Event</DialogTitle>
+                        <DialogDescription>
+                            {selectedDate && `Creating event for ${format(selectedDate, "MMMM d, yyyy")}`}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <EventForm
+                        guildId={guildId}
+                        initialDate={selectedDate}
+                        onSuccess={() => {
+                            setCreatingEvent(false);
+                            setSelectedDate(null);
+                            fetchEvents();
+                        }}
+                    />
+                </DialogContent>
+            </Dialog>
 
             {/* Edit Dialog */}
             <Dialog
@@ -1242,6 +1457,7 @@ function EventCard({
 function EventTemplatesTab({ guildId }: { guildId: string }) {
     const [templates, setTemplates] = useState<EventTemplate[]>([]);
     const [loading, setLoading] = useState(true);
+    const [createOpen, setCreateOpen] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<EventTemplate | null>(null);
     const [savingTemplate, setSavingTemplate] = useState(false);
 
@@ -1332,10 +1548,37 @@ function EventTemplatesTab({ guildId }: { guildId: string }) {
         <>
         <Card>
             <CardHeader>
-                <CardTitle>Event Templates</CardTitle>
-                <CardDescription>
-                    Save common event configurations for quick creation.
-                </CardDescription>
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <CardTitle>Event Templates</CardTitle>
+                        <CardDescription>
+                            Save common event configurations for quick creation.
+                        </CardDescription>
+                    </div>
+                    <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                        <DialogTrigger asChild>
+                            <Button>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Create Template
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Create Event Template</DialogTitle>
+                                <DialogDescription>
+                                    Save reusable defaults for future events.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <CreateEventTemplateForm
+                                guildId={guildId}
+                                onSuccess={() => {
+                                    setCreateOpen(false);
+                                    fetchTemplates();
+                                }}
+                            />
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </CardHeader>
             <CardContent>
                 {templates.length === 0 ? (
@@ -1454,6 +1697,153 @@ function EventTemplatesTab({ guildId }: { guildId: string }) {
             </DialogContent>
         </Dialog>
         </>
+    );
+}
+
+function CreateEventTemplateForm({
+    guildId,
+    onSuccess,
+}: {
+    guildId: string;
+    onSuccess: () => void;
+}) {
+    const [saving, setSaving] = useState(false);
+    const [formData, setFormData] = useState({
+        name: "",
+        defaultTitle: "",
+        defaultDescription: "",
+        defaultLocation: "",
+        defaultColor: "#5865F2",
+        defaultDurationMinutes: null as number | null,
+    });
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!formData.name.trim()) {
+            toast.error("Template name is required");
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/guilds/${guildId}/events/templates`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: formData.name.trim(),
+                    defaultTitle: formData.defaultTitle || undefined,
+                    defaultDescription: formData.defaultDescription || undefined,
+                    defaultLocation: formData.defaultLocation || undefined,
+                    defaultColor: formData.defaultColor || undefined,
+                    defaultDurationMinutes: formData.defaultDurationMinutes || undefined,
+                }),
+            });
+
+            if (!res.ok) {
+                const payload = await res.json().catch(() => ({} as { error?: string }));
+                toast.error(payload.error || "Failed to create template");
+                return;
+            }
+
+            toast.success("Template created");
+            onSuccess();
+        } catch (error) {
+            console.error("Error creating event template:", error);
+            toast.error("Failed to create template");
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+                <Label htmlFor="event-template-name">
+                    Template Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                    id="event-template-name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g., Weekly Team Meeting"
+                    required
+                />
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="event-template-title">Default Event Title</Label>
+                <Input
+                    id="event-template-title"
+                    value={formData.defaultTitle}
+                    onChange={(e) => setFormData({ ...formData, defaultTitle: e.target.value })}
+                    placeholder="e.g., Community Hangout"
+                />
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="event-template-description">Default Description</Label>
+                <Textarea
+                    id="event-template-description"
+                    value={formData.defaultDescription}
+                    onChange={(e) => setFormData({ ...formData, defaultDescription: e.target.value })}
+                    placeholder="Default description for events using this template"
+                    rows={3}
+                />
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="event-template-location">Default Location</Label>
+                <Input
+                    id="event-template-location"
+                    value={formData.defaultLocation}
+                    onChange={(e) => setFormData({ ...formData, defaultLocation: e.target.value })}
+                    placeholder="e.g., Lounge VC"
+                />
+            </div>
+
+            <div className="space-y-2">
+                <Label>Default Color</Label>
+                <div className="flex gap-2 flex-wrap">
+                    {EVENT_COLORS.map((color) => (
+                        <button
+                            key={`template-${color.value}`}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, defaultColor: color.value })}
+                            className={`w-7 h-7 rounded-full ${color.class} ${formData.defaultColor === color.value ? "ring-2 ring-offset-2 ring-primary" : ""}`}
+                            title={color.label}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="event-template-duration">Default Duration (minutes)</Label>
+                <Input
+                    id="event-template-duration"
+                    type="number"
+                    min={1}
+                    max={1440}
+                    value={formData.defaultDurationMinutes ?? ""}
+                    onChange={(e) =>
+                        setFormData({
+                            ...formData,
+                            defaultDurationMinutes: e.target.value ? Number(e.target.value) : null,
+                        })
+                    }
+                />
+            </div>
+
+            <DialogFooter>
+                <DialogClose asChild>
+                    <Button type="button" variant="outline">
+                        Cancel
+                    </Button>
+                </DialogClose>
+                <Button type="submit" disabled={saving}>
+                    {saving ? "Creating..." : "Create Template"}
+                </Button>
+            </DialogFooter>
+        </form>
     );
 }
 

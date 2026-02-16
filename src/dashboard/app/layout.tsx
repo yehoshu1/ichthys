@@ -1,20 +1,14 @@
 import type { Metadata } from "next";
-import { DM_Sans, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
+import { DM_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "../components/AuthProvider";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "../components/TooltipContext";
 
-const dmSans = DM_Sans({
-    subsets: ["latin"],
-    variable: "--font-sans",
-});
-const spaceGrotesk = Space_Grotesk({
-    subsets: ["latin"],
-    variable: "--font-display",
-});
+const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-sans" });
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-display" });
 
 export const metadata: Metadata = {
     title: "ΙΧΘΥΣ | Dashboard",
@@ -42,11 +36,11 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="en" suppressHydrationWarning>
+        <html lang="en" suppressHydrationWarning className={`${dmSans.variable} ${spaceGrotesk.variable}`}>
             <head>
                 <Script id="theme-script" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeScript }} />
             </head>
-            <body className={`${dmSans.variable} ${spaceGrotesk.variable}`}>
+            <body>
                 <AuthProvider>
                     <TooltipProvider>
                         <ErrorBoundary>

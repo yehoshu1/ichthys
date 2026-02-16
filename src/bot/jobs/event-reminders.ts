@@ -2,6 +2,7 @@ import { Client, EmbedBuilder } from 'discord.js';
 import { eventService } from '../services/event-service';
 import { formatDiscordTimestamp } from '../utils/date-parser';
 import logger from '../utils/logger';
+import { isModuleEnabled } from '@shared/modules/state';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // EVENT REMINDER JOB
@@ -20,6 +21,12 @@ export async function execute(client: Client) {
 
         for (const { reminder, event: evt } of pendingReminders) {
             try {
+                const eventsEnabled = await isModuleEnabled(evt.guildId, 'events');
+                if (!eventsEnabled) {
+                    await eventService.markReminderSent(reminder.id);
+                    continue;
+                }
+
                 // Get the user
                 const user = await client.users.fetch(reminder.userId);
                 if (!user) {

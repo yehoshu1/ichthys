@@ -1,10 +1,21 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { BookOpen, Command, FolderKanban, Home, ShieldCheck, Wrench } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import DocsSearchTrigger from "../../components/DocsSearchTrigger";
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
+    const pathname = usePathname();
+    const isDevDocs = pathname?.startsWith("/docs/dev");
+
+    // For dev docs, just render children (dev layout will handle its own sidebar)
+    if (isDevDocs) {
+        return <>{children}</>;
+    }
+
     return (
         <div className="min-h-screen px-6 py-10">
             <div className="mx-auto flex max-w-7xl flex-col gap-8">

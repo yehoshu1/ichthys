@@ -4,6 +4,7 @@ import { levelProfile, guildConfig } from '../../shared/database/schema';
 import { eq, and, or, gt, gte, lt, sql } from 'drizzle-orm';
 import { xpForLevel } from '../utils/leveling';
 import { Command } from '../types/Command';
+import logger from '../utils/logger';
 
 // This is an alias for /rank command
 const command: Command = {
@@ -115,7 +116,7 @@ const command: Command = {
             await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
-            console.error('Error fetching profile:', error);
+            logger.error('Error fetching profile:', error);
             await interaction.editReply({ content: 'There was an error fetching the profile.' });
         }
         return;

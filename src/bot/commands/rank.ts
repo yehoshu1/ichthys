@@ -4,6 +4,7 @@ import { levelProfile, guildConfig } from '../../shared/database/schema';
 import { eq, and, or, gt, gte, lt, sql } from 'drizzle-orm';
 import { xpForLevel } from '../utils/leveling';
 import { Command } from '../types/Command';
+import logger from '../utils/logger';
 
 export const rank: Command = {
     data: new SlashCommandBuilder()
@@ -109,7 +110,7 @@ export const rank: Command = {
             await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
-            console.error('Error fetching rank:', error);
+            logger.error('Error fetching rank:', error);
             await interaction.editReply({ content: 'There was an error fetching the rank.' });
         }
         return;

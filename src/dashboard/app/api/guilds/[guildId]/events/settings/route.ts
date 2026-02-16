@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, eventPollSettings } from '@/lib/db';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { authorizeGuildApiRequest } from '@/lib/guild-api-auth';
 import logger from '@/lib/logger';
+import { requireGuildModuleEnabled } from '@/lib/module-gate';
+import { parseJsonBody } from '@/lib/validation';
+
+const settingsSchema = z.object({
+    defaultEventChannelId: z.string().nullable().optional(),
+    defaultPollChannelId: z.string().nullable().optional(),
+    defaultMentionOnCreate: z.boolean().optional(),
+    defaultMentionOnStart: z.boolean().optional(),
+    allowedEventCreators: z.array(z.string()).optional(),
+    allowedPollCreators: z.array(z.string()).optional(),
+    serverTimezone: z.string().max(100).optional(),
+    aiEnabled: z.boolean().optional(),
+    aiRateLimitPerHour: z.number().int().min(0).max(1000).optional(),
+    mirrorToDiscordEvents: z.boolean().optional(),
+}).strict();
 
 // GET /api/guilds/[guildId]/events/settings - Get event/poll settings
 export async function GET(
@@ -19,6 +35,8 @@ export async function GET(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'events');
+        if (moduleGuard) return moduleGuard;
 
         let settings = await db
             .select()
@@ -64,8 +82,12 @@ export async function POST(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'events');
+        if (moduleGuard) return moduleGuard;
 
-        const body = await request.json();
+        const parsed = await parseJsonBody(request, settingsSchema);
+        if (!parsed.success) return parsed.response;
+        const body = parsed.data;
 
         // Check if settings exist
         const existingSettings = await db
