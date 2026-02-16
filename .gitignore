@@ -17,3 +17,4 @@ out/
 build/
 coverage/
 .turbo/
+src/dashboard/.next.root*
