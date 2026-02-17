@@ -7,6 +7,10 @@ import { eq, and, sql, inArray } from 'drizzle-orm';
 import { buildMessage } from '../utils/embeds';
 import { emitGuildNotificationSafe } from '../services/notificationEmitter';
 
+// Deduplicate verification profile messages (prevent double-send within 5 seconds)
+const recentProfileMessages = new Map<string, number>();
+const DEDUPE_WINDOW_MS = 5000;
+
 const event: Event<Events.GuildMemberUpdate> = {
     name: Events.GuildMemberUpdate,
     async execute(oldMember: GuildMember | PartialGuildMember, newMember: GuildMember) {
@@ -142,6 +146,28 @@ const event: Event<Events.GuildMemberUpdate> = {
 
             for (const profile of verificationProfiles) {
                 if (addedRoles.has(profile.roleId)) {
+                    // Deduplication check
+                    const dedupeKey = `${newMember.guild.id}:${newMember.id}:${profile.id}`;
+                    const now = Date.now();
+                    const lastSent = recentProfileMessages.get(dedupeKey);
+                    
+                    if (lastSent && (now - lastSent) < DEDUPE_WINDOW_MS) {
+                        logger.debug(`Skipping duplicate verification profile message for ${newMember.user.tag} (profile: ${profile.name || profile.roleId})`);
+                        continue;
+                    }
+                    
+                    recentProfileMessages.set(dedupeKey, now);
+                    
+                    // Clean up old entries
+                    if (recentProfileMessages.size > 1000) {
+                        const cutoff = now - DEDUPE_WINDOW_MS;
+                        for (const [key, timestamp] of recentProfileMessages.entries()) {
+                            if (timestamp < cutoff) {
+                                recentProfileMessages.delete(key);
+                            }
+                        }
+                    }
+                    
                     try {
                         if (profile.notifyChannelId) {
                             const channel = await newMember.guild.channels.fetch(profile.notifyChannelId);

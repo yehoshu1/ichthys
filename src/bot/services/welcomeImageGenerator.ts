@@ -298,7 +298,7 @@ function drawUsername(
     // Set font
     ctx.font = `bold ${fontSize}px "${fontFamily}", Arial, sans-serif`;
     ctx.fillStyle = config.usernameColor || '#ffffff';
-    ctx.textAlign = (config.usernameAlign as CanvasTextAlign) || 'left';
+    ctx.textAlign = (config.usernameAlign as 'left' | 'center' | 'right') || 'left';
     ctx.textBaseline = 'middle';
 
     // Apply shadow for better readability
@@ -340,7 +340,7 @@ function drawSubtitle(
     // Set font
     ctx.font = `${fontSize}px "${fontFamily}", Arial, sans-serif`;
     ctx.fillStyle = config.subtitleColor || '#cccccc';
-    ctx.textAlign = (config.usernameAlign as CanvasTextAlign) || 'left';
+    ctx.textAlign = (config.usernameAlign as 'left' | 'center' | 'right') || 'left';
     ctx.textBaseline = 'middle';
 
     // Apply shadow
@@ -375,7 +375,7 @@ function drawServerName(
     // Set font
     ctx.font = `bold ${fontSize}px "${fontFamily}", Arial, sans-serif`;
     ctx.fillStyle = config.serverNameColor || '#ffffff';
-    ctx.textAlign = (config.usernameAlign as CanvasTextAlign) || 'left';
+    ctx.textAlign = (config.usernameAlign as 'left' | 'center' | 'right') || 'left';
     ctx.textBaseline = 'middle';
 
     // Apply shadow

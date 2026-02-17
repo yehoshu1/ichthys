@@ -75,10 +75,10 @@ COPY --from=builder /app/drizzle.config.ts ./
 COPY --from=builder /app/scripts ./scripts
 
 # Create unprivileged runtime user and writable directories
-RUN groupadd -r appuser && useradd -r -g appuser appuser \
-    && mkdir -p /app/logs /app/backups \
-    && chown -R appuser:appuser /app \
-    && chmod 770 /app/logs /app/backups
+RUN groupadd -r appuser && useradd -r -g appuser -m appuser \
+    && mkdir -p /app/logs /app/backups /app/data /home/appuser/.pm2 \
+    && chown -R appuser:appuser /app /home/appuser \
+    && chmod -R 770 /app/logs /app/backups /app/data
 
 # Expose ports
 # Bot doesn't need exposed port, but Dashboard does (typically 3000)

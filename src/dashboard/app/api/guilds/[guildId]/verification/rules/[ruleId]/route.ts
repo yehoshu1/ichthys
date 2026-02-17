@@ -56,7 +56,10 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ guildId
         if (body.roleId !== undefined) updates.roleId = body.roleId;
         if (body.notifyChannelId !== undefined) updates.notifyChannelId = body.notifyChannelId;
         if (body.message !== undefined) updates.message = body.message;
-        if (body.messageEmbed !== undefined) updates.messageEmbed = body.messageEmbed;
+        if (body.messageEmbed !== undefined) {
+            // Clean undefined values from embed object for JSON serialization
+            updates.messageEmbed = body.messageEmbed ? JSON.parse(JSON.stringify(body.messageEmbed)) : null;
+        }
         if (body.enabled !== undefined) updates.enabled = body.enabled;
 
         const [updated] = await db.update(verificationMessageRule)

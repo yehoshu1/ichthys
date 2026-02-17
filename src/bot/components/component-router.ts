@@ -2,14 +2,16 @@ import type {
     ButtonInteraction,
     ModalSubmitInteraction,
     StringSelectMenuInteraction,
+    RoleSelectMenuInteraction,
+    ChannelSelectMenuInteraction,
 } from 'discord.js';
 import type { ModuleId } from '@shared/modules/registry';
 import { isModuleEnabled } from '@shared/modules/state';
 import logger from '../utils/logger';
 
-type ComponentKind = 'button' | 'string_select' | 'modal';
+type ComponentKind = 'button' | 'string_select' | 'role_select' | 'channel_select' | 'modal';
 
-type HandlerInteraction = ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction;
+type HandlerInteraction = ButtonInteraction | StringSelectMenuInteraction | RoleSelectMenuInteraction | ChannelSelectMenuInteraction | ModalSubmitInteraction;
 type ComponentHandler = (interaction: any) => Promise<void>;
 
 interface ComponentRoute {
@@ -40,6 +42,8 @@ export class ComponentRouter {
     private readonly routes: Record<ComponentKind, ComponentRoute[]> = {
         button: [],
         string_select: [],
+        role_select: [],
+        channel_select: [],
         modal: [],
     };
 
@@ -62,6 +66,14 @@ export class ComponentRouter {
 
     async dispatchStringSelect(interaction: StringSelectMenuInteraction): Promise<boolean> {
         return this.dispatch('string_select', interaction);
+    }
+
+    async dispatchRoleSelect(interaction: RoleSelectMenuInteraction): Promise<boolean> {
+        return this.dispatch('role_select', interaction);
+    }
+
+    async dispatchChannelSelect(interaction: ChannelSelectMenuInteraction): Promise<boolean> {
+        return this.dispatch('channel_select', interaction);
     }
 
     async dispatchModal(interaction: ModalSubmitInteraction): Promise<boolean> {

@@ -30,7 +30,6 @@ async function syncGuildMemberSnapshot(guildId: string, verificationRoleId: stri
             headers: {
                 Authorization: `Bot ${token}`,
             },
-            cache: "no-store",
         });
     } catch (error) {
         logger.error(`Analytics sync failed for guild ${guildId}:`, error);

@@ -20,7 +20,7 @@ const moderationConfigSchema = z.object({
     inviteFilterAction: z.enum(["DELETE", "WARN"]).default("DELETE"),
     logChannelId: nullableDiscordIdSchema,
     muteRoleId: nullableDiscordIdSchema,
-}).strict();
+}).passthrough();
 
 export async function GET(
     req: NextRequest,

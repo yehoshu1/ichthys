@@ -9,7 +9,13 @@ export function requireSameOrigin(request: NextRequest): NextResponse | null {
 
     const origin = request.headers.get("origin");
     const referer = request.headers.get("referer");
-    const expectedOrigin = request.nextUrl.origin;
+    
+    // Get the expected origin - trust X-Forwarded headers for proxied requests
+    const forwardedProto = request.headers.get("x-forwarded-proto");
+    const forwardedHost = request.headers.get("x-forwarded-host");
+    const expectedOrigin = (forwardedProto && forwardedHost) 
+        ? `${forwardedProto}://${forwardedHost}`
+        : request.nextUrl.origin;
 
     if (origin && origin !== expectedOrigin) {
         return NextResponse.json({ error: "Invalid origin" }, { status: 403 });

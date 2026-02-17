@@ -14,7 +14,7 @@ const verificationConfigSchema = z.object({
     verificationGraceDays: z.number().int().min(1).max(365).optional(),
     verificationKickDmEnabled: z.boolean().optional(),
     verificationMessage: optionalTextSchema,
-}).strict();
+}).passthrough();
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;

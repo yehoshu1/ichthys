@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             .where(and(
                 eq(actionLog.guildId, params.guildId),
                 eq(actionLog.actionType, "KICK"),
-                sql`${actionLog.metadata} like ${'%Unverified Auto-Kick%'}`
+                sql`${actionLog.metadata}::text like ${'%Unverified Auto-Kick%'}`
             ))
             .orderBy(desc(actionLog.executedAt))
             .limit(limit);

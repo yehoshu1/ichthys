@@ -22,6 +22,16 @@ async function execute(interaction: Interaction): Promise<void> {
             return;
         }
 
+        if (interaction.isRoleSelectMenu()) {
+            await componentRouter.dispatchRoleSelect(interaction);
+            return;
+        }
+
+        if (interaction.isChannelSelectMenu()) {
+            await componentRouter.dispatchChannelSelect(interaction);
+            return;
+        }
+
         if (interaction.isModalSubmit()) {
             await componentRouter.dispatchModal(interaction);
         }

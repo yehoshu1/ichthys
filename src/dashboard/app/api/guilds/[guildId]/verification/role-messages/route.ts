@@ -46,7 +46,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
             guildId,
             roleId: body.roleId,
             message: body.message,
-            messageEmbed: body.messageEmbed || null,
+            messageEmbed: body.messageEmbed ? JSON.parse(JSON.stringify(body.messageEmbed)) : null,
             enabled: body.enabled ?? true,
         }).returning();
 

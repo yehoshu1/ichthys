@@ -1,11 +1,21 @@
 {
-    "extends": "./tsconfig.json",
     "compilerOptions": {
+        "target": "ES2022",
         "module": "commonjs",
         "moduleResolution": "node",
+        "lib": ["ES2022"],
         "outDir": "./dist",
+        "rootDir": "./src",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
         "noEmit": false,
-        "rootDir": "./src"
+        "baseUrl": ".",
+        "paths": {
+            "@shared/*": ["./src/shared/*"]
+        }
     },
     "include": [
         "src/bot/**/*",

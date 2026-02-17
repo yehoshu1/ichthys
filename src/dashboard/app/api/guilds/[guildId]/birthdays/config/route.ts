@@ -17,7 +17,7 @@ const birthdayConfigSchema = z.object({
     showAge: z.boolean().optional(),
     mentionRoleId: z.string().nullable().optional(), // "everyone", "here", role ID, or null
     autoRemoveRole: z.boolean().optional(),
-}).strict();
+}).passthrough();
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;

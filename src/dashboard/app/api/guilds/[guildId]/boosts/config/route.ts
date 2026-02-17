@@ -21,7 +21,7 @@ const boostsConfigSchema = z.object({
     boostReBoostMessageEmbed: optionalEmbedSchema,
     boostRoleRemovalDays: z.number().int().min(0).max(365).optional(),
     boostRoleRemovalDmEnabled: z.boolean().optional(),
-}).strict();
+}).passthrough();
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;

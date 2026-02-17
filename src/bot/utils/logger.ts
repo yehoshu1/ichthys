@@ -38,7 +38,7 @@ const fileFormat = winston.format.combine(
     winston.format.json()
 );
 
-const logDir = 'logs';
+const logDir = path.join(process.cwd(), 'logs');
 const todayDate = new Date().toISOString().slice(0, 10);
 
 function ensureWritableLogFile(filePath: string): void {

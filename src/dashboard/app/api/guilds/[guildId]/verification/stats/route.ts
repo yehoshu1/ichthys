@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             status: sql<string>`
                 CASE 
                     WHEN ${userJoin.kickedAt} IS NOT NULL THEN 'kicked'
-                    WHEN ${userJoin.isVerified} = 1 THEN 'verified'
+                    WHEN ${userJoin.isVerified} = true THEN 'verified'
                     ELSE 'unverified'
                 END
             `,
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             ))
             .groupBy(sql`CASE 
                 WHEN ${userJoin.kickedAt} IS NOT NULL THEN 'kicked'
-                WHEN ${userJoin.isVerified} = 1 THEN 'verified'
+                WHEN ${userJoin.isVerified} = true THEN 'verified'
                 ELSE 'unverified'
             END`);
 

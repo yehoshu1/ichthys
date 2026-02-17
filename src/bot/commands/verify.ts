@@ -74,28 +74,7 @@ export const verify: Command = {
                     return;
                 }
 
-                const variables = {
-                    user: member.toString(),
-                    username: member.user.username,
-                    server: interaction.guild!.name,
-                    memberCount: interaction.guild!.memberCount.toString()
-                };
-                const messageData = buildMessage(
-                    profile.message,
-                    profile.messageEmbed as any,
-                    variables
-                );
-
-                if (messageData && profile.notifyChannelId) {
-                    try {
-                        const channel = await interaction.guild!.channels.fetch(profile.notifyChannelId);
-                        if (channel && channel.isTextBased()) {
-                            await channel.send(messageData);
-                        }
-                    } catch (error) {
-                        logger.error('Failed to send profile verification message:', error);
-                    }
-                }
+                // Note: Message will be sent automatically by guildMemberUpdate event handler
 
                 const profileLabel = profile.name || interaction.guild!.roles.cache.get(profile.roleId)?.name || 'profile';
                 await interaction.editReply(`✅ Applied verification profile **${profileLabel}** to ${member.user.username}.`);

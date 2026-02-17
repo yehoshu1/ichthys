@@ -17,7 +17,7 @@ const levelingConfigSchema = z.object({
     levelUpChannelId: nullableDiscordIdSchema,
     levelUpMessage: optionalTextSchema,
     levelUpMessageEmbed: optionalEmbedSchema,
-}).strict();
+}).passthrough(); // Allow extra fields (frontend sends entire config)
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;

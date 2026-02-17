@@ -16,6 +16,7 @@
     "dashboard:start": "next start src/dashboard",
     "start": "node dist/bot/index.js",
     "deploy": "tsx src/utils/deployCommands.ts",
+    "deploy:prod": "node scripts/deployCommands.js",
     "deploy:check": "tsx scripts/check-commands.ts",
     "guard:commands": "tsx scripts/check-command-catalog.ts",
     "guard:modules": "tsx scripts/check-module-guards.ts",

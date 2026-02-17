@@ -35,7 +35,7 @@ services:
     container_name: ixoye-app
     restart: always
     ports:
-      - "4000:3000"
+      - "4002:4002"
     volumes:
       - ./backups:/app/backups
       - ./logs:/app/logs
@@ -45,6 +45,7 @@ services:
       NODE_ENV: production
       METRICS_TOKEN: ${METRICS_TOKEN:-}
       REDIS_URL: ${REDIS_URL:-}
+      PG_SSL: "false"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:-ixoye}
