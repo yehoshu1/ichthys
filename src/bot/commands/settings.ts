@@ -4,6 +4,7 @@ import {
     PermissionFlagsBits,
     EmbedBuilder,
     ChannelType,
+    GuildMember,
 } from 'discord.js';
 import { Command } from '../types/Command';
 import { db } from '@shared/database/client';
@@ -118,6 +119,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         const guild = interaction.guild;
         if (!guild) {
             await interaction.editReply('This command can only be used in a server.');
+            return;
+        }
+
+        const member = interaction.member as GuildMember;
+        if (!member || !member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+            await interaction.editReply('You need the Manage Server permission to use this command.');
             return;
         }
 
@@ -378,11 +385,4 @@ async function setDiscordSettings(interaction: ChatInputCommandInteraction, sett
     await interaction.editReply(`✅ Discord settings updated: ${changes.join(', ')}`);
 }
 
-export default {
-    data,
-    execute,
-    moduleId: 'events',
-    policy: {
-        requiredMemberPermissions: [PermissionFlagsBits.ManageGuild],
-    },
-} as Command;
+export default { data, execute } as Command;

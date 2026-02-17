@@ -1,5 +1,8 @@
 export type DashboardNavId =
     | "overview"
+    | "events"
+    | "polls"
+    | "webhooks"
     | "welcome"
     | "verification"
     | "leveling"
@@ -24,6 +27,8 @@ export interface DashboardNavItem {
 
 export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
     { id: "overview", name: "Overview", href: "", moduleSlug: "analytics", keywords: ["home", "summary", "analytics"] },
+    { id: "events", name: "Events", href: "/events", moduleSlug: "events", keywords: ["event", "rsvp", "calendar", "schedule", "meetup", "reminder", "recurring"] },
+    { id: "polls", name: "Polls", href: "/polls", moduleSlug: "polls", keywords: ["poll", "vote", "survey", "time poll", "anonymous vote", "when2meet"] },
     { id: "welcome", name: "Welcome", href: "/welcome", moduleSlug: "welcome", keywords: ["join", "leave", "templates", "triggers", "welcome card", "welcome image", "custom welcome", "new member"] },
     { id: "verification", name: "Verification", href: "/verification", moduleSlug: "verification", keywords: ["unverified", "kick", "grace days", "verify"] },
     { id: "leveling", name: "Leveling", href: "/leveling", moduleSlug: "leveling", keywords: ["xp", "rank", "rewards", "leaderboard"] },
@@ -36,5 +41,6 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
     { id: "moderation", name: "Moderation", href: "/moderation", moduleSlug: "moderation", keywords: ["warn", "ban", "mute", "automod"] },
     { id: "logs", name: "Logs", href: "/logs", moduleSlug: "logs", keywords: ["audit", "history", "action log"] },
     { id: "settings", name: "Settings", href: "/settings", moduleSlug: "settings-backups", keywords: ["import", "export", "backup", "restore"] },
+    { id: "webhooks", name: "Webhooks & API", href: "/webhooks", moduleSlug: "webhooks", keywords: ["webhook", "api", "integration", "endpoint", "automation", "calendar"] },
     { id: "docs", name: "Documentation", href: "/docs", keywords: ["guides", "docs", "help"] },
 ];

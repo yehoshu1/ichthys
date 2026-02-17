@@ -4,7 +4,6 @@ The Events module allows server administrators to create, manage, and track serv
 
 ## Features
 
-- **Calendar View**: Interactive calendar with month, week, and day views for visualizing events
 - **Event Creation**: Create events with title, description, time, location
 - **RSVP Tracking**: Track Yes/No/Maybe/Waitlist responses
 - **Recurring Events**: Support for daily, weekly, bi-weekly, monthly, yearly recurrence
@@ -13,7 +12,6 @@ The Events module allows server administrators to create, manage, and track serv
 - **Waitlist Management**: Automatic promotion when spots open
 - **Event Templates**: Save and reuse common event configurations
 - **Color Coding**: Visual distinction for different event types
-- **Responsive Design**: Fully responsive calendar and event management across all devices
 
 ## Database Schema
 
@@ -50,33 +48,6 @@ The Events module allows server administrators to create, manage, and track serv
 | `/api/guilds/[guildId]/events/[eventId]` | DELETE | Delete event |
 | `/api/guilds/[guildId]/events/templates` | GET/POST | Event templates |
 | `/api/guilds/[guildId]/events/settings` | GET/POST | Event settings |
-
-## Dashboard Features
-
-### Calendar View (Default)
-The calendar view is the primary interface for managing events:
-
-- **View Modes**: Switch between Month, Week, and Day views
-- **Visual Event Display**: Color-coded events with time indicators
-- **Quick Actions**:
-  - Click any date to create a new event (pre-fills the date)
-  - Click an event to view details and edit
-  - Navigate with Previous/Next buttons or "Today" shortcut
-- **Event Indicators**: Shows event count when multiple events exist on same day
-- **Fully Responsive**: Adapts to mobile, tablet, and desktop screens
-
-### List Views
-- **Upcoming Events**: List of all scheduled future events
-- **Past Events**: Historical event archive
-- **Search & Filter**: Find events by title or description
-
-### Templates
-- Save common event configurations for reuse
-- Quick apply when creating new events
-
-### Settings
-- Configure server-wide event defaults
-- Set default channels and mention settings
 
 ## Bot Commands
 

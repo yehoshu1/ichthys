@@ -15,6 +15,7 @@ Added 4 new tables:
 - `webhookEndpoint` - Stores webhook configurations
 - `webhookDelivery` - Stores webhook delivery logs
 - `apiKey` - Stores API keys for external access
+- `userCalendarIntegration` - Stores calendar sync settings
 
 ### 2. Created Webhook Service
 **File:** `src/bot/services/webhook-service.ts`

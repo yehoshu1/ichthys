@@ -28,25 +28,14 @@ function setupBirthdayJobs(): void {
 const requiredEnvVars = [
     'DISCORD_TOKEN',
     'DISCORD_CLIENT_ID',
+    'ANONYMIZE_SECRET',
+    'CALENDAR_SECRET',
 ];
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
     logger.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
     process.exit(1);
-}
-
-const moduleScopedEnvVars = [
-    { moduleId: 'polls', envVar: 'ANONYMIZE_SECRET' },
-];
-
-for (const entry of moduleScopedEnvVars) {
-    if (!process.env[entry.envVar]) {
-        logger.warn(
-            `Optional module environment variable ${entry.envVar} is missing. `
-            + `Some ${entry.moduleId} features will be unavailable until configured.`
-        );
-    }
 }
 
 // Global error handlers for uncaught exceptions and unhandled rejections

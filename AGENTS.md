@@ -19,19 +19,19 @@ This document provides essential information for AI coding agents working on the
 - **Moderation**: Warnings, mutes, kicks, bans, case tracking
 - **Webhooks**: Real-time event notifications
 - **API Keys**: Programmatic access with granular permissions
+- **Calendar Sync**: Google/Outlook/Apple Calendar integration
 - **Analytics Dashboard**: Visualize server growth and activity
 
 ## Technology Stack
 
 | Component | Technology |
 |-----------|------------|
-| Bot | Discord.js v14, TypeScript, Node.js 22+ |
+| Bot | Discord.js v14, TypeScript, Bun 1.0+ |
 | Dashboard | Next.js 16 (App Router), React 19, Tailwind CSS 4 |
 | Database | PostgreSQL 17 with Drizzle ORM |
 | Authentication | NextAuth.js v4 with Discord OAuth2 |
 | Logging | Winston with daily rotation |
 | Process Manager | PM2 |
-| Package Manager | npm 11.9.0 |
 
 ## Project Structure
 
@@ -76,25 +76,25 @@ ixoye/
 
 ```bash
 # Development
-npm run dev                    # Start bot with hot reload
-npm run dashboard:dev          # Start Next.js dev server
-npm run dev:all                # Run both bot and dashboard concurrently
+bun run dev                    # Start bot with hot reload
+bun run dashboard:dev          # Start Next.js dev server
+bun run dev:all                # Run both bot and dashboard concurrently
 
 # Build
-npm run build                  # Compile bot to dist/ (uses tsconfig.bot.json)
-npm run dashboard:build        # Build Next.js for production
+bun run build                  # Compile bot to dist/ (uses tsconfig.bot.json)
+bun run dashboard:build        # Build Next.js for production
 
 # Production
-npm start                      # Run compiled bot from dist/
-npm run dashboard:start        # Start Next.js production server
+bun start                      # Run compiled bot from dist/
+bun run dashboard:start        # Start Next.js production server
 
 # Database
-npm run db:generate            # Generate Drizzle migrations
-npm run db:push                # Push schema changes to database
-npm run db:studio              # Open Drizzle Studio GUI
+bun run db:generate            # Generate Drizzle migrations
+bun run db:push                # Push schema changes to database
+bun run db:studio              # Open Drizzle Studio GUI
 
 # Deployment
-npm run deploy                 # Deploy slash commands to Discord
+bun run deploy                 # Deploy slash commands to Discord
 ```
 
 ## Code Style Guidelines
@@ -247,6 +247,7 @@ Key tables (defined in `src/shared/database/schema.ts`):
 | `webhook_endpoint` | Outgoing webhook configurations |
 | `webhook_delivery` | Webhook delivery logs |
 | `api_key` | API key storage (SHA-256 hashed) |
+| `user_calendar_integration` | Calendar sync connections |
 
 ### Moderation & Logging
 | Table | Purpose |

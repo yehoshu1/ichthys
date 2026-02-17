@@ -52,9 +52,6 @@ export const scripts: ScriptDoc[] = [
     { name: "db:backup:list", description: "List available backups.", typicalUse: "Backup auditing" },
     { name: "db:restore", description: "Restore database from backup.", typicalUse: "Recovery" },
     { name: "db:restore:list", description: "List backups available for restore.", typicalUse: "Recovery planning" },
-    { name: "db:migrate:sqlite-import", description: "Full SQLite to PostgreSQL import pass.", typicalUse: "Initial cutover load" },
-    { name: "db:migrate:delta", description: "Delta sync SQLite changes to PostgreSQL.", typicalUse: "Near-zero cutover sync" },
-    { name: "db:migrate:verify", description: "Verify table counts and checksums between SQLite and PostgreSQL.", typicalUse: "Cutover validation" },
     { name: "deploy:safe", description: "Run safe deployment flow with backup wrapper.", typicalUse: "Production deploy hardening" },
 ];
 

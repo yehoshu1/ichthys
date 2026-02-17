@@ -197,9 +197,11 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
                 position: role.position
             }));
 
-        // Filter and format channels (text, announcement, and thread channels, sort by position)
-        // Channel types: 0 = GUILD_TEXT, 5 = GUILD_ANNOUNCEMENT, 10 = ANNOUNCEMENT_THREAD, 11 = PUBLIC_THREAD, 12 = PRIVATE_THREAD
-        const allowedChannelTypes = [0, 5, 10, 11, 12];
+        // Filter and format channels
+        // Channel types:
+        // 0 = GUILD_TEXT, 2 = GUILD_VOICE, 5 = GUILD_ANNOUNCEMENT,
+        // 10 = ANNOUNCEMENT_THREAD, 11 = PUBLIC_THREAD, 12 = PRIVATE_THREAD, 13 = GUILD_STAGE_VOICE
+        const allowedChannelTypes = [0, 2, 5, 10, 11, 12, 13];
         const formattedChannels = result.channels
             .filter((channel) => allowedChannelTypes.includes(channel.type))
             .sort((a, b) => (a.position || 0) - (b.position || 0))

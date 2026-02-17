@@ -1,17 +1,17 @@
 import {
     SlashCommandBuilder,
     ChatInputCommandInteraction,
+    PermissionFlagsBits,
     ChannelType,
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
+    GuildMember,
     TextChannel,
 } from 'discord.js';
 import { Command } from '../types/Command';
 import { eventService } from '../services/event-service';
-import { isSupportedPostChannel } from '../services/event-poll-settings-service';
-import { getCommandPolicyContext } from '../services/command-policy-service';
 import { parseNaturalLanguageDate, formatDiscordTimestamp } from '../utils/date-parser';
 import logger from '../utils/logger';
 
@@ -138,11 +138,18 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             return;
         }
 
-        const policyContext = getCommandPolicyContext(interaction);
-        const channel = policyContext?.targetChannel ?? interaction.channel;
-
-        if (!isSupportedPostChannel(channel)) {
+        const member = interaction.member as GuildMember;
+        const channelOption = interaction.options.getChannel('channel');
+        const channel = channelOption || interaction.channel;
+        
+        if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
             await sendCreateResponse(interaction, 'Please specify a valid text channel.');
+            return;
+        }
+
+        // Check permissions - only check if we're posting to a different channel
+        if (channelOption && !member.permissionsIn(channel as TextChannel).has(PermissionFlagsBits.SendMessages)) {
+            await sendCreateResponse(interaction, 'You do not have permission to send messages in that channel.');
             return;
         }
 
@@ -467,15 +474,4 @@ function parseDuration(input: string): number | undefined {
     return undefined;
 }
 
-export default {
-    data,
-    execute,
-    moduleId: 'events',
-    policy: {
-        creatorPolicy: 'events',
-        postChannelPolicy: 'events',
-        channelOptionName: 'channel',
-        requireMemberSendPermissionInTargetChannel: true,
-        requireBotSendPermissionInTargetChannel: true,
-    },
-} as Command;
+export default { data, execute } as Command;

@@ -10,6 +10,7 @@ The Webhooks & API module provides outgoing webhooks for real-time event notific
 - **Delivery Logs**: Track all webhook attempts
 - **Health Monitoring**: Auto-disable failing webhooks
 - **API Keys**: Programmatic access with permissions
+- **Calendar Sync**: Connect external calendars (coming soon)
 
 ## Webhooks
 
@@ -48,27 +49,17 @@ The Webhooks & API module provides outgoing webhooks for real-time event notific
 
 ### Security Features
 
-#### Secret Encryption at Rest
-- Webhook secrets are encrypted with AES-256-GCM before storage
-- Requires `WEBHOOK_SECRET_ENCRYPTION_KEY` environment variable (minimum 16 characters)
-- Secrets are only shown once during creation
-- Encrypted secrets are automatically decrypted when signing webhook payloads
-- Legacy SHA-256 hashed secrets (from previous versions) are detected and cannot be used for HMAC signing
-
 #### HTTPS Only
 - HTTP URLs are rejected
 - Must use valid HTTPS endpoints
 
 #### SSRF Protection
-Private IP ranges are blocked both by hostname and DNS resolution:
-- `localhost`, `127.0.0.1`, `::1`
+Private IP ranges are blocked:
+- `localhost`, `127.0.0.1`
 - `10.0.0.0/8`
 - `172.16.0.0/12`
 - `192.168.0.0/16`
 - `169.254.0.0/16` (link-local)
-- IPv6 private ranges (ULA, link-local, multicast)
-
-DNS resolution is performed to prevent DNS rebinding attacks.
 
 #### HMAC Signatures
 If a secret is configured, webhooks include a signature:
@@ -138,6 +129,7 @@ X-Webhook-Signature: sha256=<hash> (if secret configured)
 | `webhook_endpoint` | Webhook configurations |
 | `webhook_delivery` | Delivery attempt logs |
 | `api_key` | API key storage |
+| `user_calendar_integration` | Calendar connections |
 
 ## API Endpoints
 
@@ -176,6 +168,17 @@ Webhooks use immediate delivery with logging:
 - Success: 2xx status code
 - Failure: Logged with error details
 - No automatic retry (design decision for simplicity)
+
+## Calendar Integration
+
+**Status**: UI implemented, backend pending
+
+Planned features:
+- Google Calendar OAuth
+- Outlook Calendar OAuth
+- Apple Calendar integration
+- Two-way sync
+- Guild filtering
 
 ## Security Considerations
 

@@ -29,6 +29,9 @@ import {
     Cake,
     MessageSquare,
     TerminalSquare,
+    CalendarDays,
+    BarChart3,
+    Webhook,
     type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
@@ -42,6 +45,9 @@ import type { SearchOpenMethod } from "../../../lib/search/telemetry";
 
 const navIconById: Record<DashboardNavId, LucideIcon> = {
     overview: LayoutDashboard,
+    events: CalendarDays,
+    polls: BarChart3,
+    webhooks: Webhook,
     welcome: Hand,
     verification: ShieldCheck,
     leveling: Star,

@@ -1,17 +1,17 @@
 import {
     SlashCommandBuilder,
     ChatInputCommandInteraction,
+    PermissionFlagsBits,
     ChannelType,
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
     StringSelectMenuBuilder,
+    GuildMember,
 } from 'discord.js';
 import { Command } from '../types/Command';
 import { pollService } from '../services/poll-service';
-import { isSupportedPostChannel } from '../services/event-poll-settings-service';
-import { getCommandPolicyContext } from '../services/command-policy-service';
 import { parseNaturalLanguageDate, formatDiscordTimestamp } from '../utils/date-parser';
 import logger from '../utils/logger';
 
@@ -95,11 +95,18 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             return;
         }
 
-        const policyContext = getCommandPolicyContext(interaction);
-        const channel = policyContext?.targetChannel ?? interaction.channel;
+        const member = interaction.member as GuildMember;
+        const channelOption = interaction.options.getChannel('channel');
+        const channel = channelOption || interaction.channel;
 
-        if (!isSupportedPostChannel(channel)) {
+        if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
             await sendPollResponse(interaction, 'Please specify a valid text channel.');
+            return;
+        }
+
+        // Check permissions - only check if we're posting to a different channel
+        if (channelOption && !member.permissionsIn(channel as import('discord.js').TextChannel).has(PermissionFlagsBits.SendMessages)) {
+            await sendPollResponse(interaction, 'You do not have permission to send messages in that channel.');
             return;
         }
 
@@ -380,15 +387,4 @@ function buildPollEmbed(
     return embed;
 }
 
-export default {
-    data,
-    execute,
-    moduleId: 'polls',
-    policy: {
-        creatorPolicy: 'polls',
-        postChannelPolicy: 'polls',
-        channelOptionName: 'channel',
-        requireMemberSendPermissionInTargetChannel: true,
-        requireBotSendPermissionInTargetChannel: true,
-    },
-} as Command;
+export default { data, execute } as Command;

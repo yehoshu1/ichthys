@@ -27,8 +27,6 @@ This section breaks down every major Ixoye module with implementation-level deta
 ### Integrations
 - [Webhooks & API](modules/webhooks.md) - Outgoing webhooks and API keys
 
-- [Notifications](modules/notifications.md) - In-app event stream and delivery preferences
-
 ### System
 - [Settings, Import/Export, and Backups](modules/settings-and-backups.md)
 - [Message Aliases](modules/aliases.md)

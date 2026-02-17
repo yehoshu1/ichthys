@@ -2,7 +2,6 @@ import { Client } from 'discord.js';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { db } from '@shared/database/client';
 import { poll } from '@shared/database/schema';
-import { isModuleEnabled } from '@shared/modules/state';
 import { pollDiscordService } from '../services/poll-discord-service';
 import logger from '../utils/logger';
 
@@ -62,11 +61,6 @@ export class PollMessageSyncJob {
 
         for (const p of newPolls) {
             try {
-                const pollsEnabled = await isModuleEnabled(p.guildId, 'polls');
-                if (!pollsEnabled) {
-                    continue;
-                }
-
                 const guild = await this.client.guilds.fetch(p.guildId).catch(() => null);
                 if (!guild) {
                     logger.warn(`Guild ${p.guildId} not found for poll ${p.id}`);
@@ -100,11 +94,6 @@ export class PollMessageSyncJob {
 
         for (const p of updatedPolls) {
             try {
-                const pollsEnabled = await isModuleEnabled(p.guildId, 'polls');
-                if (!pollsEnabled) {
-                    continue;
-                }
-
                 const guild = await this.client.guilds.fetch(p.guildId).catch(() => null);
                 if (!guild) continue;
 
@@ -135,11 +124,6 @@ export class PollMessageSyncJob {
 
         for (const p of closingPolls) {
             try {
-                const pollsEnabled = await isModuleEnabled(p.guildId, 'polls');
-                if (!pollsEnabled) {
-                    continue;
-                }
-
                 // Close the poll
                 await import('../services/poll-service').then(m => m.pollService.closePoll(p.id));
                 
@@ -172,11 +156,6 @@ export class PollMessageSyncJob {
 
         for (const p of recentlyClosedPolls) {
             try {
-                const pollsEnabled = await isModuleEnabled(p.guildId, 'polls');
-                if (!pollsEnabled) {
-                    continue;
-                }
-
                 const guild = await this.client.guilds.fetch(p.guildId).catch(() => null);
                 if (!guild) continue;
 

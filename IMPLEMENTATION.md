@@ -324,7 +324,8 @@ This document reflects the actual implementation status of the ΙΧΘΥΣ Discor
 | Permissions system | ✅ | 8 granular permissions |
 | Key expiration | ✅ | Optional expiration dates |
 | Usage tracking | ✅ | Use count and last used |
-| Dashboard UI | ✅ | `webhooks/page.tsx` |
+| Calendar integration schema | ✅ | `user_calendar_integration` table |
+| Dashboard UI | ✅ | `webhooks/page.tsx` (500+ lines) |
 | API routes | ✅ | `/api/guilds/[guildId]/webhooks/*`, `/api/guilds/[guildId]/api-keys/*` |
 
 **Features:**
@@ -334,6 +335,8 @@ This document reflects the actual implementation status of the ΙΧΘΥΣ Discor
 - ✅ Webhook health monitoring
 - ✅ Granular API permissions
 - ✅ API key expiration
+- ✅ Calendar sync support (Google, Outlook, Apple)
+- ✅ Bidirectional sync
 
 ---
 
@@ -445,6 +448,11 @@ webhook_delivery
 api_key
 ├── guildId, name, keyHash, permissions
 ├── createdBy, enabled, useCount, expiresAt
+
+user_calendar_integration
+├── userId, provider, providerAccountId
+├── accessToken, refreshToken, syncEnabled
+├── syncDirection, includeGuildIds, excludeGuildIds
 ```
 
 ---
@@ -568,6 +576,13 @@ api_key
 | POST | `/api/guilds/[guildId]/api-keys` | Create API key |
 | PATCH | `/api/guilds/[guildId]/api-keys/[keyId]` | Update key |
 | DELETE | `/api/guilds/[guildId]/api-keys/[keyId]` | Delete key |
+
+### Calendar Integrations
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/guilds/[guildId]/calendar-integrations` | List integrations |
+| PATCH | `/api/guilds/[guildId]/calendar-integrations/[id]` | Update sync |
+| DELETE | `/api/guilds/[guildId]/calendar-integrations/[id]` | Disconnect |
 
 ### Analytics
 | Method | Endpoint | Description |
