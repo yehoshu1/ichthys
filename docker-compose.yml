@@ -43,6 +43,7 @@ services:
       - .env
     environment:
       NODE_ENV: production
+      DASHBOARD_URL: https://ixoyebot.presper.xyz
       METRICS_TOKEN: ${METRICS_TOKEN:-}
       REDIS_URL: ${REDIS_URL:-}
       PG_SSL: "false"
