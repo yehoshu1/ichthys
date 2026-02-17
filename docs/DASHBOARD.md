@@ -6,7 +6,6 @@ The web dashboard is the command center for your server. It provides a comprehen
 
 - Global search is implemented inside the dashboard app (no external search service).
 - Results are composed from settings/doc sources and ranked locally.
-- Semantic/vector search is intentionally deferred; see `docs/adr/0001-defer-meilisearch-integration.md`.
 
 ## Deep-Dive Module Docs
 
@@ -95,7 +94,7 @@ The dashboard is organized into several modules accessible from the left sidebar
 | **Birthdays** | Birthday announcements and celebration settings |
 | **Role Actions** | Automated role-based actions |
 | **Reaction Roles** | Reaction-based self-role management |
-| **Webhooks & API** | Webhook endpoints, API keys, calendar sync |
+| **Webhooks & API** | Webhook endpoints, API keys |
 | **Moderation** | Auto-mod filters and moderation controls |
 | **Analytics** | Activity heatmap, top members |
 | **Settings** | Import/export configuration |
@@ -109,8 +108,18 @@ The dashboard is organized into several modules accessible from the left sidebar
 
 Create and manage server events with RSVP tracking.
 
+#### Calendar View Tab (Default)
+Interactive calendar for visualizing and managing events:
+- **View Modes**: Month, Week, or Day view
+- **Visual Layout**: Color-coded events with time indicators
+- **Quick Create**: Click any date to create an event (auto-fills the date)
+- **Quick Edit**: Click any event to view details and edit
+- **Navigation**: Previous/Next buttons, "Today" shortcut
+- **Event Density**: Shows event count when multiple events on same day
+- **Responsive**: Fully optimized for mobile, tablet, and desktop
+
 #### Upcoming Events Tab
-View all scheduled events with:
+List view of all scheduled events with:
 - Event title and description
 - Date, time, and location
 - RSVP counts (Yes/Maybe/No/Waitlist)
@@ -237,12 +246,15 @@ Configure outgoing webhooks for real-time notifications.
 2. Configure:
    - **Name**: Identifier for the webhook
    - **Endpoint URL**: HTTPS URL to receive POST requests
-   - **Secret**: Optional secret for HMAC signature verification
+   - **Secret**: Optional secret for HMAC signature verification (encrypted at rest)
    - **Event Types**: Which events to subscribe to
      - Event created/updated/deleted/started
-     - RSVP yes/no/maybe
+     - RSVP yes/no/maybe/waitlist
      - Poll created/voted/closed
    - **Enabled**: Whether to send notifications
+3. **Important**: If you set a secret, save it separately - it's encrypted and cannot be retrieved later!
+
+**Security Note:** Webhook secrets are encrypted with AES-256-GCM before storage and never shown in plain text after creation. The secret is securely decrypted only when signing webhook payloads.
 
 **Webhook Actions:**
 - **View Logs**: See delivery history
@@ -281,33 +293,12 @@ Generate API keys for programmatic access.
 3. **Important**: Copy the key immediately - it's only shown once!
 
 **Security Notes:**
-- API keys are stored as SHA-256 hashes
-- Only the creator can view the key once
+- **API keys are never stored in plain text** - they're hashed with SHA-256
+- **Keys are only shown once** during creation - copy and save them securely
+- **Key hashes are never exposed** - only metadata (name, permissions, status) is returned
 - Track usage and rotate keys regularly
-- Disable unused keys
-
-#### Calendar Tab
-
-Connect external calendars for event sync.
-
-**Supported Providers:**
-- Google Calendar
-- Outlook Calendar
-- Apple Calendar
-
-**Integration Settings:**
-- **Sync Direction**:
-  - Inbound: Import external events
-  - Outbound: Export bot events
-  - Bidirectional: Sync both ways
-- **Guild Filter**: Include/exclude specific servers
-- **Sync Status**: Last sync time and any errors
-
-**Connecting a Calendar:**
-1. Click **Connect** for desired provider
-2. Authorize the application
-3. Configure sync settings
-4. Enable/disable sync per guild
+- Disable unused keys immediately
+- Set expiration dates for temporary access
 
 ---
 
@@ -708,5 +699,6 @@ Most data updates automatically:
 5. **Regular Backups**: Export config monthly
 6. **Monitor Analytics**: Check weekly for trends
 7. **Poll Engagement**: Use time polls for scheduling with multiple people
-8. **Webhook Security**: Use secrets and verify signatures
-9. **API Key Rotation**: Rotate keys every 90 days
+8. **Webhook Security**: Always use secrets and verify HMAC signatures in production
+9. **API Key Rotation**: Rotate keys every 90 days and use expiration dates
+10. **Environment Secrets**: Ensure `WEBHOOK_SECRET_ENCRYPTION_KEY` and `ANONYMIZE_SECRET` are set for webhook and anonymous poll features

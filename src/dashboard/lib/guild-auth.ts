@@ -3,23 +3,21 @@ import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import logger from "./logger";
+import { requireGuildModuleEnabledForPath } from "./module-gate";
+import { requireSameOrigin } from "./csrf";
+import { buildRateLimitKey, checkRateLimit, DEFAULT_RATE_LIMIT } from "./rate-limit";
 
 const MANAGE_GUILD = 0x20n;
 const MANAGE_ROLES = 0x10000000n;
-const GUILD_CACHE_TTL_MS = 30_000; // 30 seconds - shorter to reduce rate limits
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_REQUESTS = 60; // Reduced from 120
+const GUILD_CACHE_TTL_MS = 5 * 60_000; // 5 minutes
+const GUILD_CACHE_STALE_WINDOW_MS = 15 * 60_000; // Serve stale data on Discord rate limits
 const MAX_GUILD_CACHE_ENTRIES = 2_000;
 
 interface GuildAccessCacheEntry {
     guildPermissions: Map<string, DiscordGuildPermissionPayload>;
     expiresAt: number;
+    staleUntil: number;
     cachedAt: number;
-}
-
-interface RateLimitEntry {
-    count: number;
-    resetAt: number;
 }
 
 interface DiscordGuildPermissionPayload {
@@ -39,7 +37,7 @@ interface GuildAuthFailure {
 }
 
 const guildAccessCache = new Map<string, GuildAccessCacheEntry>();
-const rateLimitCache = new Map<string, RateLimitEntry>();
+const guildPermissionsInFlight = new Map<string, Promise<Map<string, DiscordGuildPermissionPayload> | GuildAuthFailure>>();
 
 function jsonError(status: number, error: string): GuildAuthFailure {
     return {
@@ -51,17 +49,9 @@ function isFailure(result: GuildAuthSuccess | GuildAuthFailure): result is Guild
     return "response" in result;
 }
 
-function cleanupRateLimit(now: number): void {
-    for (const [key, value] of rateLimitCache.entries()) {
-        if (value.resetAt <= now) {
-            rateLimitCache.delete(key);
-        }
-    }
-}
-
 function cleanupGuildAccessCache(now: number): void {
     for (const [key, value] of guildAccessCache.entries()) {
-        if (value.expiresAt <= now) {
+        if (value.staleUntil <= now) {
             guildAccessCache.delete(key);
         }
     }
@@ -78,27 +68,6 @@ function cleanupGuildAccessCache(now: number): void {
             guildAccessCache.delete(key);
         }
     }
-}
-
-function enforceRateLimit(key: string): GuildAuthFailure | null {
-    const now = Date.now();
-    cleanupRateLimit(now);
-
-    const existing = rateLimitCache.get(key);
-    if (!existing || existing.resetAt <= now) {
-        rateLimitCache.set(key, {
-            count: 1,
-            resetAt: now + RATE_LIMIT_WINDOW_MS,
-        });
-        return null;
-    }
-
-    existing.count += 1;
-    if (existing.count > RATE_LIMIT_MAX_REQUESTS) {
-        return jsonError(429, "Too many requests");
-    }
-
-    return null;
 }
 
 function hasRequiredPermissions(
@@ -124,39 +93,68 @@ async function getGuildPermissions(
         return cached.guildPermissions;
     }
 
-    let response: Response;
-    try {
-        response = await fetch("https://discord.com/api/v10/users/@me/guilds", {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-            },
-            cache: "no-store",
-        });
-    } catch (error) {
-        logger.error("Failed to fetch guilds from Discord:", error);
-        return jsonError(503, "Failed to validate guild permissions - network error");
+    const inFlight = guildPermissionsInFlight.get(userId);
+    if (inFlight) {
+        return inFlight;
     }
 
-    if (!response.ok) {
-        const errorText = await response.text().catch(() => "unknown");
-        logger.error("Discord API error:", { status: response.status, error: errorText });
-        if (response.status === 401 || response.status === 403) {
-            return jsonError(401, "Unauthorized - Discord token invalid");
+    const request = (async () => {
+        let response: Response;
+        try {
+            response = await fetch("https://discord.com/api/v10/users/@me/guilds", {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+                cache: "no-store",
+            });
+        } catch (error) {
+            logger.error("Failed to fetch guilds from Discord:", error);
+            if (cached && cached.staleUntil > Date.now()) {
+                logger.warn("Using stale guild permissions cache after Discord network failure", { userId });
+                return cached.guildPermissions;
+            }
+            return jsonError(503, "Failed to validate guild permissions - network error");
         }
-        return jsonError(503, `Failed to validate guild permissions - Discord API ${response.status}`);
-    }
 
-    const guilds = await response.json() as DiscordGuildPermissionPayload[];
-    const guildPermissions = new Map<string, DiscordGuildPermissionPayload>();
-    for (const guild of guilds) guildPermissions.set(guild.id, guild);
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => "unknown");
+            logger.error("Discord API error:", { status: response.status, error: errorText });
 
-    guildAccessCache.set(userId, {
-        guildPermissions,
-        expiresAt: now + GUILD_CACHE_TTL_MS,
-        cachedAt: now,
+            if (response.status === 401 || response.status === 403) {
+                return jsonError(401, "Unauthorized - Discord token invalid");
+            }
+
+            if (response.status === 429 && cached && cached.staleUntil > Date.now()) {
+                logger.warn("Using stale guild permissions cache after Discord rate limit", { userId });
+                return cached.guildPermissions;
+            }
+
+            if (response.status === 429) {
+                return jsonError(503, "Failed to validate guild permissions - Discord API rate limit");
+            }
+
+            return jsonError(503, `Failed to validate guild permissions - Discord API ${response.status}`);
+        }
+
+        const guilds = await response.json() as DiscordGuildPermissionPayload[];
+        const guildPermissions = new Map<string, DiscordGuildPermissionPayload>();
+        for (const guild of guilds) guildPermissions.set(guild.id, guild);
+
+        const cachedAt = Date.now();
+        guildAccessCache.set(userId, {
+            guildPermissions,
+            expiresAt: cachedAt + GUILD_CACHE_TTL_MS,
+            staleUntil: cachedAt + GUILD_CACHE_STALE_WINDOW_MS,
+            cachedAt,
+        });
+
+        return guildPermissions;
+    })().finally(() => {
+        guildPermissionsInFlight.delete(userId);
     });
 
-    return guildPermissions;
+    guildPermissionsInFlight.set(userId, request);
+    return request;
 }
 
 export async function requireSession(req: NextRequest): Promise<GuildAuthSuccess | GuildAuthFailure> {
@@ -198,9 +196,14 @@ async function requireGuildAccess(
         return sessionResult;
     }
 
-    const rateLimitResult = enforceRateLimit(`${sessionResult.userId}:${guildId}`);
-    if (rateLimitResult) {
-        return rateLimitResult;
+    const rateLimit = await checkRateLimit(buildRateLimitKey(req, `session:${sessionResult.userId}`), DEFAULT_RATE_LIMIT);
+    if (!rateLimit.allowed) {
+        return jsonError(429, "Too many requests");
+    }
+
+    const csrfFailure = requireSameOrigin(req);
+    if (csrfFailure) {
+        return { response: csrfFailure };
     }
 
     const guildPermissionsResult = await getGuildPermissions(sessionResult.userId, sessionResult.accessToken);
@@ -217,6 +220,12 @@ async function requireGuildAccess(
             logger.error("Permission denied", { guildId, userId: sessionResult.userId });
             return jsonError(403, "Forbidden - You don't have MANAGE_GUILD permission");
         }
+
+        const moduleGuardResponse = await requireGuildModuleEnabledForPath(guildId, req.nextUrl.pathname);
+        if (moduleGuardResponse) {
+            return { response: moduleGuardResponse };
+        }
+
         return sessionResult;
     }
 

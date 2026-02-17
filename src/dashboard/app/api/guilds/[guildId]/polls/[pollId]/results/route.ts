@@ -4,6 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import { getDiscordUsers } from '@/lib/discord-user-cache';
 import logger from '@/lib/logger';
 import { authorizeGuildApiRequest } from '@/lib/guild-api-auth';
+import { requireGuildModuleEnabled } from '@/lib/module-gate';
 
 // GET /api/guilds/[guildId]/polls/[pollId]/results - Get poll results
 export async function GET(
@@ -16,6 +17,8 @@ export async function GET(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'polls');
+        if (moduleGuard) return moduleGuard;
 
         // Check if poll exists and belongs to guild
         const [p] = await db

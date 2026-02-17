@@ -3,6 +3,8 @@ import { and, eq, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { db, apiKey } from "@/lib/db";
 import { requireGuildManageAccess } from "@/lib/guild-auth";
+import { requireGuildModuleEnabledForPath } from "@/lib/module-gate";
+import { buildRateLimitKey, checkRateLimit, DEFAULT_RATE_LIMIT } from "@/lib/rate-limit";
 
 export type ApiPermission =
     | "events:read"
@@ -11,6 +13,15 @@ export type ApiPermission =
     | "polls:write"
     | "webhooks:read"
     | "webhooks:write";
+
+export const API_PERMISSION_VALUES: Readonly<ApiPermission[]> = [
+    "events:read",
+    "events:write",
+    "polls:read",
+    "polls:write",
+    "webhooks:read",
+    "webhooks:write",
+];
 
 export interface GuildApiAuthContext {
     authType: "session" | "api_key";
@@ -84,6 +95,10 @@ async function authorizeWithApiKey(
     }
 
     const keyHash = hashApiKey(rawApiKey);
+    const rateLimit = await checkRateLimit(buildRateLimitKey(request, `api-key:${keyHash}`), DEFAULT_RATE_LIMIT);
+    if (!rateLimit.allowed) {
+        return jsonError(429, "Too many requests");
+    }
     const [keyRecord] = await db
         .select()
         .from(apiKey)
@@ -104,6 +119,11 @@ async function authorizeWithApiKey(
 
     if (!hasApiPermission(keyRecord.permissions ?? [], requiredPermission)) {
         return jsonError(403, `Missing API key permission: ${requiredPermission}`);
+    }
+
+    const moduleGuardResponse = await requireGuildModuleEnabledForPath(guildId, request.nextUrl.pathname);
+    if (moduleGuardResponse) {
+        return { response: moduleGuardResponse };
     }
 
     await db

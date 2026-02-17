@@ -60,12 +60,21 @@ class DiscordCache {
             }
         }
     }
+
+    size(): number {
+        return this.cache.size;
+    }
+
+    maxEntries(): number {
+        return this.MAX_CACHE_ENTRIES;
+    }
 }
 
 export const discordCache = new DiscordCache();
 
 // Auto-cleanup every 5 minutes
-setInterval(() => discordCache.cleanup(), 5 * 60 * 1000);
+const cacheCleanupInterval = setInterval(() => discordCache.cleanup(), 5 * 60 * 1000);
+cacheCleanupInterval.unref?.();
 
 // Request deduplication for in-flight requests
 const inFlightRequests = new Map<string, Promise<unknown>>();
@@ -87,4 +96,18 @@ export async function dedupeRequest<T>(key: string, fn: () => Promise<T>): Promi
 
     inFlightRequests.set(key, promise);
     return promise;
+}
+
+export function getDiscordCacheMetrics(): {
+    entries: number;
+    maxEntries: number;
+    inFlightRequests: number;
+    maxInFlightRequests: number;
+} {
+    return {
+        entries: discordCache.size(),
+        maxEntries: discordCache.maxEntries(),
+        inFlightRequests: inFlightRequests.size,
+        maxInFlightRequests: MAX_IN_FLIGHT_REQUESTS,
+    };
 }

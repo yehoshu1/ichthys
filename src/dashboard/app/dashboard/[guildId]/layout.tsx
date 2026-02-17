@@ -28,6 +28,7 @@ import {
     Shield,
     Cake,
     MessageSquare,
+    Bell,
     TerminalSquare,
     CalendarDays,
     BarChart3,
@@ -43,10 +44,18 @@ import GuildNotificationBell from "../../../components/GuildNotificationBell";
 import { DASHBOARD_NAV_ITEMS, DashboardNavId } from "../../../lib/search/dashboard-nav";
 import type { SearchOpenMethod } from "../../../lib/search/telemetry";
 
+interface ModuleStateResponse {
+    modules: Array<{
+        moduleId: string;
+        enabled: boolean;
+    }>;
+}
+
 const navIconById: Record<DashboardNavId, LucideIcon> = {
     overview: LayoutDashboard,
     events: CalendarDays,
     polls: BarChart3,
+    notifications: Bell,
     webhooks: Webhook,
     welcome: Hand,
     verification: ShieldCheck,
@@ -62,6 +71,36 @@ const navIconById: Record<DashboardNavId, LucideIcon> = {
     settings: Settings,
     docs: BookOpen,
 };
+
+function mapNavItemToModuleId(item: { id: DashboardNavId; moduleSlug?: string }): string | null {
+    if (item.id === "docs") return null;
+    if (item.id === "overview") return "analytics";
+
+    const slug = item.moduleSlug ?? item.id;
+    return slug.replace(/-/g, "_");
+}
+
+function isNavItemEnabled(
+    item: { id: DashboardNavId; moduleSlug?: string },
+    moduleEnabledById: Record<string, boolean>
+): boolean {
+    const moduleId = mapNavItemToModuleId(item);
+    if (!moduleId) return true;
+    return moduleEnabledById[moduleId] ?? true;
+}
+
+function getNavHref(
+    guildId: string,
+    item: { id: DashboardNavId; href: string; moduleSlug?: string },
+    moduleEnabledById: Record<string, boolean>
+): string {
+    if (isNavItemEnabled(item, moduleEnabledById)) {
+        return `/dashboard/${guildId}${item.href}`;
+    }
+
+    const moduleId = mapNavItemToModuleId(item);
+    return `/dashboard/${guildId}/settings${moduleId ? `?module=${moduleId}` : ""}`;
+}
 
 export default function DashboardLayout({
     children,
@@ -79,6 +118,7 @@ export default function DashboardLayout({
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchOpenMethod, setSearchOpenMethod] = useState<SearchOpenMethod>("unknown");
+    const [moduleEnabledById, setModuleEnabledById] = useState<Record<string, boolean>>({});
     const fetchInProgress = useRef(false);
 
     const openSearch = (method: SearchOpenMethod): void => {
@@ -121,14 +161,26 @@ export default function DashboardLayout({
                 }
                 if (res.status === 503) {
                     // Service unavailable - check error message
-                    const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
-                    console.error("Service unavailable:", errorData);
-                    if (errorData.error?.includes("Bot may not be in server")) {
+                    const contentType = res.headers.get("content-type") || "";
+                    let errorMessage = "Unable to connect to Discord. Please try again.";
+                    let errorData: { error?: string } | null = null;
+
+                    if (contentType.includes("application/json")) {
+                        errorData = await res.json().catch(() => null);
+                    } else {
+                        const text = await res.text().catch(() => "");
+                        if (text) errorMessage = text;
+                    }
+
+                    if (errorData?.error) errorMessage = errorData.error;
+                    console.warn("Service unavailable:", errorData ?? errorMessage);
+
+                    if (errorData?.error?.includes("Bot may not be in server")) {
                         // Bot not in server
                         setIsBotMember(false);
                         return null;
                     }
-                    setFetchError(errorData.error || "Unable to connect to Discord. Please try again.");
+                    setFetchError(errorMessage);
                     return null;
                 }
                 if (!res.ok) {
@@ -159,6 +211,29 @@ export default function DashboardLayout({
             fetchGuildInfo();
         }
     }, [guildId, router]);
+
+    useEffect(() => {
+        if (!guildId) return;
+
+        fetch(`/api/guilds/${guildId}/modules`)
+            .then(async (res) => {
+                if (!res.ok) return null;
+                return (await res.json()) as ModuleStateResponse;
+            })
+            .then((payload) => {
+                if (!payload) return;
+                const next: Record<string, boolean> = {};
+                for (const entry of payload.modules) {
+                    next[entry.moduleId] = entry.enabled;
+                }
+                setModuleEnabledById(next);
+            })
+            .catch(() => {
+                // Keep navigation visible when module states cannot be fetched.
+            });
+    }, [guildId]);
+
+    const navItems = DASHBOARD_NAV_ITEMS;
 
     // Show Loading State (Prevents dashboard content from rendering prematurely)
     if (isLoading) {
@@ -242,22 +317,24 @@ export default function DashboardLayout({
             <aside className="fixed inset-y-0 left-0 z-40 hidden md:flex w-64 flex-col border-r bg-card">
                 <div className="flex h-16 items-center border-b px-6">
                     <Link href="/" className="hover:opacity-80 transition-opacity">
-                        <h1 className="text-xl font-bold">
+                        <h1 className="text-2xl font-bold">
                             <span className="text-primary">Ixoye</span> Dashboard
                         </h1>
                     </Link>
                 </div>
 
-                <nav className="flex-1 space-y-1 px-4 py-6">
+                <nav className="flex-1 space-y-1 px-4 py-6 overflow-y-auto">
                     <div className="px-3 mb-2 text-xs font-semibold uppercase text-muted-foreground">
                         Menu
                     </div>
-                    {DASHBOARD_NAV_ITEMS.map((item) => {
+                    {navItems.map((item) => {
                         const ItemIcon = navIconById[item.id];
-                        const href = `/dashboard/${guildId}${item.href}`;
+                        const enabled = isNavItemEnabled(item, moduleEnabledById);
+                        const href = getNavHref(guildId, item, moduleEnabledById);
+                        const targetHref = `/dashboard/${guildId}${item.href}`;
                         const isActive = item.href === ""
-                            ? pathname === href
-                            : pathname.startsWith(href);
+                            ? pathname === targetHref
+                            : pathname.startsWith(targetHref);
 
                         return (
                             <Link
@@ -265,11 +342,17 @@ export default function DashboardLayout({
                                 href={href}
                                 className={cn(
                                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
-                                    isActive ? "bg-secondary text-foreground" : "text-muted-foreground"
+                                    isActive ? "bg-secondary text-foreground" : "text-muted-foreground",
+                                    !enabled && "opacity-70"
                                 )}
                             >
                                 <ItemIcon className="h-4 w-4" />
-                                {item.name}
+                                <span className="flex-1">{item.name}</span>
+                                {!enabled && (
+                                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                        Off
+                                    </span>
+                                )}
                             </Link>
                         );
                     })}
@@ -331,17 +414,19 @@ export default function DashboardLayout({
                             </SheetTrigger>
                             <SheetContent side="left" className="w-64 p-0">
                                 <div className="flex h-16 items-center border-b px-6">
-                                    <h1 className="text-xl font-bold">
+                                    <h1 className="text-2xl font-bold">
                                         <span className="text-primary">Ixoye</span> Dashboard
                                     </h1>
                                 </div>
                                 <nav className="space-y-1 px-4 py-6">
-                                    {DASHBOARD_NAV_ITEMS.map((item) => {
+                                    {navItems.map((item) => {
                                         const ItemIcon = navIconById[item.id];
-                                        const href = `/dashboard/${guildId}${item.href}`;
+                                        const enabled = isNavItemEnabled(item, moduleEnabledById);
+                                        const href = getNavHref(guildId, item, moduleEnabledById);
+                                        const targetHref = `/dashboard/${guildId}${item.href}`;
                                         const isActive = item.href === ""
-                                            ? pathname === href
-                                            : pathname.startsWith(href);
+                                            ? pathname === targetHref
+                                            : pathname.startsWith(targetHref);
 
                                         return (
                                             <SheetClose asChild key={item.name}>
@@ -349,11 +434,17 @@ export default function DashboardLayout({
                                                     href={href}
                                                     className={cn(
                                                         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
-                                                        isActive ? "bg-secondary text-foreground" : "text-muted-foreground"
+                                                        isActive ? "bg-secondary text-foreground" : "text-muted-foreground",
+                                                        !enabled && "opacity-70"
                                                     )}
                                                 >
                                                     <ItemIcon className="h-4 w-4" />
-                                                    {item.name}
+                                                    <span className="flex-1">{item.name}</span>
+                                                    {!enabled && (
+                                                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                                            Off
+                                                        </span>
+                                                    )}
                                                 </Link>
                                             </SheetClose>
                                         );

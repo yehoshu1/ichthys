@@ -81,7 +81,9 @@ export function DateTimePicker({
 
     const isDisabled = (day: Date) => {
         if (!minDate) return false;
-        return day < new Date(minDate.setHours(0, 0, 0, 0));
+        const normalizedMinDate = new Date(minDate);
+        normalizedMinDate.setHours(0, 0, 0, 0);
+        return day < normalizedMinDate;
     };
 
     return (
@@ -244,7 +246,9 @@ export function DatePicker({
 
     const isDisabled = (day: Date) => {
         if (!minDate) return false;
-        return day < new Date(minDate.setHours(0, 0, 0, 0));
+        const normalizedMinDate = new Date(minDate);
+        normalizedMinDate.setHours(0, 0, 0, 0);
+        return day < normalizedMinDate;
     };
 
     return (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
 import {
@@ -48,7 +48,6 @@ import {
 import {
     Webhook,
     Key,
-    Calendar,
     Plus,
     MoreVertical,
     Trash,
@@ -60,7 +59,6 @@ import {
     Clock,
     Activity,
     Shield,
-    Link2,
     Send,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -115,19 +113,7 @@ interface ApiKey {
     key?: string;
 }
 
-interface CalendarIntegration {
-    id: string;
-    userId: string;
-    provider: "google" | "outlook" | "apple";
-    providerAccountId: string;
-    syncEnabled: boolean;
-    syncDirection: "inbound" | "outbound" | "bidirectional";
-    includeGuildIds: string[] | null;
-    excludeGuildIds: string[] | null;
-    lastSyncedAt: string | null;
-    lastSyncError: string | null;
-    createdAt: string;
-}
+
 
 const WEBHOOK_EVENT_TYPES = [
     { value: "event.created", label: "Event Created", category: "Events" },
@@ -151,9 +137,23 @@ const API_PERMISSIONS = [
     { value: "webhooks:write", label: "Write Webhooks", description: "Manage webhooks" },
 ];
 
+const WEBHOOK_TABS = ["webhooks", "api-keys"] as const;
+type WebhookTab = (typeof WEBHOOK_TABS)[number];
+
 export default function WebhooksPage() {
     const params = useParams();
+    const searchParams = useSearchParams();
     const guildId = params.guildId as string;
+    const requestedTab = searchParams.get("tab");
+    const resolvedTab: WebhookTab =
+        requestedTab && WEBHOOK_TABS.includes(requestedTab as WebhookTab)
+            ? (requestedTab as WebhookTab)
+            : "webhooks";
+    const [activeTab, setActiveTab] = useState<WebhookTab>(resolvedTab);
+
+    useEffect(() => {
+        setActiveTab(resolvedTab);
+    }, [resolvedTab]);
 
     return (
         <div className="container mx-auto p-6 max-w-6xl">
@@ -163,12 +163,16 @@ export default function WebhooksPage() {
                     Webhooks & API
                 </h1>
                 <p className="text-muted-foreground">
-                    Manage webhooks, API keys, and external integrations.
+                    Manage webhooks and API keys.
                 </p>
             </div>
 
-            <Tabs defaultValue="webhooks" className="space-y-4">
-                <TabsList className="grid w-full grid-cols-3">
+            <Tabs
+                value={activeTab}
+                onValueChange={(value) => setActiveTab(value as WebhookTab)}
+                className="space-y-4"
+            >
+                <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="webhooks">
                         <Webhook className="h-4 w-4 mr-2" />
                         Webhooks
@@ -176,10 +180,6 @@ export default function WebhooksPage() {
                     <TabsTrigger value="api-keys">
                         <Key className="h-4 w-4 mr-2" />
                         API Keys
-                    </TabsTrigger>
-                    <TabsTrigger value="calendar">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        Calendar
                     </TabsTrigger>
                 </TabsList>
 
@@ -191,9 +191,7 @@ export default function WebhooksPage() {
                     <ApiKeysTab guildId={guildId} />
                 </TabsContent>
 
-                <TabsContent value="calendar" className="space-y-4">
-                    <CalendarTab guildId={guildId} />
-                </TabsContent>
+
             </Tabs>
         </div>
     );
@@ -670,8 +668,8 @@ function WebhookForm({
                 />
                 <HelperText>
                     {webhook?.secret
-                        ? "Leave blank to keep existing secret. Enter new value to change."
-                        : "We'll send this in the X-Webhook-Signature header for verification."}
+                        ? "Leave blank to keep existing secret. Enter new value to change. Secrets are encrypted with AES-256-GCM at rest."
+                        : "We'll send an HMAC-SHA256 signature in the X-Webhook-Signature header. Secrets are encrypted with AES-256-GCM and cannot be retrieved later."}
                 </HelperText>
             </div>
 
@@ -902,7 +900,7 @@ function ApiKeysTab({ guildId }: { guildId: string }) {
                 <div>
                     <h2 className="text-xl font-semibold">API Keys</h2>
                     <p className="text-sm text-muted-foreground">
-                        Manage API keys for programmatic access to your server data.
+                        Manage API keys for programmatic access. Keys are hashed with SHA-256 and shown only once.
                     </p>
                 </div>
                 <Button onClick={() => setShowCreate(true)}>
@@ -919,7 +917,7 @@ function ApiKeysTab({ guildId }: { guildId: string }) {
                             Save Your API Key
                         </CardTitle>
                         <CardDescription className="text-yellow-700 dark:text-yellow-300">
-                            This key will only be shown once. Copy it now and store it securely.
+                            This key will only be shown once. It's hashed with SHA-256 before storage and cannot be recovered. Copy it now and store it securely.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -1227,247 +1225,5 @@ function ApiKeyForm({
                 </Button>
             </DialogFooter>
         </form>
-    );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// CALENDAR TAB
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function CalendarTab({ guildId }: { guildId: string }) {
-    const [integrations, setIntegrations] = useState<CalendarIntegration[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        fetchIntegrations();
-    }, [guildId]);
-
-    async function fetchIntegrations() {
-        try {
-            const res = await fetch(`/api/guilds/${guildId}/calendar-integrations`);
-            if (res.ok) {
-                const data = await res.json();
-                setIntegrations(data);
-            }
-        } catch (error) {
-            console.error("Error fetching integrations:", error);
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    async function disconnectIntegration(id: string) {
-        try {
-            const res = await fetch(
-                `/api/guilds/${guildId}/calendar-integrations/${id}`,
-                { method: "DELETE" }
-            );
-            if (res.ok) {
-                setIntegrations(integrations.filter((i) => i.id !== id));
-                toast.success("Integration disconnected");
-            } else {
-                toast.error("Failed to disconnect");
-            }
-        } catch (error) {
-            console.error("Error disconnecting:", error);
-            toast.error("Failed to disconnect");
-        }
-    }
-
-    async function toggleSync(id: string, enabled: boolean) {
-        try {
-            const res = await fetch(
-                `/api/guilds/${guildId}/calendar-integrations/${id}`,
-                {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ syncEnabled: enabled }),
-                }
-            );
-            if (res.ok) {
-                setIntegrations(
-                    integrations.map((i) =>
-                        i.id === id ? { ...i, syncEnabled: enabled } : i
-                    )
-                );
-                toast.success(enabled ? "Sync enabled" : "Sync paused");
-            }
-        } catch (error) {
-            console.error("Error toggling sync:", error);
-            toast.error("Failed to update");
-        }
-    }
-
-    if (loading) {
-        return (
-            <Card>
-                <CardContent className="p-8 text-center text-muted-foreground">
-                    Loading calendar integrations...
-                </CardContent>
-            </Card>
-        );
-    }
-
-    return (
-        <>
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-xl font-semibold">Calendar Integrations</h2>
-                    <p className="text-sm text-muted-foreground">
-                        Sync events with your external calendars.
-                    </p>
-                </div>
-                <Button asChild>
-                    <a href={`/api/guilds/${guildId}/calendar-integrations/connect?provider=google`}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Connect Calendar
-                    </a>
-                </Button>
-            </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Connected Calendars</CardTitle>
-                    <CardDescription>
-                        Your connected calendar accounts and sync status.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {integrations.length === 0 ? (
-                        <div className="text-center py-12">
-                            <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <h3 className="text-lg font-medium mb-2">
-                                No calendars connected
-                            </h3>
-                            <p className="text-muted-foreground mb-4">
-                                Connect your Google, Outlook, or Apple Calendar to sync events.
-                            </p>
-                            <Button asChild>
-                                <a
-                                    href={`/api/guilds/${guildId}/calendar-integrations/connect?provider=google`}
-                                >
-                                    <Link2 className="h-4 w-4 mr-2" />
-                                    Connect Google Calendar
-                                </a>
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {integrations.map((integration) => (
-                                <CalendarIntegrationCard
-                                    key={integration.id}
-                                    integration={integration}
-                                    onDisconnect={() => disconnectIntegration(integration.id)}
-                                    onToggleSync={(enabled) =>
-                                        toggleSync(integration.id, enabled)
-                                    }
-                                />
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Available Integrations</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {[
-                            {
-                                provider: "google",
-                                name: "Google Calendar",
-                                description: "Sync with Google Calendar",
-                                icon: "📅",
-                            },
-                            {
-                                provider: "outlook",
-                                name: "Outlook Calendar",
-                                description: "Sync with Microsoft Outlook",
-                                icon: "📆",
-                            },
-                        ].map((cal) => (
-                            <Card key={cal.provider} className="border-dashed">
-                                <CardContent className="p-6 text-center">
-                                    <div className="text-4xl mb-3">{cal.icon}</div>
-                                    <h4 className="font-medium">{cal.name}</h4>
-                                    <p className="text-sm text-muted-foreground mb-4">
-                                        {cal.description}
-                                    </p>
-                                    <Button variant="outline" size="sm" asChild>
-                                        <a
-                                            href={`/api/guilds/${guildId}/calendar-integrations/connect?provider=${cal.provider}`}
-                                        >
-                                            Connect
-                                        </a>
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        </>
-    );
-}
-
-function CalendarIntegrationCard({
-    integration,
-    onDisconnect,
-    onToggleSync,
-}: {
-    integration: CalendarIntegration;
-    onDisconnect: () => void;
-    onToggleSync: (enabled: boolean) => void;
-}) {
-    const providerInfo = {
-        google: { icon: "📅", name: "Google Calendar" },
-        outlook: { icon: "📆", name: "Outlook Calendar" },
-        apple: { icon: "🍎", name: "Apple Calendar" },
-    }[integration.provider] || { icon: "📅", name: integration.provider };
-
-    return (
-        <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div className="flex items-center gap-4">
-                <span className="text-2xl">{providerInfo.icon}</span>
-                <div>
-                    <div className="font-medium">{providerInfo.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                        {integration.syncDirection === "bidirectional"
-                            ? "Two-way sync"
-                            : integration.syncDirection === "inbound"
-                            ? "Import only"
-                            : "Export only"}
-                        {integration.lastSyncedAt && (
-                            <>
-                                {" "}
-                                • Last synced{" "}
-                                {formatDistanceToNow(new Date(integration.lastSyncedAt), {
-                                    addSuffix: true,
-                                })}
-                            </>
-                        )}
-                        {integration.lastSyncError && (
-                            <span className="text-red-500 ml-2">
-                                • Sync error
-                            </span>
-                        )}
-                    </div>
-                </div>
-            </div>
-            <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Sync</span>
-                    <Switch
-                        checked={integration.syncEnabled}
-                        onCheckedChange={onToggleSync}
-                    />
-                </div>
-                <Button variant="ghost" size="sm" onClick={onDisconnect}>
-                    <Trash className="h-4 w-4 text-red-500" />
-                </Button>
-            </div>
-        </div>
     );
 }

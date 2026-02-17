@@ -1,15 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, poll, pollOption, pollVote } from '@/lib/db';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, inArray, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { authorizeGuildApiRequest } from '@/lib/guild-api-auth';
 import logger from '@/lib/logger';
-import { dispatchGuildWebhookEvent } from '@/lib/webhook-dispatch';
+import { requireGuildModuleEnabled } from '@/lib/module-gate';
+import { pollService } from '@shared/services/poll-domain-service';
 
 // Validation constants
 const MAX_POLL_QUESTION_LENGTH = 200;
 const MAX_POLL_DESCRIPTION_LENGTH = 1000;
 const MAX_POLL_OPTIONS = 20;
 const MAX_OPTION_TEXT_LENGTH = 100;
+
+const pollTypeSchema = z.enum(['STANDARD', 'TIME', 'ANONYMOUS']);
+
+const createPollSchema = z.object({
+    channelId: z.string().min(1),
+    question: z.string().min(1).max(MAX_POLL_QUESTION_LENGTH),
+    description: z.string().max(MAX_POLL_DESCRIPTION_LENGTH).optional(),
+    color: z.string().max(32).optional(),
+    type: pollTypeSchema.optional(),
+    isAnonymous: z.boolean().optional(),
+    allowMultipleVotes: z.boolean().optional(),
+    maxVotesPerUser: z.number().int().min(1).max(20).optional(),
+    allowCustomOptions: z.boolean().optional(),
+    allowedRoleIds: z.array(z.string()).optional(),
+    mentionRoleIds: z.array(z.string()).optional(),
+    mentionOnCreate: z.boolean().optional(),
+    endTime: z.string().datetime().optional(),
+    options: z.array(z.union([
+        z.string(),
+        z.object({
+            text: z.string(),
+            emoji: z.string().optional(),
+        }),
+    ])).optional(),
+    timeSlots: z.array(z.string()).optional(),
+}).strict();
+
+function formatDiscordTimestampLabel(date: Date): string {
+    const unix = Math.floor(date.getTime() / 1000);
+    return `<t:${unix}:F>`;
+}
 
 // GET /api/guilds/[guildId]/polls - List all polls for a guild
 export async function GET(
@@ -26,6 +59,8 @@ export async function GET(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'polls');
+        if (moduleGuard) return moduleGuard;
 
         const { searchParams } = new URL(request.url);
         const status = searchParams.get('status') || 'active';
@@ -50,38 +85,58 @@ export async function GET(
 
         const polls = await query.orderBy(desc(poll.createdAt));
 
-        // Get options and vote counts for each poll
-        const pollsWithData = await Promise.all(
-            polls.map(async (p) => {
-                const options = await db
-                    .select()
-                    .from(pollOption)
-                    .where(eq(pollOption.pollId, p.id))
-                    .orderBy(pollOption.order);
+        if (polls.length === 0) {
+            return NextResponse.json([]);
+        }
 
-                // Get vote counts for each option
-                const optionsWithVotes = await Promise.all(
-                    options.map(async (opt) => {
-                        const votes = await db
-                            .select()
-                            .from(pollVote)
-                            .where(eq(pollVote.optionId, opt.id));
-                        return {
-                            ...opt,
-                            voteCount: votes.length,
-                        };
-                    })
-                );
+        const pollIds = polls.map((p) => p.id);
+        const options = await db
+            .select()
+            .from(pollOption)
+            .where(inArray(pollOption.pollId, pollIds))
+            .orderBy(pollOption.order);
 
-                const totalVotes = optionsWithVotes.reduce((sum, opt) => sum + opt.voteCount, 0);
+        const optionIds = options.map((opt) => opt.id);
+        const voteCounts = optionIds.length
+            ? await db
+                .select({
+                    optionId: pollVote.optionId,
+                    count: sql<number>`count(*)`,
+                })
+                .from(pollVote)
+                .where(inArray(pollVote.optionId, optionIds))
+                .groupBy(pollVote.optionId)
+            : [];
 
-                return {
-                    ...p,
-                    options: optionsWithVotes,
-                    voteCount: totalVotes,
-                };
-            })
-        );
+        const votesByOption = new Map<string, number>();
+        for (const row of voteCounts) {
+            votesByOption.set(row.optionId, Number(row.count ?? 0));
+        }
+
+        const optionsByPoll = new Map<string, typeof options>();
+        for (const option of options) {
+            const existing = optionsByPoll.get(option.pollId);
+            if (existing) {
+                existing.push(option);
+            } else {
+                optionsByPoll.set(option.pollId, [option]);
+            }
+        }
+
+        const pollsWithData = polls.map((p) => {
+            const pollOptions = optionsByPoll.get(p.id) ?? [];
+            const optionsWithVotes = pollOptions.map((opt) => ({
+                ...opt,
+                voteCount: votesByOption.get(opt.id) ?? 0,
+            }));
+            const totalVotes = optionsWithVotes.reduce((sum, opt) => sum + opt.voteCount, 0);
+
+            return {
+                ...p,
+                options: optionsWithVotes,
+                voteCount: totalVotes,
+            };
+        });
 
         return NextResponse.json(pollsWithData);
     } catch (error) {
@@ -105,35 +160,22 @@ export async function POST(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'polls');
+        if (moduleGuard) return moduleGuard;
 
         const body = await request.json();
-
-        // Validate required fields
-        if (!body.question || !body.channelId) {
+        const parsed = createPollSchema.safeParse(body);
+        if (!parsed.success) {
             return NextResponse.json(
-                { error: 'Missing required fields: question, channelId' },
+                { error: 'Invalid request body', details: parsed.error.issues },
                 { status: 400 }
             );
         }
-
-        // Validate field lengths
-        if (body.question.length > MAX_POLL_QUESTION_LENGTH) {
-            return NextResponse.json(
-                { error: `Question cannot exceed ${MAX_POLL_QUESTION_LENGTH} characters` },
-                { status: 400 }
-            );
-        }
-
-        if (body.description && body.description.length > MAX_POLL_DESCRIPTION_LENGTH) {
-            return NextResponse.json(
-                { error: `Description cannot exceed ${MAX_POLL_DESCRIPTION_LENGTH} characters` },
-                { status: 400 }
-            );
-        }
+        const data = parsed.data;
 
         // Validate options for standard/anonymous polls
-        const isTimePoll = body.type === 'TIME';
-        const options = body.options || body.timeSlots || [];
+        const isTimePoll = data.type === 'TIME';
+        const options = data.options || data.timeSlots || [];
 
         if (!isTimePoll) {
             if (!options || options.length < 2) {
@@ -151,7 +193,7 @@ export async function POST(
         }
 
         for (const option of options) {
-            const optionText = (option?.text ?? '').toString().trim();
+            const optionText = (typeof option === 'string' ? option : option?.text ?? '').toString().trim();
             if (!optionText) {
                 return NextResponse.json(
                     { error: 'Option text cannot be empty' },
@@ -167,69 +209,47 @@ export async function POST(
         }
 
         // Determine poll type (handle both body.type and body.isAnonymous)
-        let pollType: 'STANDARD' | 'TIME' | 'ANONYMOUS' = body.type || 'STANDARD';
-        if (body.isAnonymous === true) {
+        let pollType: 'STANDARD' | 'TIME' | 'ANONYMOUS' = data.type || 'STANDARD';
+        if (data.isAnonymous === true) {
             pollType = 'ANONYMOUS';
         }
 
-        const [createdPoll] = await db
-            .insert(poll)
-            .values({
-                guildId: guildId as string,
-                creatorId: auth.userId,
-                channelId: body.channelId as string,
-                question: body.question as string,
-                description: body.description as string | undefined,
-                type: pollType,
-                allowMultipleVotes: (body.allowMultipleVotes ?? false) as boolean,
-                maxVotesPerUser: body.maxVotesPerUser as number | undefined,
-                allowCustomOptions: (body.allowCustomOptions ?? false) as boolean,
-                allowedRoleIds: body.allowedRoleIds as string[] | undefined,
-                mentionRoleIds: body.mentionRoleIds as string[] | undefined,
-                mentionOnCreate: (body.mentionOnCreate ?? false) as boolean,
-                endTime: body.endTime ? new Date(body.endTime) : undefined,
-                closed: false,
-            })
-            .returning();
-
-        if (isTimePoll && body.timeSlots?.length) {
-            const values = body.timeSlots.map((slot: string, index: number) => {
+        const normalizedOptions = isTimePoll && data.timeSlots?.length
+            ? data.timeSlots.map((slot: string) => {
                 const parsed = new Date(slot);
+                if (Number.isNaN(parsed.getTime())) {
+                    throw new Error(`Invalid time slot: ${slot}`);
+                }
                 return {
-                    pollId: createdPoll.id,
-                    order: index,
-                    text: parsed.toLocaleString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                    }),
+                    text: formatDiscordTimestampLabel(parsed),
                     dateTimeValue: parsed,
                 };
-            });
-            await db.insert(pollOption).values(values);
-        } else if (options?.length) {
-            const values = options.map((opt: { text: string; emoji?: string }, index: number) => ({
-                pollId: createdPoll.id,
-                order: index,
-                text: opt.text,
-                emoji: opt.emoji || null,
-            }));
-            await db.insert(pollOption).values(values);
-        }
+            })
+            : (options as Array<{ text: string; emoji?: string; dateTimeValue?: Date }> | undefined);
 
-        await dispatchGuildWebhookEvent(guildId, 'poll.created', {
-            pollId: createdPoll.id,
-            question: createdPoll.question,
-            type: createdPoll.type,
-            channelId: createdPoll.channelId,
-            endTime: createdPoll.endTime,
-            creatorId: createdPoll.creatorId,
+        const createdPoll = await pollService.createPoll({
+            guildId,
+            creatorId: auth.userId,
+            channelId: data.channelId,
+            question: data.question,
+            description: data.description,
+            color: data.color,
+            type: pollType,
+            allowMultipleVotes: data.allowMultipleVotes ?? false,
+            maxVotesPerUser: data.maxVotesPerUser,
+            allowCustomOptions: data.allowCustomOptions ?? false,
+            allowedRoleIds: data.allowedRoleIds,
+            mentionRoleIds: data.mentionRoleIds,
+            mentionOnCreate: data.mentionOnCreate ?? false,
+            endTime: data.endTime ? new Date(data.endTime) : undefined,
+            options: normalizedOptions ?? [],
         });
 
         return NextResponse.json(createdPoll);
     } catch (error) {
+        if (error instanceof Error && error.message.startsWith('Invalid time slot:')) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+        }
         logger.error('Error creating poll:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }

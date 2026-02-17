@@ -1,5 +1,6 @@
 import { eq, and, desc, asc, sql, lte } from 'drizzle-orm';
 import { db } from '@shared/database/client';
+import { pollService as pollDomainService } from '@shared/services/poll-domain-service';
 import crypto from 'crypto';
 import { webhookService } from './webhook-service';
 import {
@@ -10,7 +11,6 @@ import {
     PollOption,
     PollVote,
     NewPoll,
-    NewPollOption,
     NewPollVote,
 } from '@shared/database/schema';
 
@@ -38,12 +38,15 @@ export interface CreatePollData {
     channelId: string;
     question: string;
     description?: string;
+    color?: string;
     options: { text: string; emoji?: string; dateTimeValue?: Date }[];
     type: 'STANDARD' | 'TIME' | 'ANONYMOUS';
     allowMultipleVotes?: boolean;
     maxVotesPerUser?: number;
     allowCustomOptions?: boolean;
     allowedRoleIds?: string[];
+    mentionRoleIds?: string[];
+    mentionOnCreate?: boolean;
     endTime?: Date | null;
 }
 
@@ -69,47 +72,7 @@ export class PollService {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     async createPoll(data: CreatePollData): Promise<Poll> {
-        const pollData: NewPoll = {
-            guildId: data.guildId,
-            creatorId: data.creatorId,
-            channelId: data.channelId,
-            question: data.question,
-            description: data.description,
-            type: data.type,
-            allowMultipleVotes: data.allowMultipleVotes ?? false,
-            maxVotesPerUser: data.maxVotesPerUser,
-            allowCustomOptions: data.allowCustomOptions ?? false,
-            allowedRoleIds: data.allowedRoleIds,
-            endTime: data.endTime,
-            closed: false,
-        };
-
-        const [createdPoll] = await db.insert(poll).values(pollData).returning();
-
-        // Create options
-        for (let i = 0; i < data.options.length; i++) {
-            const opt = data.options[i];
-            const optionData: NewPollOption = {
-                pollId: createdPoll.id,
-                order: i,
-                text: opt.text,
-                emoji: opt.emoji,
-                dateTimeValue: opt.dateTimeValue,
-            };
-            await db.insert(pollOption).values(optionData);
-        }
-
-        await webhookService.triggerEvent(createdPoll.guildId, 'poll.created', {
-            pollId: createdPoll.id,
-            question: createdPoll.question,
-            type: createdPoll.type,
-            channelId: createdPoll.channelId,
-            endTime: createdPoll.endTime,
-            optionCount: data.options.length,
-            creatorId: createdPoll.creatorId,
-        });
-
-        return createdPoll;
+        return pollDomainService.createPoll(data);
     }
 
     async getPollById(pollId: string): Promise<Poll | undefined> {
@@ -151,21 +114,31 @@ export class PollService {
     }
 
     async updatePoll(pollId: string, data: Partial<NewPoll>): Promise<Poll | undefined> {
-        const [updated] = await db
-            .update(poll)
-            .set({ ...data, updatedAt: new Date() })
-            .where(eq(poll.id, pollId))
-            .returning();
-        return updated;
+        return pollDomainService.updatePoll(pollId, data);
+    }
+
+    async updatePollWithOptions(
+        pollId: string,
+        data: Partial<NewPoll>,
+        normalizedOptions?: Array<{ text: string; emoji?: string | null; dateTimeValue?: Date | null }>
+    ): Promise<Poll | undefined> {
+        return pollDomainService.updatePollWithOptions(pollId, data, normalizedOptions);
     }
 
     async deletePoll(pollId: string): Promise<boolean> {
-        const result = await db.delete(poll).where(eq(poll.id, pollId));
-        return (result.rowCount ?? 0) > 0;
+        return pollDomainService.deletePollWithRelations(pollId);
+    }
+
+    async deletePollWithRelations(pollId: string): Promise<boolean> {
+        return pollDomainService.deletePollWithRelations(pollId);
+    }
+
+    async deletePollWithArtifacts(pollId: string): Promise<boolean> {
+        return pollDomainService.deletePollWithArtifacts(pollId);
     }
 
     async setPollMessageId(pollId: string, messageId: string): Promise<void> {
-        await db.update(poll).set({ messageId }).where(eq(poll.id, pollId));
+        await pollDomainService.setPollMessageId(pollId, messageId);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -343,51 +316,14 @@ export class PollService {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     async closePoll(pollId: string): Promise<Poll | undefined> {
-        const pollData = await this.getPollById(pollId);
-        if (!pollData) return undefined;
-
-        const [updated] = await db
-            .update(poll)
-            .set({ closed: true, closedAt: new Date(), updatedAt: new Date() })
-            .where(eq(poll.id, pollId))
-            .returning();
-
-        // Trigger webhook for poll closure
-        await webhookService.triggerEvent(pollData.guildId, 'poll.closed', {
-            pollId: pollId,
-            pollQuestion: pollData.question,
-            totalVotes: await this.getTotalVoteCount(pollId),
-        });
-
-        return updated;
-    }
-
-    private async getTotalVoteCount(pollId: string): Promise<number> {
-        const result = await db
-            .select({ count: sql<number>`count(*)`.mapWith(Number) })
-            .from(pollVote)
-            .where(eq(pollVote.pollId, pollId));
-        return result[0]?.count ?? 0;
+        return pollDomainService.closePoll(pollId);
     }
 
     async addCustomOption(pollId: string, text: string, emoji?: string): Promise<PollOption | undefined> {
         const pollData = await this.getPollById(pollId);
         if (!pollData || !pollData.allowCustomOptions) return undefined;
 
-        const existingOptions = await db
-            .select()
-            .from(pollOption)
-            .where(eq(pollOption.pollId, pollId));
-
-        const optionData: NewPollOption = {
-            pollId,
-            order: existingOptions.length,
-            text,
-            emoji,
-        };
-
-        const [created] = await db.insert(pollOption).values(optionData).returning();
-        return created;
+        return pollDomainService.addPollOption(pollId, text, emoji);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════

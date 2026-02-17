@@ -2,8 +2,60 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shared/database/client";
 import { welcomeConfig } from "@shared/database/schema";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { requireGuildManageAccess } from "@/lib/guild-auth";
 import logger from "@/lib/logger";
+
+const welcomeConfigSchema = z.object({
+    id: z.string().optional(),
+    enabled: z.boolean(),
+    targetType: z.enum(["CHANNEL", "DM"]),
+    channelId: z.string().nullable().optional(),
+    messageTemplate: z.string().max(2000).nullable().optional(),
+    embedEnabled: z.boolean(),
+    embedConfig: z.record(z.string(), z.unknown()).nullable().optional(),
+    goodbyeEnabled: z.boolean().optional(),
+    goodbyeChannelId: z.string().nullable().optional(),
+    goodbyeMessageTemplate: z.string().max(2000).nullable().optional(),
+    goodbyeEmbedEnabled: z.boolean().optional(),
+    imageEnabled: z.boolean(),
+    imageSendMode: z.enum(["WITH_TEXT", "BEFORE_TEXT", "TO_CHANNEL", "IMAGE_ONLY"]),
+    imageChannelId: z.string().nullable().optional(),
+    canvasWidth: z.number().int().min(100).max(2000),
+    canvasHeight: z.number().int().min(100).max(2000),
+    backgroundType: z.enum(["COLOR", "GRADIENT", "IMAGE"]),
+    backgroundValue: z.string().max(2048),
+    avatarShape: z.enum(["CIRCLE", "SQUARE", "ROUNDED"]),
+    avatarX: z.number().int().min(0).max(4000),
+    avatarY: z.number().int().min(0).max(4000),
+    avatarSize: z.number().int().min(16).max(1024),
+    avatarBorderColor: z.string().max(32).nullable().optional(),
+    avatarBorderWidth: z.number().int().min(0).max(50),
+    usernameX: z.number().int().min(0).max(4000),
+    usernameY: z.number().int().min(0).max(4000),
+    usernameFont: z.string().max(200),
+    usernameSize: z.number().int().min(8).max(200),
+    usernameColor: z.string().max(32),
+    usernameAlign: z.enum(["left", "center", "right"]),
+    subtitleEnabled: z.boolean(),
+    subtitleTemplate: z.string().max(2000).nullable().optional(),
+    subtitleX: z.number().int().min(0).max(4000),
+    subtitleY: z.number().int().min(0).max(4000),
+    subtitleFont: z.string().max(200),
+    subtitleSize: z.number().int().min(8).max(200),
+    subtitleColor: z.string().max(32),
+    showServerName: z.boolean(),
+    serverNameX: z.number().int().min(0).max(4000),
+    serverNameY: z.number().int().min(0).max(4000),
+    serverNameFont: z.string().max(200),
+    serverNameSize: z.number().int().min(8).max(200),
+    serverNameColor: z.string().max(32),
+    cooldownEnabled: z.boolean(),
+    cooldownSeconds: z.number().int().min(0).max(3600),
+    avatarWidth: z.number().int().min(0).max(4000).optional(),
+    avatarHeight: z.number().int().min(0).max(4000).optional(),
+    usernameWidth: z.number().int().min(0).max(4000).optional(),
+}).strict();
 
 /**
  * GET /api/guilds/[guildId]/welcome/config
@@ -105,11 +157,19 @@ export async function POST(
         const body = await req.json();
         // Support both { config: {...} } and direct body formats
         const configData = body.config || body;
+        const parsed = welcomeConfigSchema.safeParse(configData);
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: "Invalid request body", details: parsed.error.issues },
+                { status: 400 }
+            );
+        }
+        const validatedConfig = parsed.data;
 
-        logger.info("Saving welcome config", { guildId, hasConfig: !!configData, enabled: configData?.enabled, targetType: configData?.targetType, hasChannelId: !!configData?.channelId });
+        logger.info("Saving welcome config", { guildId, hasConfig: !!validatedConfig, enabled: validatedConfig.enabled, targetType: validatedConfig.targetType, hasChannelId: !!validatedConfig.channelId });
 
         // Validate required fields - only if enabled and target is CHANNEL
-        if (configData.enabled === true && configData.targetType === 'CHANNEL' && !configData.channelId) {
+        if (validatedConfig.enabled === true && validatedConfig.targetType === 'CHANNEL' && !validatedConfig.channelId) {
             logger.warn("Validation failed: Channel ID required", { guildId });
             return NextResponse.json(
                 { error: "Please select a channel for welcome messages", field: "channelId" },
@@ -119,10 +179,8 @@ export async function POST(
 
         // Remove UI-only fields that don't exist in database
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { avatarWidth, avatarHeight, usernameWidth, id, ...dbData } = configData;
-        
-        // Ensure guildId is set
-        dbData.guildId = guildId;
+        const { avatarWidth, avatarHeight, usernameWidth, id, ...dbData } = validatedConfig;
+        const dbPayload = { guildId, ...dbData };
 
         const existing = await db.query.welcomeConfig.findFirst({
             where: eq(welcomeConfig.guildId, guildId)
@@ -134,7 +192,7 @@ export async function POST(
             [result] = await db
                 .update(welcomeConfig)
                 .set({
-                    ...dbData,
+                    ...dbPayload,
                     updatedAt: new Date()
                 })
                 .where(eq(welcomeConfig.id, existing.id))
@@ -144,8 +202,7 @@ export async function POST(
             [result] = await db
                 .insert(welcomeConfig)
                 .values({
-                    guildId,
-                    ...dbData,
+                    ...dbPayload,
                     createdAt: new Date(),
                     updatedAt: new Date()
                 })

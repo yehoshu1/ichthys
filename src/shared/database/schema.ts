@@ -690,6 +690,19 @@ export const commandConfig = pgTable('command_config', {
     guildIdIdx: index('command_config_guild_id_idx').on(table.guildId),
 }));
 
+export const moduleState = pgTable('module_state', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    moduleId: text('module_id').notNull(),
+    enabled: boolean('enabled').default(true).notNull(),
+    updatedBy: text('updated_by'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildModuleUnique: uniqueIndex('module_state_guild_module_unique').on(table.guildId, table.moduleId),
+    guildIdIdx: index('module_state_guild_id_idx').on(table.guildId),
+}));
+
 export type GuildConfig = typeof guildConfig.$inferSelect;
 export type NewGuildConfig = typeof guildConfig.$inferInsert;
 
@@ -766,6 +779,9 @@ export type NewMessageAlias = typeof messageAlias.$inferInsert;
 
 export type CommandConfig = typeof commandConfig.$inferSelect;
 export type NewCommandConfig = typeof commandConfig.$inferInsert;
+
+export type ModuleState = typeof moduleState.$inferSelect;
+export type NewModuleState = typeof moduleState.$inferInsert;
 
 export type ReactionRoleMessage = typeof reactionRoleMessage.$inferSelect;
 export type NewReactionRoleMessage = typeof reactionRoleMessage.$inferInsert;
@@ -1116,35 +1132,7 @@ export const apiKey = pgTable('api_key', {
     keyHashIdx: index('api_key_key_hash_idx').on(table.keyHash),
 }));
 
-export const userCalendarIntegration = pgTable('user_calendar_integration', {
-    id: uuid('id').defaultRandom().primaryKey(),
-    userId: text('user_id').notNull(),
-    
-    // Provider details
-    provider: text('provider').notNull(), // 'google', 'outlook', 'apple'
-    providerAccountId: text('provider_account_id').notNull(),
-    accessToken: text('access_token'),
-    refreshToken: text('refresh_token'),
-    tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true, mode: 'date' }),
-    
-    // Sync settings
-    syncEnabled: boolean('sync_enabled').default(true).notNull(),
-    syncDirection: text('sync_direction').default('bidirectional').notNull(), // 'inbound', 'outbound', 'bidirectional'
-    
-    // Guild filtering
-    includeGuildIds: text('include_guild_ids').array(),
-    excludeGuildIds: text('exclude_guild_ids').array(),
-    
-    // Sync state
-    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true, mode: 'date' }),
-    lastSyncError: text('last_sync_error'),
-    
-    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
-}, (table) => ({
-    userIdIdx: index('calendar_integration_user_id_idx').on(table.userId),
-    userProviderUnique: uniqueIndex('calendar_integration_user_provider_unique').on(table.userId, table.provider),
-}));
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPE EXPORTS
@@ -1186,5 +1174,4 @@ export type NewWebhookDelivery = typeof webhookDelivery.$inferInsert;
 export type ApiKey = typeof apiKey.$inferSelect;
 export type NewApiKey = typeof apiKey.$inferInsert;
 
-export type UserCalendarIntegration = typeof userCalendarIntegration.$inferSelect;
-export type NewUserCalendarIntegration = typeof userCalendarIntegration.$inferInsert;
+

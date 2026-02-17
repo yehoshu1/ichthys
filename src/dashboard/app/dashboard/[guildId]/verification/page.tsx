@@ -712,27 +712,27 @@ export default function VerificationPage() {
                                 <p className="text-sm text-muted-foreground">No unverified users right now.</p>
                             ) : (
                                 unverifiedUsers.map((user) => (
-                                    <div key={user.userId} className="flex items-center justify-between rounded-lg border p-3">
-                                        <div className="flex items-center gap-3">
+                                    <div key={user.userId} className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                                        <div className="flex min-w-0 flex-1 items-center gap-3">
                                             {user.avatar ? (
                                                 <Image
                                                     src={user.avatar}
                                                     alt={user.username}
                                                     width={32}
                                                     height={32}
-                                                    className="rounded-full"
+                                                    className="shrink-0 rounded-full"
                                                 />
                                             ) : (
-                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
                                                     {user.username.charAt(0)}
                                                 </div>
                                             )}
-                                            <div>
-                                                <p className="text-sm font-medium">{user.username}</p>
-                                                <p className="text-xs text-muted-foreground">{user.userId}</p>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-medium">{user.username}</p>
+                                                <p className="truncate text-xs text-muted-foreground">{user.userId}</p>
                                             </div>
                                         </div>
-                                        <span className="text-xs text-muted-foreground">
+                                        <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
                                             Joined {new Date(user.joinedAt).toLocaleDateString()}
                                         </span>
                                     </div>

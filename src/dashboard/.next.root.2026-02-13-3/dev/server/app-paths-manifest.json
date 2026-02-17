@@ -1,0 +1,13 @@
+{
+  "/api/guilds/[guildId]/route": "app/api/guilds/[guildId]/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/guilds/[guildId]/notifications/unread-count/route": "app/api/guilds/[guildId]/notifications/unread-count/route.js",
+  "/api/guilds/[guildId]/leveling/config/route": "app/api/guilds/[guildId]/leveling/config/route.js",
+  "/api/guilds/[guildId]/discord-data/route": "app/api/guilds/[guildId]/discord-data/route.js",
+  "/api/guilds/[guildId]/leveling/rewards/route": "app/api/guilds/[guildId]/leveling/rewards/route.js",
+  "/dashboard/[guildId]/events/page": "app/dashboard/[guildId]/events/page.js",
+  "/dashboard/[guildId]/polls/page": "app/dashboard/[guildId]/polls/page.js",
+  "/dashboard/[guildId]/verification/page": "app/dashboard/[guildId]/verification/page.js",
+  "/dashboard/[guildId]/welcome/page": "app/dashboard/[guildId]/welcome/page.js",
+  "/dashboard/[guildId]/leveling/page": "app/dashboard/[guildId]/leveling/page.js"
+}

@@ -2,6 +2,8 @@ import { Client } from 'discord.js';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { db } from '@shared/database/client';
 import { event } from '@shared/database/schema';
+import { isModuleEnabled } from '@shared/modules/state';
+import { eventService as eventDomainService } from '@shared/services/event-domain-service';
 import { eventDiscordService } from '../services/event-discord-service';
 import { eventService } from '../services/event-service';
 import logger from '../utils/logger';
@@ -60,6 +62,11 @@ export class EventMessageSyncJob {
 
         for (const evt of newEvents) {
             try {
+                const eventsEnabled = await isModuleEnabled(evt.guildId, 'events');
+                if (!eventsEnabled) {
+                    continue;
+                }
+
                 const guild = await this.client.guilds.fetch(evt.guildId).catch(() => null);
                 if (!guild) {
                     logger.warn(`Guild ${evt.guildId} not found for event ${evt.id}`);
@@ -103,6 +110,11 @@ export class EventMessageSyncJob {
 
         for (const evt of updatedEvents) {
             try {
+                const eventsEnabled = await isModuleEnabled(evt.guildId, 'events');
+                if (!eventsEnabled) {
+                    continue;
+                }
+
                 const guild = await this.client.guilds.fetch(evt.guildId).catch(() => null);
                 if (!guild) continue;
 
@@ -121,10 +133,7 @@ export class EventMessageSyncJob {
                 } else if (evt.discordScheduledEventId) {
                     try {
                         await eventService.deleteDiscordScheduledEvent(evt, guild);
-                        await db
-                            .update(event)
-                            .set({ discordScheduledEventId: null })
-                            .where(eq(event.id, evt.id));
+                        await eventDomainService.setEventDiscordScheduledEventId(evt.id, null);
                         logger.info(`Removed Discord Scheduled Event for event ${evt.id} (mirroring disabled)`);
                     } catch (discordError) {
                         logger.error(`Failed to remove Discord Scheduled Event for event ${evt.id}:`, discordError);

@@ -94,12 +94,12 @@ export class PollDiscordService {
                 const votersText = showVoters && opt.voteCount > 0
                     ? `\n👥 ${this.formatVoters(opt.voters)}`
                     : '';
-                return `${emoji} ${opt.option.text}\n\`${bar}\` ${opt.percentage}% (${opt.voteCount})${votersText}`;
+                return `${emoji} ${this.getOptionDisplayText(opt.option, pollData.type)}\n\`${bar}\` ${opt.percentage}% (${opt.voteCount})${votersText}`;
             }).join('\n\n');
         } else {
             optionsText = options.map((opt, i) => {
                 const emoji = opt.emoji || `${i + 1}.`;
-                return `${emoji} ${opt.text}`;
+                return `${emoji} ${this.getOptionDisplayText(opt, pollData.type)}`;
             }).join('\n\n');
         }
 
@@ -117,7 +117,13 @@ export class PollDiscordService {
         return embed;
     }
 
-    buildVoteButtons(pollId: string, options: PollOption[], allowMultiple: boolean, maxVotes?: number | null): ActionRowBuilder<ButtonBuilder | StringSelectMenuBuilder>[] {
+    buildVoteButtons(
+        pollId: string,
+        options: PollOption[],
+        pollType: PollDisplayData['type'],
+        allowMultiple: boolean,
+        maxVotes?: number | null
+    ): ActionRowBuilder<ButtonBuilder | StringSelectMenuBuilder>[] {
         const components: ActionRowBuilder<ButtonBuilder | StringSelectMenuBuilder>[] = [];
 
         if (options.length <= 5) {
@@ -154,9 +160,15 @@ export class PollDiscordService {
 
             for (let i = 0; i < options.length; i++) {
                 const opt = options[i];
+                const optionDisplayText = this.getOptionDisplayText(opt, pollType);
                 selectMenu.addOptions({
-                    label: opt.text.substring(0, 100),
+                    label: pollType === 'TIME'
+                        ? `Slot ${i + 1}`
+                        : optionDisplayText.substring(0, 100),
                     value: `${i}`,
+                    ...(pollType === 'TIME'
+                        ? { description: optionDisplayText.substring(0, 100) }
+                        : {}),
                     ...(opt.emoji ? { emoji: opt.emoji } : {}),
                 });
             }
@@ -196,7 +208,7 @@ export class PollDiscordService {
         const { options } = pollWithOptions;
 
         const embed = await this.buildPollEmbed(poll, options);
-        const components = this.buildVoteButtons(poll.id, options, poll.allowMultipleVotes, poll.maxVotesPerUser);
+        const components = this.buildVoteButtons(poll.id, options, poll.type, poll.allowMultipleVotes, poll.maxVotesPerUser);
 
         // Build mention string
         let mentionContent = '';
@@ -242,7 +254,7 @@ export class PollDiscordService {
                     components: [],
                 });
             } else {
-                const components = this.buildVoteButtons(poll.id, options, poll.allowMultipleVotes, poll.maxVotesPerUser);
+                const components = this.buildVoteButtons(poll.id, options, poll.type, poll.allowMultipleVotes, poll.maxVotesPerUser);
                 await message.edit({
                     embeds: [embed],
                     components,
@@ -326,6 +338,39 @@ export class PollDiscordService {
         }
 
         return `${value.slice(0, maxLength - 15)}\n…(truncated)`;
+    }
+
+    private getOptionDisplayText(option: PollOption, pollType: PollDisplayData['type']): string {
+        if (pollType !== 'TIME') {
+            return option.text;
+        }
+
+        const fromDate = this.normalizeDate(option.dateTimeValue);
+        if (fromDate) {
+            return this.formatDiscordTimestamp(fromDate);
+        }
+
+        if (option.text.includes('<t:')) {
+            return option.text;
+        }
+
+        const parsedFromText = this.normalizeDate(option.text);
+        if (parsedFromText) {
+            return this.formatDiscordTimestamp(parsedFromText);
+        }
+
+        return option.text;
+    }
+
+    private normalizeDate(value: Date | string | null | undefined): Date | null {
+        if (!value) return null;
+        const parsed = value instanceof Date ? value : new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    private formatDiscordTimestamp(date: Date): string {
+        const unix = Math.floor(date.getTime() / 1000);
+        return `<t:${unix}:F>`;
     }
 }
 

@@ -4,11 +4,12 @@ import { z } from "zod";
 import { db, notificationEvent, notificationUserCursor, notificationUserState } from "@/lib/db";
 import { requireGuildManageAccess } from "@/lib/guild-auth";
 import logger from "@/lib/logger";
+import { parseJsonBody } from "@/lib/validation";
 
 const markReadSchema = z.object({
     markAll: z.boolean().default(false),
     notificationIds: z.array(z.string().uuid()).max(100).default([]),
-});
+}).strict();
 
 export async function POST(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
@@ -17,13 +18,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
     const auth = await requireGuildManageAccess(guildId, req);
     if ("response" in auth) return auth.response;
 
-    let parsed: z.infer<typeof markReadSchema>;
-    try {
-        const body = await req.json();
-        parsed = markReadSchema.parse(body);
-    } catch {
-        return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-    }
+    const parsedResult = await parseJsonBody(req, markReadSchema);
+    if (!parsedResult.success) return parsedResult.response;
+    const parsed = parsedResult.data;
 
     if (!parsed.markAll && parsed.notificationIds.length === 0) {
         return NextResponse.json({ error: "Provide notificationIds or markAll=true" }, { status: 400 });

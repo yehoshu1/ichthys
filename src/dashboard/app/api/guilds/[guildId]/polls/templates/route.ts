@@ -2,7 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, pollTemplate } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import logger from '@/lib/logger';
+import { z } from 'zod';
 import { authorizeGuildApiRequest } from '@/lib/guild-api-auth';
+import { requireGuildModuleEnabled } from '@/lib/module-gate';
+import { parseJsonBody } from '@/lib/validation';
+
+const pollTypeSchema = z.enum(['STANDARD', 'TIME', 'ANONYMOUS']);
+
+const createTemplateSchema = z.object({
+    name: z.string().trim().min(1).max(100),
+    description: z.string().max(1000).optional(),
+    question: z.string().max(200).optional(),
+    pollDescription: z.string().max(1000).optional(),
+    type: pollTypeSchema.optional(),
+    allowMultipleVotes: z.boolean().optional(),
+    maxVotesPerUser: z.number().int().min(1).max(20).optional(),
+    allowCustomOptions: z.boolean().optional(),
+    defaultOptions: z.array(z.string().min(1).max(100)).max(20).optional(),
+}).strict();
 
 // GET /api/guilds/[guildId]/polls/templates - List poll templates
 export async function GET(
@@ -19,6 +36,8 @@ export async function GET(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'polls');
+        if (moduleGuard) return moduleGuard;
 
         const templates = await db
             .select()
@@ -47,15 +66,12 @@ export async function POST(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'polls');
+        if (moduleGuard) return moduleGuard;
 
-        const body = await request.json();
-
-        if (!body.name) {
-            return NextResponse.json(
-                { error: 'Template name is required' },
-                { status: 400 }
-            );
-        }
+        const parsed = await parseJsonBody(request, createTemplateSchema);
+        if (!parsed.success) return parsed.response;
+        const body = parsed.data;
 
         const newTemplate = await db
             .insert(pollTemplate)

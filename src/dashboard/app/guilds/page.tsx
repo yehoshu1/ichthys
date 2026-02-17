@@ -8,7 +8,7 @@ import Link from "next/link";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { Search } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import ThemeToggle from "../../components/ThemeToggle";
 
 interface Guild {
@@ -62,16 +62,22 @@ export default function GuildsPage() {
 
     if (status === "loading" || loading) {
         return (
-            <main style={styles.container}>
-                <p style={styles.loadingText}>Loading your servers...</p>
+            <main className="min-h-screen px-6 py-12">
+                <div className="mx-auto flex max-w-2xl flex-col items-center justify-center gap-3 text-center text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <p className="text-sm">Loading your servers...</p>
+                </div>
             </main>
         );
     }
 
     if (error) {
         return (
-            <main style={styles.container}>
-                <p style={styles.errorText}>Error: {error}</p>
+            <main className="min-h-screen px-6 py-12">
+                <div className="mx-auto flex max-w-2xl flex-col items-center justify-center gap-3 text-center">
+                    <p className="text-sm font-medium text-destructive">Error: {error}</p>
+                    <p className="text-xs text-muted-foreground">Try refreshing or signing in again.</p>
+                </div>
             </main>
         );
     }
@@ -151,22 +157,3 @@ export default function GuildsPage() {
         </main>
     );
 }
-
-const styles: { [key: string]: React.CSSProperties } = {
-    container: {
-        minHeight: "100vh",
-        padding: "40px 20px",
-        maxWidth: "1200px",
-        margin: "0 auto",
-    },
-    loadingText: {
-        textAlign: "center",
-        color: "#94a3b8",
-        marginTop: "100px",
-    },
-    errorText: {
-        textAlign: "center",
-        color: "#ef4444",
-        marginTop: "100px",
-    },
-};

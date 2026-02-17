@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { db, pollTemplate } from '@/lib/db';
+import { z } from 'zod';
 import { authorizeGuildApiRequest } from '@/lib/guild-api-auth';
 import logger from '@/lib/logger';
+import { requireGuildModuleEnabled } from '@/lib/module-gate';
+import { parseJsonBody } from '@/lib/validation';
+
+const pollTypeSchema = z.enum(['STANDARD', 'TIME', 'ANONYMOUS']);
+
+const updateTemplateSchema = z.object({
+    name: z.string().trim().min(1).max(100).optional(),
+    description: z.string().max(1000).optional(),
+    question: z.string().max(200).optional(),
+    pollDescription: z.string().max(1000).optional(),
+    type: pollTypeSchema.optional(),
+    allowMultipleVotes: z.boolean().optional(),
+    maxVotesPerUser: z.number().int().min(1).max(20).optional(),
+    allowCustomOptions: z.boolean().optional(),
+    defaultOptions: z.array(z.string().min(1).max(100)).max(20).optional(),
+}).strict();
 
 export async function PATCH(
     request: NextRequest,
@@ -14,8 +31,12 @@ export async function PATCH(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'polls');
+        if (moduleGuard) return moduleGuard;
 
-        const body = await request.json();
+        const parsed = await parseJsonBody(request, updateTemplateSchema);
+        if (!parsed.success) return parsed.response;
+        const body = parsed.data;
 
         const [existing] = await db
             .select()
@@ -64,6 +85,8 @@ export async function DELETE(
         if ('response' in auth) {
             return auth.response;
         }
+        const moduleGuard = await requireGuildModuleEnabled(guildId, 'polls');
+        if (moduleGuard) return moduleGuard;
 
         const [existing] = await db
             .select({ id: pollTemplate.id })

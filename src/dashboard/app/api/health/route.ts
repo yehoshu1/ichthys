@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { checkPoolHealth, getPoolMetrics } from "@shared/database/client";
 import logger from "@/lib/logger";
 
@@ -7,6 +7,20 @@ interface HealthCheck {
     healthy: boolean;
     responseTime: number;
     message?: string;
+}
+
+function isDetailedHealthAuthorized(request: NextRequest): boolean {
+    const configuredToken = process.env.METRICS_TOKEN;
+    if (!configuredToken) {
+        return process.env.NODE_ENV !== "production";
+    }
+
+    const bearer = request.headers.get("authorization");
+    if (!bearer?.startsWith("Bearer ")) {
+        return false;
+    }
+
+    return bearer.slice("Bearer ".length).trim() === configuredToken;
 }
 
 /**
@@ -79,7 +93,11 @@ export async function GET() {
  * Detailed health check with metrics
  * For internal monitoring use
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
+    if (!isDetailedHealthAuthorized(request)) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const checks: HealthCheck[] = [];
 
     // Database health with metrics
