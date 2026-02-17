@@ -26,6 +26,7 @@ export const data = new SlashCommandBuilder()
 
 // Common reminder presets
 const reminderPresets = [
+    { label: 'on event start', minutes: 0 },
     { label: '10 minutes before', minutes: 10 },
     { label: '30 minutes before', minutes: 30 },
     { label: '1 hour before', minutes: 60 },
@@ -63,7 +64,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         // Parse the reminder time
         const minutesBefore = parseReminderTime(whenInput);
 
-        if (!minutesBefore || minutesBefore <= 0) {
+        if (minutesBefore === null || minutesBefore < 0) {
             const presetsList = reminderPresets.map(p => `• "${p.label}"`).join('\n');
             await interaction.editReply(
                 `Invalid reminder time. Please use a format like:\n${presetsList}\n\nOr specify in minutes (e.g., "30 minutes before")`
@@ -79,22 +80,30 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         }
 
         // Set the reminder
-        const success = await eventService.setReminder(eventId, interaction.user.id, minutesBefore);
-
-        if (!success) {
+        const reminderResult = await eventService.upsertReminder(eventId, interaction.user.id, minutesBefore);
+        if (reminderResult.status === 'unchanged') {
             await interaction.editReply('You already have a reminder set for that time.');
             return;
         }
 
+        const reminderTitle = reminderResult.status === 'updated' ? '⏰ Reminder Updated' : '⏰ Reminder Set';
+
         // Build confirmation embed
         const embed = new EmbedBuilder()
-            .setTitle('⏰ Reminder Set')
+            .setTitle(reminderTitle)
             .setColor('#57F287')
-            .setDescription(`You will be reminded about **${evt.title}** ${formatDiscordTimestamp(reminderTime, 'R')}`)
+            .setDescription(minutesBefore === 0
+                ? `You will be reminded when **${evt.title}** starts.`
+                : `You will be reminded about **${evt.title}** ${formatDiscordTimestamp(reminderTime, 'R')}`
+            )
             .addFields(
                 { name: 'Event', value: evt.title, inline: true },
                 { name: 'Starts', value: formatDiscordTimestamp(evt.startTime, 'F'), inline: true },
-                { name: 'Reminder', value: formatDiscordTimestamp(reminderTime, 'R'), inline: true }
+                {
+                    name: 'Reminder',
+                    value: minutesBefore === 0 ? 'On event start' : formatDiscordTimestamp(reminderTime, 'R'),
+                    inline: true,
+                }
             );
 
         await interaction.editReply({ embeds: [embed] });
@@ -113,6 +122,8 @@ function parseReminderTime(input: string): number | null {
     // Check presets first
     for (const preset of reminderPresets) {
         if (normalized.includes(preset.label.toLowerCase()) ||
+            normalized === 'event start' ||
+            normalized === 'on start' ||
             normalized === `${preset.minutes}m` ||
             normalized === `${preset.minutes} minutes` ||
             normalized === `${preset.minutes} minute`) {

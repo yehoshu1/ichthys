@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { Command } from '../types/Command';
+import logger from '../utils/logger';
 
 const command: Command = {
     data: new SlashCommandBuilder()
@@ -69,7 +70,7 @@ const command: Command = {
             await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
-            console.error('Error fetching avatar:', error);
+            logger.error('Error fetching avatar:', error);
             await interaction.editReply({ content: 'There was an error fetching the avatar.' });
         }
     }

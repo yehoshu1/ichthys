@@ -1,5 +1,17 @@
 import { eq, and, gte, lte, desc, asc, sql } from 'drizzle-orm';
 import { db } from '@shared/database/client';
+import { eventService as eventDomainService } from '@shared/services/event-domain-service';
+import { webhookService } from './webhook-service';
+import {
+    ChannelType,
+    Guild,
+    GuildScheduledEventEntityType,
+    GuildScheduledEventPrivacyLevel,
+    GuildScheduledEventRecurrenceRuleFrequency,
+    GuildScheduledEventRecurrenceRuleOptions,
+    GuildScheduledEventRecurrenceRuleWeekday,
+} from 'discord.js';
+import logger from '../utils/logger';
 import {
     event,
     eventRsvp,
@@ -24,9 +36,11 @@ export interface CreateEventData {
     guildId: string;
     creatorId: string;
     channelId: string;
+    locationChannelId?: string;
     title: string;
     startTime: Date;
     description?: string;
+    color?: string;
     endTime?: Date | null;
     durationMinutes?: number;
     location?: string;
@@ -41,6 +55,7 @@ export interface CreateEventData {
     attendeeRoleId?: string;
     repeatFrequency?: 'NONE' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'YEARLY';
     repeatUntil?: Date;
+    mirrorToDiscord?: boolean;
 }
 
 export interface RsvpData {
@@ -50,38 +65,113 @@ export interface RsvpData {
     note?: string;
 }
 
+export interface ReminderUpsertResult {
+    status: 'created' | 'updated' | 'unchanged';
+    previousMinutesBefore?: number;
+}
+
 export class EventService {
+
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // EVENT CRUD
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    async createEvent(data: CreateEventData): Promise<Event> {
-        const eventData: NewEvent = {
-            guildId: data.guildId,
-            creatorId: data.creatorId,
-            channelId: data.channelId,
-            title: data.title,
-            description: data.description,
-            location: data.location,
-            imageUrl: data.imageUrl,
-            startTime: data.startTime,
-            endTime: data.endTime,
-            durationMinutes: data.durationMinutes,
-            maxAttendees: data.maxAttendees,
-            enableWaitlist: data.enableWaitlist ?? false,
-            mentionRoleIds: data.mentionRoleIds,
-            mentionOnCreate: data.mentionOnCreate ?? false,
-            mentionOnStart: data.mentionOnStart ?? false,
-            requiredRoleIds: data.requiredRoleIds,
-            blockedRoleIds: data.blockedRoleIds,
-            attendeeRoleId: data.attendeeRoleId,
-            repeatFrequency: data.repeatFrequency ?? 'NONE',
-            repeatUntil: data.repeatUntil,
-            status: 'SCHEDULED',
-        };
+    async createEvent(data: CreateEventData, guild?: Guild): Promise<Event> {
+        const created = await eventDomainService.createEvent(data);
 
-        const [created] = await db.insert(event).values(eventData).returning();
+        // Create Discord Scheduled Event if enabled and guild provided
+        if (created.mirrorToDiscord && guild) {
+            try {
+                const discordEventId = await this.createDiscordScheduledEvent(created, guild);
+                if (discordEventId) {
+                    await eventDomainService.setEventDiscordScheduledEventId(created.id, discordEventId);
+                    created.discordScheduledEventId = discordEventId;
+                }
+            } catch (error) {
+                logger.error('Failed to create Discord Scheduled Event:', error);
+            }
+        }
+
         return created;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // DISCORD SCHEDULED EVENTS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    private async createDiscordScheduledEvent(eventData: Event, guild: Guild): Promise<string | null> {
+        try {
+            const locationConfig = await this.resolveScheduledEventLocationConfig(eventData, guild);
+            const scheduledEndTime = this.resolveScheduledEndTime(eventData, locationConfig.entityType);
+            const recurrenceRule = this.buildDiscordRecurrenceRule(eventData);
+
+            const discordEvent = await guild.scheduledEvents.create({
+                name: eventData.title,
+                description: eventData.description || undefined,
+                scheduledStartTime: eventData.startTime,
+                scheduledEndTime,
+                privacyLevel: GuildScheduledEventPrivacyLevel.GuildOnly,
+                entityType: locationConfig.entityType,
+                channel: locationConfig.channelId,
+                entityMetadata: locationConfig.entityMetadata,
+                image: eventData.imageUrl || undefined,
+                recurrenceRule: recurrenceRule ?? undefined,
+            });
+
+            logger.info(`Created Discord Scheduled Event ${discordEvent.id} for event ${eventData.id}`);
+            return discordEvent.id;
+        } catch (error) {
+            logger.error('Error creating Discord Scheduled Event:', error);
+            return null;
+        }
+    }
+
+    async updateDiscordScheduledEvent(eventData: Event, guild: Guild): Promise<void> {
+        if (!eventData.discordScheduledEventId) return;
+
+        try {
+            const discordEvent = await guild.scheduledEvents.fetch(eventData.discordScheduledEventId).catch(() => null);
+            if (!discordEvent) {
+                logger.warn(`Discord Scheduled Event ${eventData.discordScheduledEventId} not found for event ${eventData.id}`);
+                return;
+            }
+
+            // Update the event
+            const locationConfig = await this.resolveScheduledEventLocationConfig(eventData, guild);
+            const scheduledEndTime = this.resolveScheduledEndTime(eventData, locationConfig.entityType);
+            const recurrenceRule = this.buildDiscordRecurrenceRule(eventData);
+            await discordEvent.edit({
+                name: eventData.title,
+                description: eventData.description || undefined,
+                scheduledStartTime: eventData.startTime,
+                scheduledEndTime,
+                entityType: locationConfig.entityType,
+                channel: locationConfig.channelId ?? null,
+                entityMetadata: locationConfig.entityMetadata,
+                image: eventData.imageUrl || undefined,
+                recurrenceRule: recurrenceRule ?? null,
+                status: eventData.status === 'CANCELLED' ? 2 : undefined, // 2 = Canceled
+            });
+
+            logger.info(`Updated Discord Scheduled Event ${discordEvent.id} for event ${eventData.id}`);
+        } catch (error) {
+            logger.error('Error updating Discord Scheduled Event:', error);
+        }
+    }
+
+    async deleteDiscordScheduledEvent(eventData: Event, guild: Guild): Promise<void> {
+        if (!eventData.discordScheduledEventId) return;
+
+        try {
+            const discordEvent = await guild.scheduledEvents.fetch(eventData.discordScheduledEventId).catch(() => null);
+            if (discordEvent) {
+                await discordEvent.delete();
+                logger.info(`Deleted Discord Scheduled Event ${discordEvent.id} for event ${eventData.id}`);
+            }
+        } catch (error) {
+            logger.error('Error deleting Discord Scheduled Event:', error);
+        }
     }
 
     async getEventById(eventId: string): Promise<Event | undefined> {
@@ -89,8 +179,8 @@ export class EventService {
         return result;
     }
 
-    async getEventsByGuild(guildId: string, options?: { 
-        status?: string; 
+    async getEventsByGuild(guildId: string, options?: {
+        status?: string;
         upcoming?: boolean;
         limit?: number;
         offset?: number;
@@ -107,10 +197,10 @@ export class EventService {
         }
 
         const baseQuery = db.select().from(event).where(and(...conditions));
-        
+
         // Apply ordering
         const orderedQuery = baseQuery.orderBy(asc(event.startTime));
-        
+
         // Apply limit if specified
         if (options?.limit) {
             if (options?.offset) {
@@ -118,30 +208,63 @@ export class EventService {
             }
             return await orderedQuery.limit(options.limit);
         }
-        
+
         return await orderedQuery;
     }
 
-    async updateEvent(eventId: string, data: Partial<NewEvent>): Promise<Event | undefined> {
-        const [updated] = await db
-            .update(event)
-            .set({ ...data, updatedAt: new Date() })
-            .where(eq(event.id, eventId))
-            .returning();
+    async updateEvent(eventId: string, data: Partial<NewEvent>, guild?: Guild): Promise<Event | undefined> {
+        const updated = await eventDomainService.updateEvent(eventId, data);
+        if (!updated) return undefined;
+
+        // Shared domain service handles webhook + mirror disable cleanup.
+        // Bot-side service keeps native Discord scheduled events in sync when guild is available.
+        if (updated.mirrorToDiscord && guild) {
+            if (updated.discordScheduledEventId) {
+                await this.updateDiscordScheduledEvent(updated, guild);
+            } else {
+                const discordEventId = await this.createDiscordScheduledEvent(updated, guild);
+                if (discordEventId) {
+                    await eventDomainService.setEventDiscordScheduledEventId(eventId, discordEventId);
+                    updated.discordScheduledEventId = discordEventId;
+                }
+            }
+        }
+
         return updated;
     }
 
-    async deleteEvent(eventId: string): Promise<boolean> {
-        const result = await db.delete(event).where(eq(event.id, eventId));
-        return (result.rowCount ?? 0) > 0;
+    async deleteEvent(eventId: string, _guild?: Guild): Promise<boolean> {
+        return eventDomainService.deleteEvent(eventId);
     }
 
-    async cancelEvent(eventId: string): Promise<Event | undefined> {
-        return this.updateEvent(eventId, { status: 'CANCELLED' });
+    async cancelEvent(eventId: string, guild?: Guild): Promise<Event | undefined> {
+        const updated = await this.updateEvent(eventId, { status: 'CANCELLED' }, guild);
+        return updated;
+    }
+
+    async syncEventWithDiscord(eventId: string, guild: Guild): Promise<void> {
+        const eventData = await this.getEventById(eventId);
+        if (!eventData || !eventData.mirrorToDiscord) return;
+
+        // Child rows created for recurring schedules should not create/update
+        // standalone native Discord events. Recurrence is managed on the parent.
+        if (eventData.parentEventId) {
+            await eventDomainService.disableEventMirror(eventData.id);
+            return;
+        }
+
+        if (eventData.discordScheduledEventId) {
+            await this.updateDiscordScheduledEvent(eventData, guild);
+        } else {
+            const discordEventId = await this.createDiscordScheduledEvent(eventData, guild);
+            if (discordEventId) {
+                await eventDomainService.setEventDiscordScheduledEventId(eventId, discordEventId);
+            }
+        }
     }
 
     async setEventMessageId(eventId: string, messageId: string): Promise<void> {
-        await db.update(event).set({ messageId }).where(eq(event.id, eventId));
+        await eventDomainService.setEventMessageId(eventId, messageId);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -158,17 +281,17 @@ export class EventService {
 
     async getRsvpsByEvent(eventId: string, status?: string): Promise<EventRsvp[]> {
         const conditions = [eq(eventRsvp.eventId, eventId)];
-        
+
         if (status) {
             conditions.push(eq(eventRsvp.status, status as any));
         }
-        
+
         return await db.select().from(eventRsvp).where(and(...conditions)).orderBy(desc(eventRsvp.respondedAt));
     }
 
     async getRsvpCounts(eventId: string): Promise<{ yes: number; no: number; maybe: number; waitlist: number }> {
         const rsvps = await this.getRsvpsByEvent(eventId);
-        
+
         return {
             yes: rsvps.filter(r => r.status === 'YES').length,
             no: rsvps.filter(r => r.status === 'NO').length,
@@ -250,6 +373,20 @@ export class EventService {
             await db.insert(eventRsvp).values(rsvpData);
         }
 
+        // Trigger webhook for RSVP
+        const eventType = status === 'YES' ? 'rsvp.yes' :
+            status === 'NO' ? 'rsvp.no' :
+                status === 'MAYBE' ? 'rsvp.maybe' :
+                    status === 'WAITLIST' ? 'rsvp.waitlist' : 'rsvp.updated';
+
+        await webhookService.triggerEvent(eventData.guildId, eventType, {
+            eventId: data.eventId,
+            userId: data.userId,
+            status: status,
+            waitlisted,
+            eventTitle: eventData.title,
+        });
+
         return { success: true, waitlisted, message: waitlisted ? 'You have been added to the waitlist' : undefined };
     }
 
@@ -270,26 +407,52 @@ export class EventService {
     }
 
     async promoteFromWaitlist(eventId: string): Promise<string | null> {
-        const eventData = await this.getEventById(eventId);
-        if (!eventData || !eventData.enableWaitlist) return null;
+        return await db.transaction(async (tx) => {
+            // Get event data within transaction
+            const [eventData] = await tx
+                .select()
+                .from(event)
+                .where(eq(event.id, eventId));
 
-        // Find first waitlisted person
-        const [firstWaitlisted] = await db
-            .select()
-            .from(eventRsvp)
-            .where(and(eq(eventRsvp.eventId, eventId), eq(eventRsvp.status, 'WAITLIST')))
-            .orderBy(asc(eventRsvp.respondedAt))
-            .limit(1);
+            if (!eventData || !eventData.enableWaitlist) return null;
 
-        if (firstWaitlisted) {
-            await db
-                .update(eventRsvp)
-                .set({ status: 'YES', updatedAt: new Date() })
-                .where(eq(eventRsvp.id, firstWaitlisted.id));
-            return firstWaitlisted.userId;
-        }
+            // Check if there's actually a spot available
+            if (eventData.maxAttendees) {
+                const [countResult] = await tx
+                    .select({ count: sql<number>`count(*)`.mapWith(Number) })
+                    .from(eventRsvp)
+                    .where(and(
+                        eq(eventRsvp.eventId, eventId),
+                        eq(eventRsvp.status, 'YES')
+                    ));
 
-        return null;
+                if (countResult.count >= eventData.maxAttendees) {
+                    // Event is still full, don't promote
+                    return null;
+                }
+            }
+
+            // Find first waitlisted person
+            const [firstWaitlisted] = await tx
+                .select()
+                .from(eventRsvp)
+                .where(and(
+                    eq(eventRsvp.eventId, eventId),
+                    eq(eventRsvp.status, 'WAITLIST')
+                ))
+                .orderBy(asc(eventRsvp.respondedAt))
+                .limit(1);
+
+            if (firstWaitlisted) {
+                await tx
+                    .update(eventRsvp)
+                    .set({ status: 'YES', updatedAt: new Date() })
+                    .where(eq(eventRsvp.id, firstWaitlisted.id));
+                return firstWaitlisted.userId;
+            }
+
+            return null;
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -309,6 +472,52 @@ export class EventService {
             // Duplicate reminder
             return false;
         }
+    }
+
+    async upsertReminder(eventId: string, userId: string, minutesBefore: number): Promise<ReminderUpsertResult> {
+        return await db.transaction(async (tx) => {
+            const existingReminders = await tx
+                .select()
+                .from(eventReminder)
+                .where(and(
+                    eq(eventReminder.eventId, eventId),
+                    eq(eventReminder.userId, userId),
+                ))
+                .orderBy(desc(eventReminder.createdAt));
+
+            const latestExisting = existingReminders[0];
+            if (
+                existingReminders.length === 1 &&
+                latestExisting.minutesBefore === minutesBefore &&
+                latestExisting.sentAt === null
+            ) {
+                return {
+                    status: 'unchanged',
+                    previousMinutesBefore: latestExisting.minutesBefore,
+                };
+            }
+
+            if (existingReminders.length > 0) {
+                await tx
+                    .delete(eventReminder)
+                    .where(and(
+                        eq(eventReminder.eventId, eventId),
+                        eq(eventReminder.userId, userId),
+                    ));
+            }
+
+            const reminderData: NewEventReminder = {
+                eventId,
+                userId,
+                minutesBefore,
+            };
+            await tx.insert(eventReminder).values(reminderData);
+
+            return {
+                status: existingReminders.length > 0 ? 'updated' : 'created',
+                previousMinutesBefore: latestExisting?.minutesBefore,
+            };
+        });
     }
 
     async removeReminder(eventId: string, userId: string, minutesBefore: number): Promise<boolean> {
@@ -331,7 +540,7 @@ export class EventService {
             .where(and(eq(eventReminder.eventId, eventId), eq(eventReminder.userId, userId)));
     }
 
-    async getPendingReminders(beforeTime: Date): Promise<{reminder: EventReminder, event: Event}[]> {
+    async getPendingReminders(beforeTime: Date): Promise<{ reminder: EventReminder, event: Event }[]> {
         return await db
             .select({
                 reminder: eventReminder,
@@ -444,11 +653,28 @@ export class EventService {
     }
 
     async markEventAsStarted(eventId: string): Promise<void> {
-        await db.update(event).set({ status: 'ACTIVE' }).where(eq(event.id, eventId));
+        const updated = await eventDomainService.setEventStatus(eventId, 'ACTIVE');
+
+        if (updated) {
+            await webhookService.triggerEvent(updated.guildId, 'event.started', {
+                eventId: updated.id,
+                title: updated.title,
+                startTime: updated.startTime,
+                channelId: updated.channelId,
+                discordScheduledEventId: updated.discordScheduledEventId,
+            });
+        }
     }
 
     async markEventAsCompleted(eventId: string): Promise<void> {
-        await db.update(event).set({ status: 'COMPLETED' }).where(eq(event.id, eventId));
+        await eventDomainService.setEventStatus(eventId, 'COMPLETED');
+    }
+
+    async getActiveEvents(): Promise<Event[]> {
+        return await db
+            .select()
+            .from(event)
+            .where(eq(event.status, 'ACTIVE'));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -456,55 +682,147 @@ export class EventService {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     async createRepeatingEvents(parentEvent: Event): Promise<Event[]> {
-        if (parentEvent.repeatFrequency === 'NONE' || !parentEvent.repeatUntil) {
-            return [];
+        return eventDomainService.createRepeatingEvents(parentEvent);
+    }
+
+    private resolveScheduledEndTime(
+        eventData: Event,
+        entityType: GuildScheduledEventEntityType
+    ): Date | undefined {
+        if (eventData.endTime) {
+            return eventData.endTime;
         }
 
-        const created: Event[] = [];
-        let currentDate = new Date(parentEvent.startTime);
-        const endDate = parentEvent.repeatUntil;
+        if (entityType !== GuildScheduledEventEntityType.External) {
+            return undefined;
+        }
 
-        while (currentDate < endDate) {
-            // Calculate next date based on frequency
-            switch (parentEvent.repeatFrequency) {
-                case 'DAILY':
-                    currentDate.setDate(currentDate.getDate() + 1);
-                    break;
-                case 'WEEKLY':
-                    currentDate.setDate(currentDate.getDate() + 7);
-                    break;
-                case 'BIWEEKLY':
-                    currentDate.setDate(currentDate.getDate() + 14);
-                    break;
-                case 'MONTHLY':
-                    currentDate.setMonth(currentDate.getMonth() + 1);
-                    break;
-                case 'YEARLY':
-                    currentDate.setFullYear(currentDate.getFullYear() + 1);
-                    break;
-            }
+        const durationMinutes = eventData.durationMinutes && eventData.durationMinutes > 0
+            ? eventData.durationMinutes
+            : 60;
 
-            if (currentDate >= endDate) break;
+        return new Date(eventData.startTime.getTime() + durationMinutes * 60000);
+    }
 
-            // Create new event instance
-            const newEventData: NewEvent = {
-                ...parentEvent,
-                id: undefined as any, // Will be generated
-                startTime: currentDate,
-                endTime: parentEvent.endTime
-                    ? new Date(currentDate.getTime() + (parentEvent.endTime.getTime() - parentEvent.startTime.getTime()))
-                    : undefined,
-                parentEventId: parentEvent.id,
-                messageId: undefined,
-                createdAt: undefined,
-                updatedAt: undefined,
+    private async resolveScheduledEventLocationConfig(
+        eventData: Event,
+        guild: Guild
+    ): Promise<{
+        entityType: GuildScheduledEventEntityType;
+        channelId?: string;
+        entityMetadata?: { location: string };
+    }> {
+        const locationChannel = eventData.locationChannelId
+            ? await guild.channels.fetch(eventData.locationChannelId).catch(() => null)
+            : null;
+
+        if (locationChannel?.isVoiceBased()) {
+            return {
+                entityType: locationChannel.type === ChannelType.GuildStageVoice
+                    ? GuildScheduledEventEntityType.StageInstance
+                    : GuildScheduledEventEntityType.Voice,
+                channelId: locationChannel.id,
             };
-
-            const [newEvent] = await db.insert(event).values(newEventData).returning();
-            created.push(newEvent);
         }
 
-        return created;
+        const legacyChannel = await guild.channels.fetch(eventData.channelId).catch(() => null);
+        if (!eventData.locationChannelId && legacyChannel?.isVoiceBased()) {
+            return {
+                entityType: legacyChannel.type === ChannelType.GuildStageVoice
+                    ? GuildScheduledEventEntityType.StageInstance
+                    : GuildScheduledEventEntityType.Voice,
+                channelId: legacyChannel.id,
+            };
+        }
+
+        const externalLocation = eventData.location?.trim()
+            || (locationChannel ? `In ${locationChannel.name}` : `In ${legacyChannel?.name || 'Discord'}`);
+
+        return {
+            entityType: GuildScheduledEventEntityType.External,
+            entityMetadata: { location: externalLocation },
+        };
+    }
+
+    private buildDiscordRecurrenceRule(
+        eventData: Event
+    ): (GuildScheduledEventRecurrenceRuleOptions & { endAt?: Date }) | null {
+        if (eventData.repeatFrequency === 'NONE') {
+            return null;
+        }
+
+        const weekday = this.toDiscordWeekday(eventData.startTime);
+        const common = {
+            startAt: eventData.startTime,
+            endAt: eventData.repeatUntil ?? undefined,
+        };
+
+        switch (eventData.repeatFrequency) {
+            case 'DAILY':
+                return {
+                    ...common,
+                    frequency: GuildScheduledEventRecurrenceRuleFrequency.Daily,
+                    interval: 1,
+                    byWeekday: [
+                        GuildScheduledEventRecurrenceRuleWeekday.Monday,
+                        GuildScheduledEventRecurrenceRuleWeekday.Tuesday,
+                        GuildScheduledEventRecurrenceRuleWeekday.Wednesday,
+                        GuildScheduledEventRecurrenceRuleWeekday.Thursday,
+                        GuildScheduledEventRecurrenceRuleWeekday.Friday,
+                        GuildScheduledEventRecurrenceRuleWeekday.Saturday,
+                        GuildScheduledEventRecurrenceRuleWeekday.Sunday,
+                    ],
+                };
+            case 'WEEKLY':
+                return {
+                    ...common,
+                    frequency: GuildScheduledEventRecurrenceRuleFrequency.Weekly,
+                    interval: 1,
+                    byWeekday: [weekday],
+                };
+            case 'BIWEEKLY':
+                return {
+                    ...common,
+                    frequency: GuildScheduledEventRecurrenceRuleFrequency.Weekly,
+                    interval: 2,
+                    byWeekday: [weekday],
+                };
+            case 'MONTHLY':
+                return {
+                    ...common,
+                    frequency: GuildScheduledEventRecurrenceRuleFrequency.Monthly,
+                    interval: 1,
+                    byNWeekday: [{ day: weekday, n: this.getWeekOfMonth(eventData.startTime) }],
+                };
+            case 'YEARLY':
+                return {
+                    ...common,
+                    frequency: GuildScheduledEventRecurrenceRuleFrequency.Yearly,
+                    interval: 1,
+                    byMonth: [eventData.startTime.getUTCMonth() + 1],
+                    byMonthDay: [eventData.startTime.getUTCDate()],
+                };
+            default:
+                return null;
+        }
+    }
+
+    private toDiscordWeekday(date: Date): GuildScheduledEventRecurrenceRuleWeekday {
+        const utcDay = date.getUTCDay();
+        const map: Record<number, GuildScheduledEventRecurrenceRuleWeekday> = {
+            0: GuildScheduledEventRecurrenceRuleWeekday.Sunday,
+            1: GuildScheduledEventRecurrenceRuleWeekday.Monday,
+            2: GuildScheduledEventRecurrenceRuleWeekday.Tuesday,
+            3: GuildScheduledEventRecurrenceRuleWeekday.Wednesday,
+            4: GuildScheduledEventRecurrenceRuleWeekday.Thursday,
+            5: GuildScheduledEventRecurrenceRuleWeekday.Friday,
+            6: GuildScheduledEventRecurrenceRuleWeekday.Saturday,
+        };
+        return map[utcDay];
+    }
+
+    private getWeekOfMonth(date: Date): number {
+        return Math.floor((date.getUTCDate() - 1) / 7) + 1;
     }
 }
 

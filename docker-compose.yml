@@ -1,8 +1,23 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: ixoye-redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ixoye_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   postgres:
     image: postgres:17
     container_name: ixoye-postgres
     restart: always
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ixoye}
       POSTGRES_USER: ${POSTGRES_USER:-ixoye}
@@ -28,6 +43,8 @@ services:
       - .env
     environment:
       NODE_ENV: production
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      REDIS_URL: ${REDIS_URL:-}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:-ixoye}
@@ -35,6 +52,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
       DATABASE_URL: postgresql://${POSTGRES_USER:-ixoye}:${POSTGRES_PASSWORD:-ixoye}@postgres:5432/${POSTGRES_DB:-ixoye}
     depends_on:
+      redis:
+        condition: service_healthy
       postgres:
         condition: service_healthy
 
@@ -83,3 +102,4 @@ services:
 
 volumes:
   ixoye_pg_data:
+  ixoye_redis_data:

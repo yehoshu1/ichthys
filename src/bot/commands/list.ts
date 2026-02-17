@@ -101,6 +101,10 @@ async function listEvents(
             `👥 ${rsvpCounts.yes} going, ${rsvpCounts.maybe} maybe`,
         ];
 
+        if (evt.locationChannelId) {
+            value.push(`🎙️ Voice location: <#${evt.locationChannelId}>`);
+        }
+
         if (evt.location) {
             value.push(`📍 ${evt.location}`);
         }

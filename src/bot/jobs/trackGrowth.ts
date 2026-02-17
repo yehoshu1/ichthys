@@ -4,6 +4,7 @@ import { guildGrowth, userJoin, guildConfig } from "../../shared/database/schema
 import { eq, and, gte, sql } from "drizzle-orm";
 import client from "../client";
 import logger from "../utils/logger";
+import { isModuleEnabled } from "@shared/modules/state";
 
 /**
  * Track daily guild growth metrics
@@ -22,6 +23,9 @@ export default function startGrowthTrackingJob() {
 
             for (const config of configs) {
                 try {
+                    const analyticsEnabled = await isModuleEnabled(config.guildId, 'analytics');
+                    if (!analyticsEnabled) continue;
+
                     const guild = client.guilds.cache.get(config.guildId);
                     if (!guild) {
                         logger.debug(`Guild ${config.guildId} not in cache, skipping growth tracking`);

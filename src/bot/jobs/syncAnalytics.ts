@@ -3,6 +3,7 @@ import logger from "../utils/logger";
 import { db } from "../../shared/database/client";
 import { guildConfig, userJoin } from "../../shared/database/schema";
 import { eq, sql } from "drizzle-orm";
+import { isModuleEnabled } from "@shared/modules/state";
 
 const CHUNK_SIZE = 50;
 let isRunning = false;
@@ -90,6 +91,9 @@ export async function syncAnalyticsOnce(): Promise<void> {
     }).from(guildConfig);
 
     for (const config of configs) {
+        const analyticsEnabled = await isModuleEnabled(config.guildId, 'analytics');
+        if (!analyticsEnabled) continue;
+
         await syncGuildMemberSnapshot(config.guildId, config.verificationRoleId);
     }
 }

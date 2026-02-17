@@ -7,6 +7,7 @@ import {
 import { Command } from '../types/Command';
 import { eventService } from '../services/event-service';
 import { pollService } from '../services/poll-service';
+import { canMemberManageCreatorOwnedResource } from '../services/resource-authorization-service';
 import logger from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
@@ -34,6 +35,20 @@ export const data = new SlashCommandBuilder()
             .setDescription('Reason for deletion')
     );
 
+async function resolveInteractionMember(
+    interaction: ChatInputCommandInteraction
+): Promise<GuildMember | null> {
+    if (!interaction.guild) {
+        return null;
+    }
+
+    if (interaction.member instanceof GuildMember) {
+        return interaction.member;
+    }
+
+    return interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+}
+
 export async function execute(interaction: ChatInputCommandInteraction) {
     try {
         await interaction.deferReply({ ephemeral: true });
@@ -44,7 +59,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             return;
         }
 
-        const member = interaction.member as GuildMember;
+        const member = await resolveInteractionMember(interaction);
+        if (!member) {
+            await interaction.editReply('Unable to verify your server membership. Please try again.');
+            return;
+        }
+
         const type = interaction.options.getString('type', true);
         const id = interaction.options.getString('id', true);
         const reason = interaction.options.getString('reason');
@@ -79,32 +99,21 @@ async function deleteEvent(
         return;
     }
 
-    // Check permissions
-    const isCreator = evt.creatorId === member.id;
-    const isAdmin = member.permissions.has(PermissionFlagsBits.ManageEvents) ||
-                    member.permissions.has(PermissionFlagsBits.Administrator);
+    const allowed = canMemberManageCreatorOwnedResource({
+        member,
+        creatorUserId: evt.creatorId,
+        adminPermissions: [
+            PermissionFlagsBits.ManageEvents,
+            PermissionFlagsBits.Administrator,
+        ],
+    });
 
-    if (!isCreator && !isAdmin) {
+    if (!allowed) {
         await interaction.editReply('You can only delete events you created or if you have Manage Events permission.');
         return;
     }
 
-    // Try to delete the message if possible
-    if (evt.messageId && evt.channelId) {
-        try {
-            const channel = await interaction.guild?.channels.fetch(evt.channelId);
-            if (channel?.isTextBased()) {
-                const message = await channel.messages.fetch(evt.messageId).catch((error) => { logger.warn(`Failed to fetch event message ${evt.messageId} for deletion:`, error); return null; });
-                if (message) {
-                    await message.delete();
-                }
-            }
-        } catch (error) {
-            logger.warn(`Could not delete event message ${evt.messageId}:`, error);
-        }
-    }
-
-    // Delete from database
+    // Delete through shared domain path (includes Discord artifact cleanup).
     await eventService.deleteEvent(eventId);
 
     const reasonText = reason ? `\nReason: ${reason}` : '';
@@ -131,33 +140,22 @@ async function deletePoll(
         return;
     }
 
-    // Check permissions
-    const isCreator = poll.creatorId === member.id;
-    const isAdmin = member.permissions.has(PermissionFlagsBits.ManageGuild) ||
-                    member.permissions.has(PermissionFlagsBits.Administrator);
+    const allowed = canMemberManageCreatorOwnedResource({
+        member,
+        creatorUserId: poll.creatorId,
+        adminPermissions: [
+            PermissionFlagsBits.ManageGuild,
+            PermissionFlagsBits.Administrator,
+        ],
+    });
 
-    if (!isCreator && !isAdmin) {
+    if (!allowed) {
         await interaction.editReply('You can only delete polls you created or if you have Administrator permission.');
         return;
     }
 
-    // Try to delete the message if possible
-    if (poll.messageId && poll.channelId) {
-        try {
-            const channel = await interaction.guild?.channels.fetch(poll.channelId);
-            if (channel?.isTextBased()) {
-                const message = await channel.messages.fetch(poll.messageId).catch((error) => { logger.warn(`Failed to fetch poll message ${poll.messageId} for deletion:`, error); return null; });
-                if (message) {
-                    await message.delete();
-                }
-            }
-        } catch (error) {
-            logger.warn(`Could not delete poll message ${poll.messageId}:`, error);
-        }
-    }
-
-    // Delete from database
-    await pollService.deletePoll(pollId);
+    // Delete through shared domain path (includes Discord artifact cleanup).
+    await pollService.deletePollWithArtifacts(pollId);
 
     const reasonText = reason ? `\nReason: ${reason}` : '';
     await interaction.editReply(`✅ Poll "${poll.question}" has been deleted.${reasonText}`);

@@ -1,17 +1,17 @@
 import {
     SlashCommandBuilder,
     ChatInputCommandInteraction,
-    PermissionFlagsBits,
     ChannelType,
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
     StringSelectMenuBuilder,
-    GuildMember,
 } from 'discord.js';
 import { Command } from '../types/Command';
 import { pollService } from '../services/poll-service';
+import { isSupportedPostChannel } from '../services/event-poll-settings-service';
+import { getCommandPolicyContext } from '../services/command-policy-service';
 import { parseNaturalLanguageDate, formatDiscordTimestamp } from '../utils/date-parser';
 import logger from '../utils/logger';
 
@@ -84,26 +84,22 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
     try {
-        await interaction.deferReply({ ephemeral: true });
+        const acknowledged = await ensurePollAcknowledged(interaction);
+        if (!acknowledged) {
+            return;
+        }
 
         const guild = interaction.guild;
         if (!guild) {
-            await interaction.editReply('This command can only be used in a server.');
+            await sendPollResponse(interaction, 'This command can only be used in a server.');
             return;
         }
 
-        const member = interaction.member as GuildMember;
-        const channelOption = interaction.options.getChannel('channel');
-        const channel = channelOption || interaction.channel;
+        const policyContext = getCommandPolicyContext(interaction);
+        const channel = policyContext?.targetChannel ?? interaction.channel;
 
-        if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
-            await interaction.editReply('Please specify a valid text channel.');
-            return;
-        }
-
-        // Check permissions - only check if we're posting to a different channel
-        if (channelOption && !member.permissionsIn(channel as import('discord.js').TextChannel).has(PermissionFlagsBits.SendMessages)) {
-            await interaction.editReply('You do not have permission to send messages in that channel.');
+        if (!isSupportedPostChannel(channel)) {
+            await sendPollResponse(interaction, 'Please specify a valid text channel.');
             return;
         }
 
@@ -121,12 +117,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         const options = optionsInput.split(',').map(o => o.trim()).filter(o => o.length > 0);
 
         if (options.length < 2) {
-            await interaction.editReply('Please provide at least 2 options separated by commas.');
+            await sendPollResponse(interaction, 'Please provide at least 2 options separated by commas.');
             return;
         }
 
         if (options.length > 25) {
-            await interaction.editReply('You can have a maximum of 25 options.');
+            await sendPollResponse(interaction, 'You can have a maximum of 25 options.');
             return;
         }
 
@@ -135,7 +131,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         if (endTimeInput) {
             endTime = parseNaturalLanguageDate(endTimeInput);
             if (!endTime) {
-                await interaction.editReply('Invalid end time format. Try something like "in 2 hours" or "tomorrow 5pm".');
+                await sendPollResponse(interaction, 'Invalid end time format. Try something like "in 2 hours" or "tomorrow 5pm".');
                 return;
             }
         }
@@ -148,7 +144,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             for (let i = 0; i < options.length; i++) {
                 const parsedDate = parseNaturalLanguageDate(options[i]);
                 if (!parsedDate) {
-                    await interaction.editReply(`Could not parse "${options[i]}" as a valid date/time.`);
+                    await sendPollResponse(interaction, `Could not parse "${options[i]}" as a valid date/time.`);
                     return;
                 }
                 pollOptions.push({
@@ -228,8 +224,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             // Use select menu for more options
             const selectMenu = new StringSelectMenuBuilder()
                 .setCustomId(`poll:vote:${createdPoll.id}`)
-                .setPlaceholder('Select an option to vote')
-                .setMinValues(1)
+                .setPlaceholder(allowMultiple ? 'Select option(s) to vote (or clear to remove)' : 'Select an option to vote (or clear to remove)')
+                .setMinValues(0)
                 .setMaxValues(allowMultiple ? (maxVotes || pollOptions.length) : 1);
 
             for (let i = 0; i < pollOptions.length; i++) {
@@ -266,14 +262,78 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         // Update poll with message ID
         await pollService.setPollMessageId(createdPoll.id, message.id);
 
-        await interaction.editReply('✅ Poll created successfully!');
+        await sendPollResponse(interaction, '✅ Poll created successfully!');
 
         logger.info(`Poll created: ${createdPoll.id} by ${interaction.user.tag} in ${guild.name}`);
 
     } catch (error) {
         logger.error('Error creating poll:', error);
-        await interaction.editReply('An error occurred while creating the poll. Please try again.');
+        await sendPollResponse(interaction, 'An error occurred while creating the poll. Please try again.');
     }
+}
+
+async function ensurePollAcknowledged(interaction: ChatInputCommandInteraction): Promise<boolean> {
+    if (interaction.deferred || interaction.replied) {
+        return true;
+    }
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            await interaction.deferReply({ ephemeral: true });
+            return true;
+        } catch (error) {
+            const retryable = isRetryableNetworkError(error);
+            logger.warn(`Failed to defer /poll interaction (attempt ${attempt}/3):`, error);
+            if (!retryable || attempt === 3) {
+                break;
+            }
+            await delay(250 * attempt);
+        }
+    }
+
+    return sendPollResponse(interaction, 'I could not acknowledge this interaction in time. Please run `/poll` again.');
+}
+
+async function sendPollResponse(interaction: ChatInputCommandInteraction, content: string): Promise<boolean> {
+    if (interaction.deferred || interaction.replied) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                await interaction.editReply({ content });
+                return true;
+            } catch (editError) {
+                const retryable = isRetryableNetworkError(editError);
+                logger.warn(`Failed to edit /poll interaction reply (attempt ${attempt}/2):`, editError);
+                if (!retryable || attempt === 2) {
+                    break;
+                }
+                await delay(250 * attempt);
+            }
+        }
+    }
+
+    try {
+        await interaction.reply({ content, ephemeral: true });
+        return true;
+    } catch (replyError) {
+        logger.warn('Failed to send /poll interaction reply, attempting follow-up:', replyError);
+    }
+
+    try {
+        await interaction.followUp({ content, ephemeral: true });
+        return true;
+    } catch (followUpError) {
+        logger.error('Failed to send /poll interaction response:', followUpError);
+        return false;
+    }
+}
+
+function isRetryableNetworkError(error: unknown): boolean {
+    const code = (error as { code?: string }).code;
+    return code === 'EAI_AGAIN' || code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'UND_ERR_CONNECT_TIMEOUT';
+}
+
+function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function buildPollEmbed(
@@ -300,7 +360,7 @@ function buildPollEmbed(
     // Add options
     const optionsText = options
         .map((opt, i) => `${opt.emoji || `${i + 1}.`} ${opt.text} - 0 votes (0%)`)
-        .join('\n');
+        .join('\n\n');
 
     embed.addFields({ name: 'Options', value: optionsText || 'No options', inline: false });
 
@@ -320,4 +380,15 @@ function buildPollEmbed(
     return embed;
 }
 
-export default { data, execute } as Command;
+export default {
+    data,
+    execute,
+    moduleId: 'polls',
+    policy: {
+        creatorPolicy: 'polls',
+        postChannelPolicy: 'polls',
+        channelOptionName: 'channel',
+        requireMemberSendPermissionInTargetChannel: true,
+        requireBotSendPermissionInTargetChannel: true,
+    },
+} as Command;

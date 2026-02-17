@@ -7,7 +7,6 @@ This guide is the canonical setup reference for the current Ixoye codebase.
 - Node.js: `22.x` recommended
 - npm: `11.9.0` (declared in `package.json`)
 - Database: PostgreSQL 17 (`DATABASE_URL=postgresql://...`)
-- Search: in-process dashboard search (no external Meilisearch dependency)
 - Bot framework: Discord.js v14
 - Dashboard: Next.js 16 App Router
 
@@ -72,6 +71,10 @@ openssl rand -base64 32
 | `POSTGRES_USER` | Yes | PostgreSQL username. |
 | `POSTGRES_PASSWORD` | Yes | PostgreSQL password. |
 | `DASHBOARD_URL` | No | Base URL for the `/dashboard` command. Required for users to access the dashboard link. |
+| `WEBHOOK_SECRET_ENCRYPTION_KEY` | Yes (webhook features) | Encrypts webhook secrets at rest (minimum 16 characters). |
+| `ANONYMIZE_SECRET` | Yes (anonymous polls) | Secret for anonymizing user IDs in anonymous polls (minimum 16 characters). |
+| `METRICS_TOKEN` | Optional (recommended in prod) | Bearer token required to access `GET /api/metrics` in production. |
+| `REDIS_URL` | Optional (recommended in prod) | Enables distributed dashboard rate limiting/cache across multiple app instances. Requires `ioredis` package installed. |
 
 ### Common Local Values
 
@@ -85,7 +88,45 @@ POSTGRES_PASSWORD=change_me
 DATABASE_URL=postgresql://ixoye:change_me@localhost:5432/ixoye
 NODE_ENV=development
 LOG_LEVEL=info
+WEBHOOK_SECRET_ENCRYPTION_KEY=replace_with_random_16plus_chars
+ANONYMIZE_SECRET=replace_with_different_random_16plus_chars
+METRICS_TOKEN=replace_with_random_metrics_token
+REDIS_URL=redis://localhost:6379
 ```
+
+When `REDIS_URL` is set, dashboard rate limiting attempts to use Redis (multi-instance safe). If Redis client support is unavailable or `REDIS_URL` is unset, it falls back to in-memory per-instance limits.
+
+### Rate Limiting
+
+The dashboard uses optional Redis-backed rate limiting for multi-instance deployments:
+
+- **With Redis:** 
+  1. Install the optional dependency: `npm install ioredis`
+  2. Set `REDIS_URL` environment variable
+  3. Rate limits are shared across all instances
+  4. Add Redis service to docker-compose (already configured in dev/prod compose files)
+  
+- **Without Redis:** 
+  - Falls back to in-memory LRU cache automatically
+  - Each instance tracks limits independently (fine for single-instance deployments)
+
+The rate limiting service logs warnings if Redis connection fails and automatically falls back to in-memory mode. Redis is loaded dynamically at runtime, so the application works without the `ioredis` package installed.
+
+### Metrics Endpoint
+
+- Route: `GET /api/metrics`
+- Auth:
+   - Production: requires `Authorization: Bearer <METRICS_TOKEN>`
+   - Development: allowed without token when `METRICS_TOKEN` is unset
+- Includes: process uptime, memory usage, DB pool metrics, rate-limit store stats, and Discord cache stats.
+
+### Detailed Health Endpoint
+
+- Route: `POST /api/health`
+- Auth:
+   - Production: requires `Authorization: Bearer <METRICS_TOKEN>`
+   - Development: allowed without token when `METRICS_TOKEN` is unset
+- Purpose: internal diagnostics with DB pool and memory details.
 
 ## 3. Install Dependencies
 
@@ -96,14 +137,6 @@ npm ci
 ```
 
 If lockfile changes during development, run `npm ci` again.
-
-## 3.1 Search Guardrail Check
-
-Run this to ensure Meilisearch artifacts were not accidentally introduced:
-
-```bash
-npm run guard:no-meili
-```
 
 ## 4. Initialize Database
 

@@ -4,7 +4,6 @@ import {
     PermissionFlagsBits,
     EmbedBuilder,
     ChannelType,
-    GuildMember,
 } from 'discord.js';
 import { Command } from '../types/Command';
 import { db } from '@shared/database/client';
@@ -100,6 +99,16 @@ export const data = new SlashCommandBuilder()
                     .setMinValue(1)
                     .setMaxValue(100)
             )
+    )
+    .addSubcommand(subcommand =>
+        subcommand
+            .setName('discord')
+            .setDescription('Configure Discord integration settings')
+            .addBooleanOption(option =>
+                option
+                    .setName('mirror_to_events')
+                    .setDescription('Mirror new events to Discord Scheduled Events by default')
+            )
     );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
@@ -109,12 +118,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         const guild = interaction.guild;
         if (!guild) {
             await interaction.editReply('This command can only be used in a server.');
-            return;
-        }
-
-        const member = interaction.member as GuildMember;
-        if (!member || !member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-            await interaction.editReply('You need the Manage Server permission to use this command.');
             return;
         }
 
@@ -141,6 +144,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 break;
             case 'ai':
                 await setAiSettings(interaction, settings);
+                break;
+            case 'discord':
+                await setDiscordSettings(interaction, settings);
                 break;
         }
 
@@ -208,6 +214,13 @@ async function viewSettings(interaction: ChatInputCommandInteraction, settings: 
                 value: [
                     `Enabled: ${settings.aiEnabled ? '✅' : '❌'}`,
                     `Rate Limit: ${settings.aiRateLimitPerHour}/hour`,
+                ].join('\n'),
+                inline: true,
+            },
+            {
+                name: '📅 Discord Integration',
+                value: [
+                    `Mirror to Discord Events: ${settings.mirrorToDiscordEvents ?? true ? '✅' : '❌'}`,
                 ].join('\n'),
                 inline: true,
             }
@@ -343,4 +356,33 @@ async function setAiSettings(interaction: ChatInputCommandInteraction, settings:
     await interaction.editReply(`✅ AI settings updated: ${changes.join(', ')}`);
 }
 
-export default { data, execute } as Command;
+async function setDiscordSettings(interaction: ChatInputCommandInteraction, settings: any) {
+    const mirrorToEvents = interaction.options.getBoolean('mirror_to_events');
+
+    const updates: any = {};
+    if (mirrorToEvents !== null) updates.mirrorToDiscordEvents = mirrorToEvents;
+
+    if (Object.keys(updates).length === 0) {
+        await interaction.editReply('Please specify at least one Discord setting.');
+        return;
+    }
+
+    await db
+        .update(eventPollSettings)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(eventPollSettings.id, settings.id));
+
+    const changes = [];
+    if (mirrorToEvents !== null) changes.push(`Mirror to Discord Events ${mirrorToEvents ? 'enabled' : 'disabled'}`);
+
+    await interaction.editReply(`✅ Discord settings updated: ${changes.join(', ')}`);
+}
+
+export default {
+    data,
+    execute,
+    moduleId: 'events',
+    policy: {
+        requiredMemberPermissions: [PermissionFlagsBits.ManageGuild],
+    },
+} as Command;

@@ -5,6 +5,7 @@ import client from '../client';
 import logger from '../utils/logger';
 import { db } from '../../shared/database/client';
 import { notificationDelivery, notificationEvent } from '../../shared/database/schema';
+import { isModuleEnabled } from '@shared/modules/state';
 
 const MAX_PER_RUN = 50;
 const MAX_ATTEMPTS = 5;
@@ -170,7 +171,19 @@ export async function processNotificationDeliveriesOnce(): Promise<void> {
     }
 
     logger.info(`Processing ${pending.length} queued notification delivery(ies)`);
+    const moduleEnabledCache = new Map<string, boolean>();
+
     for (const row of pending) {
+        let notificationsEnabled = moduleEnabledCache.get(row.delivery.guildId);
+        if (notificationsEnabled === undefined) {
+            notificationsEnabled = await isModuleEnabled(row.delivery.guildId, 'notifications');
+            moduleEnabledCache.set(row.delivery.guildId, notificationsEnabled);
+        }
+
+        if (!notificationsEnabled) {
+            continue;
+        }
+
         await processDelivery(row.delivery, row.event);
     }
 }

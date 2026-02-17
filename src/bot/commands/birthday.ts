@@ -637,10 +637,6 @@ const command: Command = {
 
                 case 'admin-set': {
                     await interaction.deferReply({ ephemeral: true });
-                    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ModerateMembers)) {
-                        await interaction.editReply({ content: '❌ You need **Moderate Members** permission to use this command.' });
-                        return;
-                    }
 
                     const targetUser = interaction.options.getUser('user', true);
                     const day = interaction.options.getInteger('day', true);
@@ -678,10 +674,6 @@ const command: Command = {
 
                 case 'admin-remove': {
                     await interaction.deferReply({ ephemeral: true });
-                    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ModerateMembers)) {
-                        await interaction.editReply({ content: '❌ You need **Moderate Members** permission to use this command.' });
-                        return;
-                    }
 
                     const targetUser = interaction.options.getUser('user', true);
 
@@ -699,10 +691,6 @@ const command: Command = {
 
                 case 'test': {
                     await interaction.deferReply({ ephemeral: true });
-                    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-                        await interaction.editReply({ content: '❌ You need **Manage Server** permission to use this command.' });
-                        return;
-                    }
 
                     const config = await db.query.birthdayConfig.findFirst({
                         where: eq(birthdayConfig.guildId, guildId)
@@ -820,7 +808,14 @@ const command: Command = {
                 await interaction.reply({ content: '❌ An error occurred while processing your request.', ephemeral: true });
             }
         }
-    }
+    },
+    policy: {
+        subcommandMemberPermissions: {
+            'admin-set': [PermissionFlagsBits.ModerateMembers],
+            'admin-remove': [PermissionFlagsBits.ModerateMembers],
+            test: [PermissionFlagsBits.ManageGuild],
+        },
+    },
 };
 
 export default command;

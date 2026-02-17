@@ -19,6 +19,7 @@ import { eq, and } from 'drizzle-orm';
 import logger from '../utils/logger';
 import { Client, TextChannel } from 'discord.js';
 import { emitGuildNotificationSafe } from '../services/notificationEmitter';
+import { isModuleEnabled } from '@shared/modules/state';
 
 /**
  * Check for birthdays and send announcements
@@ -41,6 +42,9 @@ export async function checkBirthdays(client: Client) {
 
         for (const config of configs) {
             try {
+                const birthdaysEnabled = await isModuleEnabled(config.guildId, 'birthdays');
+                if (!birthdaysEnabled) continue;
+
                 // Check if it's the configured hour
                 if (config.hourOfDay !== currentHour) {
                     continue;
@@ -286,6 +290,9 @@ export async function removeExpiredBirthdayRoles(client: Client) {
             if (!config.roleId) continue;
 
             try {
+                const birthdaysEnabled = await isModuleEnabled(config.guildId, 'birthdays');
+                if (!birthdaysEnabled) continue;
+
                 const guild = await client.guilds.fetch(config.guildId).catch((error) => { logger.warn(`Failed to fetch guild ${config.guildId} for birthday role removal:`, error); return null; });
                 if (!guild) continue;
 

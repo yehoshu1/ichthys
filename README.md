@@ -18,6 +18,7 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 - **🚀 Boost Management**: Track server boosts, reward boosters with roles, and send custom thank-you messages.
 - **⭐ Leveling System**: XP tracking for text and voice, customizable level-up messages, leaderboards, and role rewards.
 - **🤖 Role Actions**: Automate actions (DM, Kick, Log) when members gain or lose specific roles.
+<<<<<<< HEAD
 - **🎉 Events**: Create and manage server events with RSVP tracking, reminders, templates, and optional Discord Event mirroring.
 - **📊 Polls**: Interactive polls with multiple choice, ranked choice, and approval voting, plus templates and scheduled posting.
 - **🎂 Birthdays**: Track member birthdays with automated announcements and optional role assignments.
@@ -25,6 +26,23 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 - **🪝 Webhooks**: Managed webhook system for event notifications and channel integrations.
 - **🔔 Notifications**: In-dashboard notification system with preferences and delivery tracking.
 - **🛠️ Moderation**: Comprehensive mod tools including warns, mutes, timeouts, kicks, bans, and audit logging.
+=======
+- **🎂 Birthdays**: Automatic birthday announcements with timezone support and age calculation.
+- **📅 Events**: Create and manage server events with RSVP tracking, recurring schedules, and role restrictions.
+- **📊 Polls**: Standard polls, time polls (When2meet-style), and anonymous voting.
+- **🎭 Reaction Roles**: Self-assignable roles via reactions, buttons, or dropdowns.
+- **🔧 Moderation**: Warnings, mutes, kicks, bans, timeouts, and case tracking.
+- **📝 Message Aliases**: Auto-responder system with custom triggers.
+
+### Integration & API
+- **🔗 Webhooks**: Receive real-time event notifications via HTTP POST requests with HMAC signature verification and encryption at rest.
+- **🔑 API Keys**: Programmatic access to your server data with granular permissions and secure hash storage.
+- **🔔 Notifications**: In-app notification stream for operational events and user preferences.
+
+### Infrastructure
+- **🚀 Performance**: Optional Redis-backed distributed rate limiting for multi-instance deployments with automatic in-memory fallback.
+- **🔒 Security**: AES-256-GCM encryption for webhook secrets at rest, SSRF protection with DNS validation, and fail-fast secret validation.
+>>>>>>> d03121e24f4f489ccf5801b927664547d11c622d
 
 ### Tech Stack
 - **Bot**: [Discord.js](https://discord.js.org/) v14, TypeScript, [Bun](https://bun.sh/) 1.0+
@@ -35,19 +53,17 @@ A powerful, scalable, and feature-rich Discord bot with a comprehensive web dash
 - **Charts**: [Recharts](https://recharts.org/)
 - **Process Management**: [PM2](https://pm2.keymetrics.io/) for production deployment
 
-### Search Architecture
-- Dashboard global search is local/in-process and built from existing settings/doc sources.
-- Ixoye does not currently depend on Meilisearch or external vector search services.
-- Decision record: [ADR 0001](docs/adr/0001-defer-meilisearch-integration.md).
-
 ## 📂 Documentation
 
 - **[Setup Guide](docs/SETUP.md)**: How to install, configure, and run the bot locally or in production.
 - **[Dashboard Guide](docs/DASHBOARD.md)**: A walkthrough of the web dashboard features and configuration.
 - **[Commands Reference](docs/COMMANDS.md)**: Complete npm and slash command catalog with options and examples.
 - **[Module Docs](docs/MODULES.md)**: Deep-dive pages for each module and subsystem.
+<<<<<<< HEAD
 - **[Module Lifecycle](docs/modules/MODULE_LIFECYCLE.md)**: How to enable, disable, and manage modules per-guild.
 - **[Agent Guide](AGENTS.md)**: Essential information for AI coding agents working on this project.
+=======
+>>>>>>> d03121e24f4f489ccf5801b927664547d11c622d
 
 ## 🛠️ Quick Start
 

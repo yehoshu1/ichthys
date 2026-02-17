@@ -1,8 +1,27 @@
+name: ixoye-dev
+
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ixoye_redis_data_dev:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ixoye_dev_net
+
   postgres:
     image: postgres:17
-    container_name: ixoye-postgres-dev
     restart: unless-stopped
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ixoye_dev}
       POSTGRES_USER: ${POSTGRES_USER:-ixoye}
@@ -14,12 +33,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    networks:
+      - ixoye_dev_net
 
   ixoye-dev:
     build:
       context: .
       target: dev
-    container_name: ixoye-dev
     restart: no
     ports:
       - "4000:4000"
@@ -42,15 +62,24 @@ services:
     environment:
       NODE_ENV: development
       NEXT_TELEMETRY_DISABLED: 1
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      REDIS_URL: ${REDIS_URL:-}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:-ixoye_dev}
       POSTGRES_USER: ${POSTGRES_USER:-ixoye}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
       DATABASE_URL: postgresql://${POSTGRES_USER:-ixoye}:${POSTGRES_PASSWORD:-ixoye}@postgres:5432/${POSTGRES_DB:-ixoye_dev}
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     depends_on:
+      redis:
+        condition: service_healthy
       postgres:
         condition: service_healthy
+    networks:
+      - ixoye_dev_net
     develop:
       watch:
         - action: rebuild
@@ -60,7 +89,6 @@ services:
 
   ixoye-pg-backup-dev:
     image: postgres:17
-    container_name: ixoye-pg-backup-dev
     restart: unless-stopped
     depends_on:
       postgres:
@@ -100,8 +128,15 @@ services:
 
           sleep "$${BACKUP_INTERVAL_SECONDS:-86400}"
         done
+    networks:
+      - ixoye_dev_net
 
 volumes:
   ixoye_node_modules:
   ixoye_backups:
   ixoye_pg_data_dev:
+  ixoye_redis_data_dev:
+
+networks:
+  ixoye_dev_net:
+    name: ixoye_dev_net

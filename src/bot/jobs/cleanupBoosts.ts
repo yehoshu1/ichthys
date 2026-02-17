@@ -5,6 +5,7 @@ import { eq, and, lt } from 'drizzle-orm';
 import client from '../client';
 import logger from '../utils/logger';
 import { emitGuildNotificationSafe } from '../services/notificationEmitter';
+import { isModuleEnabled } from '@shared/modules/state';
 
 export function setupBoostCleanupJob() {
     // Run every day at 3:00 AM
@@ -31,6 +32,9 @@ export async function cleanupExpiredBoosts() {
 
         for (const boost of expiredBoosts) {
             try {
+                const boostsEnabled = await isModuleEnabled(boost.guildId, 'boosts');
+                if (!boostsEnabled) continue;
+
                 const guild = await client.guilds.fetch(boost.guildId);
                 if (!guild) continue;
 

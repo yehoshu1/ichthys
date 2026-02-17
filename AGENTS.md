@@ -4,7 +4,7 @@ This document provides essential information for AI coding agents working on the
 
 ## Project Overview
 
-ΙΧΘΥΣ is a feature-rich Discord bot with a comprehensive web dashboard for community management. It provides welcome messages, verification tracking, boost management, leveling system, and role-based actions.
+ΙΧΘΥΣ is a feature-rich Discord bot with a comprehensive web dashboard for community management. It provides welcome messages, verification tracking, boost management, leveling system, role-based actions, events, polls, and more.
 
 **Key Features:**
 - **Welcome System**: Role-based message triggers with customizable templates
@@ -12,18 +12,26 @@ This document provides essential information for AI coding agents working on the
 - **Boost Management**: Track server boosts and reward boosters
 - **Leveling System**: XP tracking for text and voice with role rewards
 - **Role Actions**: Automate actions (DM, Kick, Log) when roles change
+- **Birthdays**: Automatic birthday announcements with timezone support
+- **Events**: Event creation with RSVP, recurring schedules, role restrictions
+- **Polls**: Standard, time polls (When2meet-style), and anonymous voting
+- **Reaction Roles**: Self-assignable roles via reactions/buttons/dropdowns
+- **Moderation**: Warnings, mutes, kicks, bans, case tracking
+- **Webhooks**: Real-time event notifications
+- **API Keys**: Programmatic access with granular permissions
 - **Analytics Dashboard**: Visualize server growth and activity
 
 ## Technology Stack
 
 | Component | Technology |
 |-----------|------------|
-| Bot | Discord.js v14, TypeScript, Bun 1.0+ |
+| Bot | Discord.js v14, TypeScript, Node.js 22+ |
 | Dashboard | Next.js 16 (App Router), React 19, Tailwind CSS 4 |
-| Database | SQLite with Drizzle ORM |
+| Database | PostgreSQL 17 with Drizzle ORM |
 | Authentication | NextAuth.js v4 with Discord OAuth2 |
 | Logging | Winston with daily rotation |
 | Process Manager | PM2 |
+| Package Manager | npm 11.9.0 |
 
 ## Project Structure
 
@@ -53,9 +61,9 @@ ixoye/
 ├── docs/                       # Documentation
 │   ├── SETUP.md               # Setup and installation guide
 │   ├── COMMANDS.md            # Bot commands reference
-│   └── DASHBOARD.md           # Dashboard user guide
+│   ├── DASHBOARD.md           # Dashboard user guide
+│   └── MODULES.md             # Module documentation
 ├── drizzle/                    # Database migrations (generated)
-├── data/                       # SQLite database files (runtime)
 ├── logs/                       # Application logs (runtime)
 ├── drizzle.config.ts          # Drizzle ORM configuration
 ├── tailwind.config.ts         # Tailwind CSS configuration
@@ -68,25 +76,25 @@ ixoye/
 
 ```bash
 # Development
-bun run dev                    # Start bot with hot reload
-bun run dashboard:dev          # Start Next.js dev server
-bun run dev:all                # Run both bot and dashboard concurrently
+npm run dev                    # Start bot with hot reload
+npm run dashboard:dev          # Start Next.js dev server
+npm run dev:all                # Run both bot and dashboard concurrently
 
 # Build
-bun run build                  # Compile bot to dist/ (uses tsconfig.bot.json)
-bun run dashboard:build        # Build Next.js for production
+npm run build                  # Compile bot to dist/ (uses tsconfig.bot.json)
+npm run dashboard:build        # Build Next.js for production
 
 # Production
-bun start                      # Run compiled bot from dist/
-bun run dashboard:start        # Start Next.js production server
+npm start                      # Run compiled bot from dist/
+npm run dashboard:start        # Start Next.js production server
 
 # Database
-bun run db:generate            # Generate Drizzle migrations
-bun run db:push                # Push schema changes to database
-bun run db:studio              # Open Drizzle Studio GUI
+npm run db:generate            # Generate Drizzle migrations
+npm run db:push                # Push schema changes to database
+npm run db:studio              # Open Drizzle Studio GUI
 
 # Deployment
-bun run deploy                 # Deploy slash commands to Discord
+npm run deploy                 # Deploy slash commands to Discord
 ```
 
 ## Code Style Guidelines
@@ -117,6 +125,13 @@ bun run deploy                 # Deploy slash commands to Discord
 - Place client components in `components/` with clear naming
 - Use `AuthProvider` for session management
 - API routes follow RESTful patterns under `app/api/guilds/[guildId]/`
+
+## UI Component Guidelines
+- **Always use shadcn/ui components first** - Check `src/dashboard/components/ui/` for existing components
+- Extend shadcn components rather than creating custom ones when possible
+- Use the shadcn CLI to add new components: `npx shadcn add <component>`
+- For date/time pickers, use the custom `DateTimePicker` and `DatePicker` from `components/ui/datetime-picker.tsx`
+- Use `RoleMultiSelect` and `ChannelMultiSelect` from `components/DiscordSelectors.tsx` for multi-select role/channel inputs
 
 ### Database Patterns
 - Use Drizzle ORM for all database operations
@@ -152,13 +167,14 @@ NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=generate_with_openssl_rand_base64_32
 
 # Database
-DATABASE_URL=file:./data/ixoye.db
+DATABASE_URL=postgresql://ixoye:change_me@localhost:5432/ixoye
 
 # Optional
 LOG_LEVEL=info                    # debug, info, warn, error
 NODE_ENV=development              # development, production
 PORT=3000                         # Dashboard port
 GUILD_ID=your_test_guild_id       # For testing slash commands
+DASHBOARD_URL=https://yourdomain.com  # For /dashboard command
 ```
 
 ## Security Considerations
@@ -169,24 +185,142 @@ GUILD_ID=your_test_guild_id       # For testing slash commands
 4. **API Authorization**: Dashboard API routes check user has access to requested guild
 5. **SQL Injection**: Protected by Drizzle ORM parameterized queries
 6. **XSS Protection**: React's built-in escaping, plus careful handling of Discord content
+7. **API Keys**: Stored as SHA-256 hashes, only shown once on creation
+8. **Webhook Secrets**: Stored as SHA-256 hashes, used for HMAC signature verification
 
 ## Database Schema
 
 Key tables (defined in `src/shared/database/schema.ts`):
 
+### Core Configuration
 | Table | Purpose |
 |-------|---------|
 | `guild_config` | Server-wide settings for all features |
+
+### Welcome & Verification
+| Table | Purpose |
+|-------|---------|
 | `welcome_trigger` | Role-based welcome message triggers |
+| `welcome_config` | Welcome system configuration |
 | `message_template` | Reusable message templates |
 | `user_join` | Track joins/verification status |
-| `user_boost` | Track server boost status and roles |
+| `verification_message_rule` | Role-specific verification messages |
+| `verification_role_message` | Profile-based verification messages |
+
+### Leveling & Boosts
+| Table | Purpose |
+|-------|---------|
 | `level_profile` | User XP and levels per guild |
 | `level_reward` | Role rewards at specific levels |
+| `user_boost` | Track server boost status and roles |
+| `boost_log` | Boost event history |
+
+### Role Management
+| Table | Purpose |
+|-------|---------|
 | `role_action` | Automated actions on role changes |
+| `scheduled_role_action` | Delayed role actions |
+| `reaction_role_message` | Reaction role configurations |
+| `reaction_role` | Individual reaction-role mappings |
+
+### Events & Scheduling
+| Table | Purpose |
+|-------|---------|
+| `event` | Server events with RSVP and scheduling |
+| `event_rsvp` | Event RSVP tracking (yes/no/maybe/waitlist) |
+| `event_reminder` | User reminder preferences |
+| `event_template` | Reusable event templates |
+| `event_poll_settings` | Server-wide event/poll settings |
+| `user_timezone` | User timezone preferences |
+
+### Polls
+| Table | Purpose |
+|-------|---------|
+| `poll` | Polls (standard, time, anonymous) |
+| `poll_option` | Poll choices/options |
+| `poll_vote` | User votes on polls (hashed for anonymous) |
+| `poll_template` | Reusable poll templates |
+
+### Webhooks & API
+| Table | Purpose |
+|-------|---------|
+| `webhook_endpoint` | Outgoing webhook configurations |
+| `webhook_delivery` | Webhook delivery logs |
+| `api_key` | API key storage (SHA-256 hashed) |
+
+### Moderation & Logging
+| Table | Purpose |
+|-------|---------|
+| `moderation_case` | Moderation action cases |
+| `moderation_settings` | Server moderation configuration |
 | `action_log` | Audit trail of executed actions |
 | `message_activity` | Analytics data for message heatmaps |
+
+### Other Features
+| Table | Purpose |
+|-------|---------|
+| `birthday_config` | Birthday announcement settings |
+| `birthday_entry` | User birthday information |
+| `birthday_log` | Birthday celebration history |
 | `message_alias` | Auto-responder trigger words and responses |
+| `command_config` | Per-command configuration |
+| `discord_user_cache` | Cached Discord user information |
+| `guild_growth` | Server growth analytics |
+
+### Notifications
+| Table | Purpose |
+|-------|---------|
+| `notification_event` | System notification events |
+| `notification_delivery` | Notification delivery tracking |
+| `notification_user_state` | Per-user notification state |
+| `notification_user_cursor` | User notification read positions |
+| `notification_preference` | User notification preferences |
+
+## Webhook Implementation
+
+Webhooks provide real-time event notifications to external systems.
+
+### Supported Events
+- `event.created`, `event.updated`, `event.deleted`, `event.started`
+- `rsvp.yes`, `rsvp.no`, `rsvp.maybe`, `rsvp.waitlist`
+- `poll.created`, `poll.voted`, `poll.closed`
+
+### Security Features
+- **HTTPS Only**: HTTP URLs are rejected
+- **SSRF Protection**: Private IP ranges blocked (localhost, 10.x, 172.16-31.x, 192.168.x)
+- **HMAC Signatures**: Optional secret for payload verification
+- **Auto-Disable**: Webhooks disabled after 10 consecutive failures
+
+### Webhook Service
+Location: `src/bot/services/webhook-service.ts`
+
+```typescript
+// Trigger webhook for event
+await webhookService.triggerEvent(guildId, 'event.created', {
+    eventId: created.id,
+    title: created.title,
+    // ... event data
+});
+```
+
+### Payload Format
+```json
+{
+  "event": "event.created",
+  "timestamp": "2026-02-11T12:00:00.000Z",
+  "guildId": "123456789",
+  "data": { /* event-specific data */ }
+}
+```
+
+### Signature Verification
+```typescript
+const signature = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(JSON.stringify(payload))
+    .digest('hex');
+// Compare to X-Webhook-Signature header
+```
 
 ## Common Tasks
 
@@ -205,6 +339,21 @@ Key tables (defined in `src/shared/database/schema.ts`):
 
 **Info Commands**: `/user`, `/avatar`, `/server`, `/roles`, `/dashboard`
 
+**Event Commands**:
+- `/event create` - Create a new event
+- `/event list` - List upcoming events
+- `/event info [id]` - Get event details
+- `/event edit [id]` - Edit an event
+- `/event cancel [id]` - Cancel an event
+- `/rsvp [event] [status]` - RSVP to an event
+- `/reminder [event] [minutes]` - Set a reminder
+
+**Poll Commands**:
+- `/poll create` - Create a standard poll
+- `/poll create time` - Create a time poll
+- `/poll close [id]` - Close a poll early
+- `/poll results [id]` - View poll results
+
 **Birthday Commands**: `/birthday set`, `/birthday remove`, `/birthday view`, `/birthday list`, `/birthday next`, `/birthday stats`, `/birthday admin-set`, `/birthday admin-remove`, `/birthday test`
 
 **Moderation Commands**: 
@@ -217,13 +366,15 @@ Key tables (defined in `src/shared/database/schema.ts`):
 
 **Role Management**: `/role give`, `/role remove`
 
+**Reaction Roles**: `/reactionrole create`, `/reactionrole add`, `/reactionrole remove`, `/reactionrole list`, `/reactionrole delete`
+
 **Admin/Setup**: `/setup`, `/config`, `/welcome`, `/verify`, `/boost`, `/reactionrole`
 
 ### Adding a New Dashboard Page
 1. Create folder in `src/dashboard/app/dashboard/[guildId]/{feature}/`
 2. Add `page.tsx` with the component
 3. Add API routes in `src/dashboard/app/api/guilds/[guildId]/{feature}/`
-4. Update navigation in guild layout if needed
+4. Update navigation in `src/dashboard/lib/search/dashboard-nav.ts` if needed
 
 ### Adding Database Fields
 1. **⚠️ BACKUP FIRST**: Run `npm run db:backup` to create a backup
@@ -290,9 +441,8 @@ The Dockerfile uses multi-stage builds:
 - Ensure redirect URI in Discord app matches `NEXTAUTH_URL`
 
 ### Database errors
-- Ensure `data/` directory exists and is writable
 - Run `npm run db:push` to update schema
-- Check `DATABASE_URL` format (should be `file:./data/ixoye.db`)
+- Check `DATABASE_URL` format (should be `postgresql://...`)
 
 ## Useful Resources
 

@@ -4,17 +4,34 @@ This section breaks down every major Ixoye module with implementation-level deta
 
 ## Module Pages
 
+### Core Features
 - [Welcome System](modules/welcome.md)
 - [Verification System](modules/verification.md)
 - [Leveling System](modules/leveling.md)
 - [Boost Management](modules/boosts.md)
 - [Birthdays](modules/birthdays.md)
+
+### Event Management
+- [Events](modules/events.md) - Event creation, RSVP, recurring schedules
+- [Polls](modules/polls.md) - Standard, time, and anonymous polls
+
+### Role Management
 - [Role Actions](modules/role-actions.md)
-- [Moderation](modules/moderation.md)
 - [Reaction Roles](modules/reaction-roles.md)
+
+### Moderation & Analytics
+- [Moderation](modules/moderation.md)
 - [Analytics](modules/analytics.md)
 - [Action Logs](modules/logs.md)
+
+### Integrations
+- [Webhooks & API](modules/webhooks.md) - Outgoing webhooks and API keys
+
+- [Notifications](modules/notifications.md) - In-app event stream and delivery preferences
+
+### System
 - [Settings, Import/Export, and Backups](modules/settings-and-backups.md)
+- [Message Aliases](modules/aliases.md)
 
 ## How to Use These Docs
 

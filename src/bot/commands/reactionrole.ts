@@ -132,7 +132,12 @@ const command: Command = {
                 ephemeral: true
             });
         }
-    }
+    },
+    policy: {
+        subcommandBotPermissions: {
+            add: [PermissionFlagsBits.ManageRoles],
+        },
+    },
 };
 
 async function handleCreate(interaction: ChatInputCommandInteraction) {
@@ -205,9 +210,9 @@ async function handleAdd(interaction: ChatInputCommandInteraction) {
         }
 
         // Check if role is manageable
-        const botMember = interaction.guild!.members.me;
-        if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
-            await interaction.reply({ content: 'I need the "Manage Roles" permission to assign roles.', ephemeral: true });
+        const botMember = interaction.guild!.members.me ?? await interaction.guild!.members.fetchMe().catch(() => null);
+        if (!botMember) {
+            await interaction.reply({ content: 'I could not resolve my member state in this server.', ephemeral: true });
             return;
         }
 

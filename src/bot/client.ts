@@ -1,7 +1,7 @@
 import { Client, GatewayIntentBits, Events, Collection, Partials, Options } from 'discord.js';
 import logger from './utils/logger';
 import { guildConfigService } from './services/guildConfigService';
-import { setBotClient } from '../dashboard/lib/bot-client';
+import { setBotClient } from '@shared/runtime/bot-client';
 
 function getPositiveInt(value: string | undefined, fallback: number): number {
     const parsed = Number.parseInt(value ?? '', 10);

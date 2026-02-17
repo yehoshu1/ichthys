@@ -5,6 +5,7 @@ import { db } from '../../shared/database/client';
 import { guildConfig, userJoin, actionLog } from '../../shared/database/schema';
 import { eq, and, isNull, lte, gt } from 'drizzle-orm';
 import { emitGuildNotificationSafe } from '../services/notificationEmitter';
+import { isModuleEnabled } from '@shared/modules/state';
 
 export default function startCleanupJob() {
     // Run every hour
@@ -14,6 +15,9 @@ export default function startCleanupJob() {
             const configs = await db.select().from(guildConfig).where(eq(guildConfig.verificationEnabled, true));
 
             for (const config of configs) {
+                const verificationEnabled = await isModuleEnabled(config.guildId, 'verification');
+                if (!verificationEnabled) continue;
+
                 if (!config.verificationGraceDays) continue;
 
                 // Calculate cutoff date

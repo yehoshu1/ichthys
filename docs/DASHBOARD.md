@@ -6,24 +6,39 @@ The web dashboard is the command center for your server. It provides a comprehen
 
 - Global search is implemented inside the dashboard app (no external search service).
 - Results are composed from settings/doc sources and ranked locally.
-- Semantic/vector search is intentionally deferred; see `docs/adr/0001-defer-meilisearch-integration.md`.
 
 ## Deep-Dive Module Docs
 
 For implementation-level detail per module, use:
 
-- [Module Documentation Index](MODULES.md)
+### Core Modules
 - [Welcome System](modules/welcome.md)
 - [Verification System](modules/verification.md)
 - [Leveling System](modules/leveling.md)
 - [Boost Management](modules/boosts.md)
 - [Birthdays](modules/birthdays.md)
+
+### Event Management
+- [Events](modules/events.md) - Event creation, RSVP, recurring schedules
+- [Polls](modules/polls.md) - Standard, time, and anonymous polls
+
+### Role Management
 - [Role Actions](modules/role-actions.md)
-- [Moderation](modules/moderation.md)
 - [Reaction Roles](modules/reaction-roles.md)
+
+### Moderation & Analytics
+- [Moderation](modules/moderation.md)
 - [Analytics](modules/analytics.md)
 - [Action Logs](modules/logs.md)
+
+### Integrations
+- [Webhooks & API](modules/webhooks.md) - Outgoing webhooks and API keys
+
+### System
 - [Settings, Import/Export, and Backups](modules/settings-and-backups.md)
+- [Message Aliases](modules/aliases.md)
+
+See [Module Documentation Index](MODULES.md) for complete list.
 
 ---
 
@@ -31,16 +46,15 @@ For implementation-level detail per module, use:
 
 ### Method 1: Discord Command (Recommended)
 
-Use the `/dashboard show` command in your Discord server to get a direct link:
+Use the `/dashboard` command in your Discord server to get a direct link:
 
 ```
-/dashboard show
+/dashboard
 ```
 
 This will display:
 - A clickable link to your server's dashboard
 - The full URL for copying
-- Admin info (if you're an administrator)
 
 ### Method 2: Direct URL
 
@@ -58,11 +72,6 @@ The dashboard URL is configured by the bot administrator via the `DASHBOARD_URL`
 DASHBOARD_URL=https://dashboard.yourdomain.com
 ```
 
-Use cases:
-- Custom branded domain
-- Reverse proxy setups  
-- CDN or load balancer configurations
-
 Users can access the dashboard using the `/dashboard` command, which will provide them with the configured URL.
 
 ---
@@ -75,17 +84,19 @@ The dashboard is organized into several modules accessible from the left sidebar
 
 | Module | Description |
 |--------|-------------|
-| **Overview** | Server stats, growth charts, setup checklist |
+| **Overview** | Server stats, activity heatmap, top members |
+| **Events** | Event creation, RSVP management, templates |
+| **Polls** | Standard polls, time polls, anonymous voting |
 | **Welcome** | Welcome messages, triggers, templates |
 | **Verification** | Auto-kick settings, verification profiles |
 | **Leveling** | XP settings, level rewards, leaderboard |
 | **Boosts** | Boost rewards configuration |
 | **Birthdays** | Birthday announcements and celebration settings |
 | **Role Actions** | Automated role-based actions |
-| **Moderation** | Auto-mod filters and moderation controls |
 | **Reaction Roles** | Reaction-based self-role management |
+| **Webhooks & API** | Webhook endpoints, API keys |
+| **Moderation** | Auto-mod filters and moderation controls |
 | **Analytics** | Activity heatmap, top members |
-| **Logs** | Action execution history and failures |
 | **Settings** | Import/export configuration |
 | **Documentation** | Quick reference guide |
 
@@ -93,7 +104,203 @@ The dashboard is organized into several modules accessible from the left sidebar
 
 ## Module Guide
 
-This page provides an overview of major modules. For full module-by-module detail (including Moderation, Reaction Roles, Logs, and API/table references), use [docs/MODULES.md](MODULES.md).
+### 📅 Events
+
+Create and manage server events with RSVP tracking.
+
+#### Calendar View Tab (Default)
+Interactive calendar for visualizing and managing events:
+- **View Modes**: Month, Week, or Day view
+- **Visual Layout**: Color-coded events with time indicators
+- **Quick Create**: Click any date to create an event (auto-fills the date)
+- **Quick Edit**: Click any event to view details and edit
+- **Navigation**: Previous/Next buttons, "Today" shortcut
+- **Event Density**: Shows event count when multiple events on same day
+- **Responsive**: Fully optimized for mobile, tablet, and desktop
+
+#### Upcoming Events Tab
+List view of all scheduled events with:
+- Event title and description
+- Date, time, and location
+- RSVP counts (Yes/Maybe/No/Waitlist)
+- Color-coded event cards
+- Recurring event indicators
+
+**Event Actions:**
+- **Edit**: Modify event details
+- **Duplicate**: Create a copy of the event
+- **Delete**: Remove the event
+
+#### Creating an Event
+
+1. Click **Create Event**
+2. Fill in event details:
+   - **Title**: Event name
+   - **Description**: Event details
+   - **Channel**: Where to post the event
+   - **Start Time**: When the event begins
+   - **End Time**: When the event ends (optional)
+   - **Location**: Physical or virtual location
+   - **Color**: Visual theme for the event card
+3. Configure RSVP settings:
+   - **Max Attendees**: Limit attendance (optional)
+   - **Enable Waitlist**: Allow waitlist when full
+   - **Required Roles**: Who can attend
+   - **Blocked Roles**: Who cannot attend
+   - **Attendee Role**: Auto-assign role to attendees
+4. Set recurrence (optional):
+   - **Frequency**: Daily, weekly, bi-weekly, monthly, yearly
+   - **End Date**: When recurrence stops
+5. Configure mentions:
+   - **Mention on Create**: Ping roles when posted
+   - **Mention on Start**: Ping roles when event begins
+
+#### Templates Tab
+Save common event configurations:
+- Template name and description
+- Default title, description, location
+- Default duration and color
+- Quick apply when creating events
+
+#### Settings Tab
+Configure server-wide defaults:
+- Default event channel
+- Default mention settings
+- Server timezone
+
+---
+
+### 📊 Polls
+
+Create polls to gather opinions and schedule events.
+
+#### Active Polls Tab
+View all active polls with:
+- Poll question and description
+- Vote counts
+- Poll type (Standard/Time/Anonymous)
+- Time remaining (if set)
+
+**Poll Actions:**
+- **View Results**: See voting breakdown
+- **Edit**: Modify poll settings
+- **Close**: End voting early
+- **Delete**: Remove the poll
+
+#### Creating a Poll
+
+1. Click **Create Poll**
+2. Select poll type:
+   - **Standard**: Multiple choice voting
+   - **Time Poll**: When2meet-style time scheduling
+   - **Anonymous**: Hidden voter identities
+3. Configure poll:
+   - **Question**: What you're asking
+   - **Description**: Additional context
+   - **Channel**: Where to post
+4. Add options (for standard polls):
+   - Option text and optional emoji
+   - Minimum 2 options required
+5. Set poll settings:
+   - **Allow Multiple Votes**: Users can vote for multiple options
+   - **Max Votes Per User**: Limit multiple votes
+   - **Allow Custom Options**: Users can add options
+   - **Anonymous Voting**: Hide who voted
+   - **End Time**: Auto-close poll
+   - **Role Restrictions**: Limit who can vote
+
+#### Time Poll Creation
+
+For scheduling events:
+1. Select **Time Poll** type
+2. Set event duration (30m, 1h, 1.5h, 2h, 3h, 4h)
+3. Choose date range
+4. Set time range (earliest to latest)
+5. System generates time slot options automatically
+
+#### Results View
+- Bar chart visualization
+- Vote counts and percentages
+- Winner highlighting
+- Total votes cast
+
+---
+
+### 🔗 Webhooks & API
+
+Manage integrations and programmatic access.
+
+#### Webhooks Tab
+
+Configure outgoing webhooks for real-time notifications.
+
+**Webhook List:**
+- Name and endpoint URL
+- Enabled/disabled status
+- Event types subscribed
+- Health status (healthy/failing)
+- Last success/failure times
+
+**Creating a Webhook:**
+1. Click **Add Webhook**
+2. Configure:
+   - **Name**: Identifier for the webhook
+   - **Endpoint URL**: HTTPS URL to receive POST requests
+   - **Secret**: Optional secret for HMAC signature verification (encrypted at rest)
+   - **Event Types**: Which events to subscribe to
+     - Event created/updated/deleted/started
+     - RSVP yes/no/maybe/waitlist
+     - Poll created/voted/closed
+   - **Enabled**: Whether to send notifications
+3. **Important**: If you set a secret, save it separately - it's encrypted and cannot be retrieved later!
+
+**Security Note:** Webhook secrets are encrypted with AES-256-GCM before storage and never shown in plain text after creation. The secret is securely decrypted only when signing webhook payloads.
+
+**Webhook Actions:**
+- **View Logs**: See delivery history
+- **Send Test**: Test the endpoint
+- **Edit**: Modify configuration
+- **Delete**: Remove the webhook
+
+**Delivery Logs:**
+- Timestamp
+- Event type
+- HTTP status code
+- Response time
+- Success/failure indicator
+
+#### API Keys Tab
+
+Generate API keys for programmatic access.
+
+**API Key List:**
+- Key name
+- Status (active/disabled)
+- Permissions granted
+- Usage count
+- Last used time
+- Expiration date (if set)
+
+**Creating an API Key:**
+1. Click **Create API Key**
+2. Configure:
+   - **Name**: Identifier for the key
+   - **Permissions**: Select access levels
+     - events:read, events:write
+     - polls:read, polls:write
+     - webhooks:read, webhooks:write
+   - **Expiration**: Optional expiration (7d, 30d, 90d, 1yr)
+3. **Important**: Copy the key immediately - it's only shown once!
+
+**Security Notes:**
+- **API keys are never stored in plain text** - they're hashed with SHA-256
+- **Keys are only shown once** during creation - copy and save them securely
+- **Key hashes are never exposed** - only metadata (name, permissions, status) is returned
+- Track usage and rotate keys regularly
+- Disable unused keys immediately
+- Set expiration dates for temporary access
+
+---
 
 ### 👋 Welcome System
 
@@ -360,6 +567,41 @@ Automate actions when members receive or lose roles.
 
 ---
 
+### 🎭 Reaction Roles
+
+Create self-assignable roles via reactions, buttons, or dropdowns.
+
+#### Creating Reaction Roles
+
+1. Click **Create Reaction Role**
+2. Select component type:
+   - **Reactions**: Traditional emoji reactions
+   - **Buttons**: Discord button components
+   - **Dropdown**: Discord select menu
+3. Configure message:
+   - **Channel**: Where to post
+   - **Title**: Message title
+   - **Description**: Message content
+4. Add role mappings:
+   - Select role
+   - Choose emoji (for reactions/buttons)
+   - Set description (for buttons/dropdown)
+   - Choose behavior type:
+     - **Toggle**: Add/remove on click
+     - **Add Only**: Can only add role
+     - **Remove Only**: Can only remove role
+     - **Unique**: Only one role from group
+5. Post the message
+
+#### Managing Reaction Roles
+
+- View all reaction role messages
+- Edit role mappings
+- Delete messages
+- Track assignment counts
+
+---
+
 ### 📊 Analytics
 
 View server activity insights.
@@ -456,3 +698,7 @@ Most data updates automatically:
 4. **Use Role Actions Carefully**: Test kick actions thoroughly
 5. **Regular Backups**: Export config monthly
 6. **Monitor Analytics**: Check weekly for trends
+7. **Poll Engagement**: Use time polls for scheduling with multiple people
+8. **Webhook Security**: Always use secrets and verify HMAC signatures in production
+9. **API Key Rotation**: Rotate keys every 90 days and use expiration dates
+10. **Environment Secrets**: Ensure `WEBHOOK_SECRET_ENCRYPTION_KEY` and `ANONYMIZE_SECRET` are set for webhook and anonymous poll features

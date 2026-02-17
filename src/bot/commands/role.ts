@@ -129,6 +129,7 @@ async function handleRoleRemove(interaction: any) {
 }
 
 const command: Command = {
+    moduleId: 'moderation',
     data: new SlashCommandBuilder()
         .setName('role')
         .setDescription('Role management commands')

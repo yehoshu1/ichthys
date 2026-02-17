@@ -3,6 +3,7 @@ import { db } from '../../shared/database/client';
 import { levelProfile, guildConfig } from '../../shared/database/schema';
 import { eq, desc } from 'drizzle-orm';
 import { Command } from '../types/Command';
+import logger from '../utils/logger';
 
 export const leaderboard: Command = {
     data: new SlashCommandBuilder()
@@ -91,7 +92,7 @@ export const leaderboard: Command = {
             await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
-            console.error('Error fetching leaderboard:', error);
+            logger.error('Error fetching leaderboard:', error);
             await interaction.editReply({ content: 'There was an error fetching the leaderboard.' });
         }
     }

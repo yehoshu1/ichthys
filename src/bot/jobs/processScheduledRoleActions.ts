@@ -7,6 +7,7 @@ import { buildMessage } from "../utils/embeds";
 import { db } from "../../shared/database/client";
 import { scheduledRoleAction, roleAction, actionLog } from "../../shared/database/schema";
 import { emitGuildNotificationSafe } from "../services/notificationEmitter";
+import { isModuleEnabled } from "@shared/modules/state";
 
 const MAX_PER_RUN = 100;
 let isRunning = false;
@@ -237,7 +238,19 @@ export async function processScheduledRoleActionsOnce(): Promise<void> {
 
     logger.info(`Processing ${pending.length} scheduled role action(s)`);
 
+    const moduleEnabledCache = new Map<string, boolean>();
+
     for (const entry of pending) {
+        let roleActionsEnabled = moduleEnabledCache.get(entry.guildId);
+        if (roleActionsEnabled === undefined) {
+            roleActionsEnabled = await isModuleEnabled(entry.guildId, 'role_actions');
+            moduleEnabledCache.set(entry.guildId, roleActionsEnabled);
+        }
+
+        if (!roleActionsEnabled) {
+            continue;
+        }
+
         await db.update(scheduledRoleAction)
             .set({
                 status: "PROCESSING",

@@ -8,14 +8,14 @@ RUN npm install -g npm@11.9.0
 # Dev stage (for watch mode)
 FROM base AS dev
 WORKDIR /app
-# Install build tools
-RUN apt-get update -y && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+# Install build tools and canvas dependencies
+RUN apt-get update -y && apt-get install -y python3 make g++ pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package.json package-lock.json ./
 # Install ALL dependencies (including devDeps)
 # Using npm install instead of npm ci to handle cases where package.json has newer packages
-RUN npm install || npm ci
+RUN npm install --legacy-peer-deps || npm ci --legacy-peer-deps
 
 # Copy source
 COPY . .
@@ -28,14 +28,14 @@ CMD ["sh", "/app/scripts/dev-start.sh"]
 FROM base AS builder
 WORKDIR /app
 
-# Install build dependencies for native modules
-RUN apt-get update -y && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+# Install build dependencies for native modules (including canvas)
+RUN apt-get update -y && apt-get install -y python3 make g++ pkg-config libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package.json package-lock.json ./
 # Install ALL dependencies (including devDeps)
 # Using npm install instead of npm ci to handle cases where package.json has newer packages
-RUN npm install || npm ci
+RUN npm install --legacy-peer-deps || npm ci --legacy-peer-deps
 
 # Copy source
 COPY . .
@@ -63,7 +63,7 @@ RUN apt-get update && apt-get install -y procps && npm install -g pm2 && rm -rf 
 # Copy necessary files
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/package-lock.json ./
-RUN npm install || npm ci
+RUN npm install --legacy-peer-deps || npm ci --legacy-peer-deps
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/dashboard/.next ./src/dashboard/.next
 COPY --from=builder /app/src/dashboard/next.config.js ./src/dashboard/next.config.js

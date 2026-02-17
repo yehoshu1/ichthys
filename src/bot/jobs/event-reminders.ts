@@ -2,6 +2,7 @@ import { Client, EmbedBuilder } from 'discord.js';
 import { eventService } from '../services/event-service';
 import { formatDiscordTimestamp } from '../utils/date-parser';
 import logger from '../utils/logger';
+import { isModuleEnabled } from '@shared/modules/state';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // EVENT REMINDER JOB
@@ -20,6 +21,12 @@ export async function execute(client: Client) {
 
         for (const { reminder, event: evt } of pendingReminders) {
             try {
+                const eventsEnabled = await isModuleEnabled(evt.guildId, 'events');
+                if (!eventsEnabled) {
+                    await eventService.markReminderSent(reminder.id);
+                    continue;
+                }
+
                 // Get the user
                 const user = await client.users.fetch(reminder.userId);
                 if (!user) {
@@ -35,7 +42,13 @@ export async function execute(client: Client) {
                     .addFields(
                         { name: 'Event', value: evt.title, inline: false },
                         { name: 'Starts', value: formatDiscordTimestamp(evt.startTime, 'R'), inline: false },
-                        { name: 'Location', value: evt.location || `<#${evt.channelId}>`, inline: false }
+                        {
+                            name: 'Location',
+                            value: evt.locationChannelId
+                                ? `<#${evt.locationChannelId}>${evt.location ? `\n${evt.location}` : ''}`
+                                : (evt.location || `<#${evt.channelId}>`),
+                            inline: false,
+                        }
                     );
 
                 if (evt.description) {

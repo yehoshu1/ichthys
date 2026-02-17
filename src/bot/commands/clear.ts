@@ -68,6 +68,8 @@ async function sendModLog(
 }
 
 const command: Command = {
+    moduleId: 'moderation',
+    limitOptionName: 'amount',
     data: new SlashCommandBuilder()
         .setName('clear')
         .setDescription('Clear messages in the current channel')
