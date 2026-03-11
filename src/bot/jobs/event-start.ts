@@ -1,4 +1,4 @@
-import { Client, EmbedBuilder, TextChannel } from 'discord.js';
+import { Client, EmbedBuilder } from 'discord.js';
 import { eventService } from '../services/event-service';
 import { formatDiscordTimestamp } from '../utils/date-parser';
 import logger from '../utils/logger';
@@ -36,9 +36,11 @@ export async function execute(client: Client) {
                     continue;
                 }
 
-                // Get channel
-                const channel = guild.channels.cache.get(evt.channelId) as TextChannel;
-                if (!channel || !channel.isTextBased()) {
+                // Get channel (fallback to API fetch if not cached)
+                const cachedChannel = guild.channels.cache.get(evt.channelId);
+                const channel = cachedChannel ?? await guild.channels.fetch(evt.channelId).catch(() => null);
+
+                if (!channel || !channel.isTextBased() || !('send' in channel)) {
                     logger.warn(`Channel ${evt.channelId} not found for starting event ${evt.id}`);
                     continue;
                 }
@@ -50,7 +52,7 @@ export async function execute(client: Client) {
                 // Build start announcement
                 const embed = new EmbedBuilder()
                     .setTitle('🎉 Event Starting Now!')
-                    .setDescription(`**${evt.title}** is starting!`)
+                    .setDescription(`${evt.title} is starting!`)
                     .setColor('#57F287')
                     .addFields(
                         { name: 'Event', value: evt.title, inline: false },
@@ -61,32 +63,26 @@ export async function execute(client: Client) {
                     embed.addFields({ name: 'Location', value: evt.location, inline: false });
                 }
 
-                if (attendeeIds.length > 0) {
-                    const mentions = attendeeIds.map(id => `<@${id}>`).join(' ');
-                    
-                    // Send mention message if configured
-                    if (evt.mentionOnStart && evt.mentionRoleIds?.length) {
-                        const roleMentions = evt.mentionRoleIds.map(id => `<@&${id}>`).join(' ');
-                        await channel.send({
-                            content: `${roleMentions}\n🎉 **${evt.title}** is starting now!`,
-                            allowedMentions: { roles: evt.mentionRoleIds },
-                        });
-                    } else {
-                        await channel.send({
-                            content: `🎉 **${evt.title}** is starting now!`,
-                        });
-                    }
+                embed.addFields({
+                    name: `Attendees (${attendeeIds.length})`,
+                    value: buildAttendeeFieldValue(attendeeIds),
+                    inline: false,
+                });
 
-                    // Send attendee mentions
-                    if (mentions.length <= 2000) {
-                        await channel.send({
-                            content: `Attendees: ${mentions}`,
-                            allowedMentions: { users: attendeeIds },
-                        });
-                    }
-                }
+                const startMentionRoleIds = evt.mentionOnStart && evt.mentionRoleIds?.length
+                    ? Array.from(new Set(evt.mentionRoleIds))
+                    : [];
+                const startMentions = startMentionRoleIds.length > 0
+                    ? startMentionRoleIds.map(id => `<@&${id}>`).join(' ')
+                    : undefined;
 
-                await channel.send({ embeds: [embed] });
+                await channel.send({
+                    content: startMentions,
+                    embeds: [embed],
+                    allowedMentions: startMentionRoleIds.length > 0
+                        ? { roles: startMentionRoleIds }
+                        : undefined,
+                });
 
                 // Assign attendee roles if configured
                 if (evt.attendeeRoleId) {
@@ -112,4 +108,33 @@ export async function execute(client: Client) {
     } catch (error) {
         logger.error('Error in event start job:', error);
     }
+}
+
+function buildAttendeeFieldValue(attendeeIds: string[]): string {
+    if (attendeeIds.length === 0) {
+        return 'No confirmed attendees yet.';
+    }
+
+    const maxFieldLength = 1024;
+    const mentions: string[] = [];
+    let currentLength = 0;
+
+    for (const userId of attendeeIds) {
+        const mention = `<@${userId}>`;
+        const separatorLength = mentions.length > 0 ? 2 : 0; // ", "
+
+        if (currentLength + separatorLength + mention.length > maxFieldLength) {
+            break;
+        }
+
+        if (separatorLength > 0) {
+            currentLength += separatorLength;
+        }
+        mentions.push(mention);
+        currentLength += mention.length;
+    }
+
+    const omittedCount = attendeeIds.length - mentions.length;
+    const suffix = omittedCount > 0 ? `, +${omittedCount} more` : '';
+    return `${mentions.join(', ')}${suffix}`;
 }

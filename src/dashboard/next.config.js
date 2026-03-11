@@ -1,3 +1,47 @@
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
+
+// `next dev src/dashboard` loads env files from `src/dashboard` by default.
+// Load repo-root env files so dashboard and bot share the same local config.
+const nodeEnv = process.env.NODE_ENV || "development";
+const rootDir = path.resolve(__dirname, "../..");
+const envCandidates = [
+    `.env.${nodeEnv}.local`,
+    ".env.local",
+    `.env.${nodeEnv}`,
+    ".env",
+];
+
+const dashboardEnvAllowlist = new Set([
+    "DATABASE_URL",
+    "DISCORD_CLIENT_ID",
+    "DISCORD_CLIENT_SECRET",
+    "DISCORD_TOKEN",
+    "LOG_LEVEL",
+    "METRICS_TOKEN",
+    "NEXTAUTH_SECRET",
+    "NEXTAUTH_URL",
+    "NEXT_PUBLIC_DISCORD_CLIENT_ID",
+    "NODE_ENV",
+    "REDIS_URL",
+]);
+
+for (const file of envCandidates) {
+    const envPath = path.join(rootDir, file);
+    if (fs.existsSync(envPath)) {
+        const parsed = dotenv.parse(fs.readFileSync(envPath));
+        for (const [key, value] of Object.entries(parsed)) {
+            if (!dashboardEnvAllowlist.has(key)) {
+                continue;
+            }
+            if (process.env[key] === undefined) {
+                process.env[key] = value;
+            }
+        }
+    }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     reactStrictMode: true,

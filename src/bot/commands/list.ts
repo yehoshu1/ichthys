@@ -114,7 +114,7 @@ async function listEvents(
         }
 
         embed.addFields({
-            name: evt.title,
+            name: buildFieldNameWithId(evt.title, evt.id),
             value: value.join('\n'),
             inline: false,
         });
@@ -173,13 +173,25 @@ async function listPolls(
         value.push(`${typeLabels[poll.type] || '📊 Poll'}`);
 
         embed.addFields({
-            name: poll.question,
+            name: buildFieldNameWithId(poll.question, poll.id),
             value: value.join('\n'),
             inline: false,
         });
     }
 
     await interaction.editReply({ embeds: [embed] });
+}
+
+function buildFieldNameWithId(label: string, id: string): string {
+    const suffix = ` | ID: ${id}`;
+    const maxFieldNameLength = 256;
+
+    if (label.length + suffix.length <= maxFieldNameLength) {
+        return `${label}${suffix}`;
+    }
+
+    const truncatedLabelMax = Math.max(1, maxFieldNameLength - suffix.length - 3);
+    return `${label.slice(0, truncatedLabelMax).trimEnd()}...${suffix}`;
 }
 
 export default { data, execute } as Command;

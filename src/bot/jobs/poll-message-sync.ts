@@ -16,6 +16,7 @@ export class PollMessageSyncJob {
     private client: Client;
     private intervalId: NodeJS.Timeout | null = null;
     private readonly intervalMs = 5000; // Check every 5 seconds
+    private readonly createSyncGraceMs = 15000; // Let command-path posting set messageId first
 
     constructor(client: Client) {
         this.client = client;
@@ -46,13 +47,16 @@ export class PollMessageSyncJob {
     }
 
     private async syncNewPolls(): Promise<void> {
+        const createdBefore = new Date(Date.now() - this.createSyncGraceMs);
+
         // Find polls without messageId (newly created polls)
         const newPolls = await db
             .select()
             .from(poll)
             .where(and(
                 isNull(poll.messageId),
-                eq(poll.closed, false)
+                eq(poll.closed, false),
+                sql`${poll.createdAt} <= ${createdBefore}`
             ))
             .limit(10);
 

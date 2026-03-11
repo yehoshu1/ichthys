@@ -36,7 +36,15 @@ import {
     type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from "../../../components/ui/sheet";
+import {
+    Sheet,
+    SheetContent,
+    SheetTrigger,
+    SheetClose,
+    SheetHeader,
+    SheetTitle,
+    SheetDescription,
+} from "../../../components/ui/sheet";
 import ThemeToggle from "../../../components/ThemeToggle";
 import { toast } from "sonner";
 import GlobalSearchModal from "../../../components/GlobalSearchModal";
@@ -412,13 +420,19 @@ export default function DashboardLayout({
                                     <Menu className="h-5 w-5" />
                                 </Button>
                             </SheetTrigger>
-                            <SheetContent side="left" className="w-64 p-0">
+                            <SheetContent side="left" className="w-64 p-0 flex flex-col">
+                                <SheetHeader className="sr-only">
+                                    <SheetTitle>Navigation menu</SheetTitle>
+                                    <SheetDescription>
+                                        Navigate between dashboard sections for this server.
+                                    </SheetDescription>
+                                </SheetHeader>
                                 <div className="flex h-16 items-center border-b px-6">
                                     <h1 className="text-2xl font-bold">
                                         <span className="text-primary">Ixoye</span> Dashboard
                                     </h1>
                                 </div>
-                                <nav className="space-y-1 px-4 py-6">
+                                <nav className="flex-1 overflow-y-auto space-y-1 px-4 py-6">
                                     {navItems.map((item) => {
                                         const ItemIcon = navIconById[item.id];
                                         const enabled = isNavItemEnabled(item, moduleEnabledById);
@@ -450,7 +464,7 @@ export default function DashboardLayout({
                                         );
                                     })}
                                 </nav>
-                                <div className="absolute bottom-0 left-0 right-0 border-t p-4">
+                                <div className="border-t p-4 shrink-0">
                                     <Button
                                         variant="ghost"
                                         size="sm"
