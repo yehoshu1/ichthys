@@ -24,7 +24,6 @@ export const CANONICAL_COMMAND_IDS = [
     'poll',
     'profile',
     'rank',
-    'reactionrole',
     'remind',
     'role',
     'roles',

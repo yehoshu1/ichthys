@@ -17,19 +17,19 @@ const mockLogger = {
     error: vi.fn(),
 };
 
-vi.mock('../services/event-service', () => ({
+vi.mock('../../services/event-service', () => ({
     eventService: mockEventService,
 }));
 
-vi.mock('../services/poll-service', () => ({
+vi.mock('../../services/poll-service', () => ({
     pollService: mockPollService,
 }));
 
-vi.mock('../services/resource-authorization-service', () => ({
+vi.mock('../../services/resource-authorization-service', () => ({
     canMemberManageCreatorOwnedResource: mockCanManage,
 }));
 
-vi.mock('../utils/logger', () => ({
+vi.mock('../../utils/logger', () => ({
     default: mockLogger,
 }));
 
@@ -71,7 +71,7 @@ describe('/delete command', () => {
     });
 
     it('returns not found when event is missing', async () => {
-        const { execute } = await import('./delete');
+        const { execute } = await import('../../commands/delete');
         const interaction = createDeleteInteraction({ type: 'event', id: 'missing-event' });
 
         mockEventService.getEventById.mockResolvedValue(undefined);
@@ -84,7 +84,7 @@ describe('/delete command', () => {
     });
 
     it('denies event deletion without authorization', async () => {
-        const { execute } = await import('./delete');
+        const { execute } = await import('../../commands/delete');
         const interaction = createDeleteInteraction({ type: 'event', id: 'event-1' });
 
         mockEventService.getEventById.mockResolvedValue({
@@ -104,7 +104,7 @@ describe('/delete command', () => {
     });
 
     it('deletes event when authorized and includes reason in response', async () => {
-        const { execute } = await import('./delete');
+        const { execute } = await import('../../commands/delete');
         const interaction = createDeleteInteraction({
             type: 'event',
             id: 'event-2',
@@ -129,7 +129,7 @@ describe('/delete command', () => {
     });
 
     it('deletes poll when authorized', async () => {
-        const { execute } = await import('./delete');
+        const { execute } = await import('../../commands/delete');
         const interaction = createDeleteInteraction({ type: 'poll', id: 'poll-1' });
 
         mockPollService.getPollById.mockResolvedValue({

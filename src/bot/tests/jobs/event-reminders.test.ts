@@ -12,7 +12,7 @@ const mockLogger = {
     error: vi.fn(),
 };
 
-vi.mock('../services/event-service', () => ({
+vi.mock('../../services/event-service', () => ({
     eventService: mockEventService,
 }));
 
@@ -20,7 +20,7 @@ vi.mock('@shared/modules/state', () => ({
     isModuleEnabled: mockIsModuleEnabled,
 }));
 
-vi.mock('../utils/logger', () => ({
+vi.mock('../../utils/logger', () => ({
     default: mockLogger,
 }));
 
@@ -30,7 +30,7 @@ describe('event-reminders job', () => {
     });
 
     it('sends DM reminder embed and marks reminder as sent', async () => {
-        const { execute } = await import('./event-reminders');
+        const { execute } = await import('../../jobs/event-reminders');
 
         const send = vi.fn().mockResolvedValue(undefined);
         const usersFetch = vi.fn().mockResolvedValue({ send });
@@ -75,7 +75,7 @@ describe('event-reminders job', () => {
     });
 
     it('marks reminder sent without DM when module is disabled', async () => {
-        const { execute } = await import('./event-reminders');
+        const { execute } = await import('../../jobs/event-reminders');
 
         const usersFetch = vi.fn();
         const client = {
@@ -111,7 +111,7 @@ describe('event-reminders job', () => {
     });
 
     it('marks reminder sent when DM send fails', async () => {
-        const { execute } = await import('./event-reminders');
+        const { execute } = await import('../../jobs/event-reminders');
 
         const send = vi.fn().mockRejectedValue(new Error('cannot DM user'));
         const usersFetch = vi.fn().mockResolvedValue({ send });

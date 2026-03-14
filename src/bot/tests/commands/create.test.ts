@@ -16,24 +16,24 @@ const mockLogger = {
     error: vi.fn(),
 };
 
-vi.mock('../services/event-service', () => ({
+vi.mock('../../services/event-service', () => ({
     eventService: mockEventService,
 }));
 
-vi.mock('../services/event-poll-settings-service', () => ({
+vi.mock('../../services/event-poll-settings-service', () => ({
     isSupportedPostChannel: mockIsSupportedPostChannel,
 }));
 
-vi.mock('../services/command-policy-service', () => ({
+vi.mock('../../services/command-policy-service', () => ({
     getCommandPolicyContext: mockGetCommandPolicyContext,
 }));
 
-vi.mock('../utils/date-parser', () => ({
+vi.mock('../../utils/date-parser', () => ({
     parseNaturalLanguageDate: mockParseNaturalLanguageDate,
     formatDiscordTimestamp: mockFormatDiscordTimestamp,
 }));
 
-vi.mock('../utils/logger', () => ({
+vi.mock('../../utils/logger', () => ({
     default: mockLogger,
 }));
 
@@ -143,7 +143,7 @@ describe('/create command', () => {
     });
 
     it('rejects unsupported target channels', async () => {
-        const { execute } = await import('./create');
+        const { execute } = await import('../../commands/create');
         const { interaction } = createCreateInteraction();
         mockIsSupportedPostChannel.mockReturnValue(false);
 
@@ -154,7 +154,7 @@ describe('/create command', () => {
     });
 
     it('rejects invalid or past datetime values', async () => {
-        const { execute } = await import('./create');
+        const { execute } = await import('../../commands/create');
         const { interaction } = createCreateInteraction();
 
         mockParseNaturalLanguageDate.mockReturnValue(new Date(Date.now() - 60_000));
@@ -168,7 +168,7 @@ describe('/create command', () => {
     });
 
     it('creates event, posts embed message, and stores message id', async () => {
-        const { execute } = await import('./create');
+        const { execute } = await import('../../commands/create');
         const { interaction, channelSend } = createCreateInteraction({
             optionRoles: {
                 mention_on_create: { id: 'role-1' },
@@ -193,7 +193,7 @@ describe('/create command', () => {
     });
 
     it('returns success with warning when event is saved but channel post fails', async () => {
-        const { execute } = await import('./create');
+        const { execute } = await import('../../commands/create');
         const { interaction } = createCreateInteraction({ channelSendReject: true });
         const startTime = new Date(Date.now() + 2 * 60 * 60_000);
 
@@ -212,7 +212,7 @@ describe('/create command', () => {
     });
 
     it('creates repeating events when repeat options are provided', async () => {
-        const { execute } = await import('./create');
+        const { execute } = await import('../../commands/create');
         const repeatUntil = new Date(Date.now() + 10 * 24 * 60 * 60_000);
         const startTime = new Date(Date.now() + 24 * 60 * 60_000);
         const { interaction } = createCreateInteraction({

@@ -11,7 +11,14 @@ export async function loadCommands() {
         return;
     }
 
-    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.ts') || file.endsWith('.js'));
+    const commandFiles = fs.readdirSync(commandsPath).filter((file) =>
+        (file.endsWith('.ts') || file.endsWith('.js')) &&
+        !file.endsWith('.test.ts') &&
+        !file.endsWith('.test.js') &&
+        !file.endsWith('.spec.ts') &&
+        !file.endsWith('.spec.js') &&
+        !file.endsWith('.d.ts')
+    );
 
     for (const file of commandFiles) {
         const filePath = path.join(commandsPath, file);

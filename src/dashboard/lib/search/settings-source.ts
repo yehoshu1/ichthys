@@ -60,8 +60,6 @@ function buildEntryTitle(pathSegments: string[]): string {
         verificationRules: "Verification Rule",
         verificationRoleMessages: "Verification Role Message",
         moderationSettings: "Moderation Settings",
-        reactionRoleMessages: "Reaction Role Message",
-        reactionRoles: "Reaction Role",
         birthdayConfig: "Birthday Config",
         birthdayEntries: "Birthday Entry",
         messageAliases: "Message Alias",
@@ -112,12 +110,6 @@ function mapSettingsPathToHref(path: string, guildId: string): string {
     }
     if (path.startsWith("moderationSettings")) {
         return `/dashboard/${guildId}/moderation?tab=settings`;
-    }
-    if (path.startsWith("reactionRoleMessages")) {
-        return `/dashboard/${guildId}/reaction-roles?tab=messages`;
-    }
-    if (path.startsWith("reactionRoles")) {
-        return `/dashboard/${guildId}/reaction-roles?tab=roles`;
     }
     if (path.startsWith("birthdayConfig") || path.startsWith("birthdayEntries")) {
         return `/dashboard/${guildId}/birthdays?tab=settings`;

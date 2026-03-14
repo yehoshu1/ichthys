@@ -17,7 +17,6 @@ import {
     Settings,
     Shield,
     ShieldCheck,
-    Smile,
     Sparkles,
     Star,
     Zap,
@@ -45,8 +44,8 @@ const moduleCards = [
         icon: Shield,
     },
     {
-        title: "Birthdays + Reaction Roles",
-        desc: "Birthday reminders and role assignment plus message-based role selection systems.",
+        title: "Birthdays",
+        desc: "Birthday reminders, timezone-aware celebration windows, and scheduled birthday role management.",
         icon: Cake,
     },
     {
@@ -77,7 +76,7 @@ const commandCategories = [
     },
     {
         title: "Admin Commands",
-        examples: "/setup, /config, /welcome, /verify, /boost, /reactionrole, /setxp, /setlevel",
+        examples: "/setup, /config, /welcome, /verify, /boost, /setxp, /setlevel",
     },
 ];
 
@@ -99,7 +98,7 @@ export default function Home() {
                         ΙΧΘΥΣ for modern community infrastructure
                     </h1>
                     <p className="text-base text-muted-foreground md:text-lg">
-                        Manage welcome and verification flows, moderation, leveling, boosts, birthdays, reaction roles,
+                        Manage welcome and verification flows, moderation, leveling, boosts, birthdays,
                         aliases, role automations, analytics, logs, and backups from one dashboard.
                     </p>
 
@@ -197,11 +196,11 @@ export default function Home() {
                             </div>
                             <div className="flex items-center gap-3 rounded-xl border bg-background p-4">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
-                                    <Smile className="h-5 w-5" />
+                                    <Cake className="h-5 w-5" />
                                 </div>
                                 <div>
                                     <p className="text-sm font-semibold">Engagement systems built in</p>
-                                    <p className="text-xs text-muted-foreground">Leveling, birthdays, reaction roles, and visibility through analytics.</p>
+                                    <p className="text-xs text-muted-foreground">Leveling, birthdays, and visibility through analytics.</p>
                                 </div>
                             </div>
                         </div>

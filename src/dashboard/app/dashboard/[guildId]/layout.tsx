@@ -24,11 +24,9 @@ import {
     BookOpen,
     Bot,
     Loader2,
-    Smile,
     Shield,
     Cake,
     MessageSquare,
-    Bell,
     TerminalSquare,
     CalendarDays,
     BarChart3,
@@ -48,7 +46,6 @@ import {
 import ThemeToggle from "../../../components/ThemeToggle";
 import { toast } from "sonner";
 import GlobalSearchModal from "../../../components/GlobalSearchModal";
-import GuildNotificationBell from "../../../components/GuildNotificationBell";
 import { DASHBOARD_NAV_ITEMS, DashboardNavId } from "../../../lib/search/dashboard-nav";
 import type { SearchOpenMethod } from "../../../lib/search/telemetry";
 
@@ -59,18 +56,23 @@ interface ModuleStateResponse {
     }>;
 }
 
+interface GuildInfoResponse {
+    name?: string;
+    iconUrl?: string | null;
+    isBotMember?: boolean | null;
+}
+
 const navIconById: Record<DashboardNavId, LucideIcon> = {
     overview: LayoutDashboard,
     events: CalendarDays,
     polls: BarChart3,
-    notifications: Bell,
+    notifications: ScrollText,
     webhooks: Webhook,
     welcome: Hand,
     verification: ShieldCheck,
     leveling: Star,
     boosts: Rocket,
     birthdays: Cake,
-    "reaction-roles": Smile,
     "role-actions": Zap,
     aliases: MessageSquare,
     commands: TerminalSquare,
@@ -121,6 +123,7 @@ export default function DashboardLayout({
     const router = useRouter();
     const guildId = params.guildId as string;
     const [guildName, setGuildName] = useState<string>("");
+    const [guildIconUrl, setGuildIconUrl] = useState<string | null>(null);
     const [isBotMember, setIsBotMember] = useState<boolean | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
@@ -197,12 +200,13 @@ export default function DashboardLayout({
                     setFetchError(text || "Failed to fetch guild information");
                     return null;
                 }
-                return res.json();
+                return res.json() as Promise<GuildInfoResponse>;
             })
             .then(data => {
                 if (!data) return; // Handled above (redirect or signout)
                 if (data.name) setGuildName(data.name);
-                setIsBotMember(data.isBotMember);
+                setGuildIconUrl(data.iconUrl ?? null);
+                setIsBotMember(data.isBotMember ?? null);
             })
             .catch(err => {
                 console.error("Failed to fetch guild info:", err);
@@ -545,7 +549,19 @@ export default function DashboardLayout({
                             <Search className="h-5 w-5" />
                         </Button>
                         <ThemeToggle />
-                        <GuildNotificationBell guildId={guildId} />
+                        {guildIconUrl ? (
+                            <Image
+                                src={guildIconUrl}
+                                alt={`${guildName || guildId} icon`}
+                                width={36}
+                                height={36}
+                                className="h-9 w-9 rounded-full border object-cover"
+                            />
+                        ) : (
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full border bg-muted text-xs font-semibold uppercase text-muted-foreground">
+                                {(guildName || guildId).slice(0, 1)}
+                            </div>
+                        )}
                     </div>
                 </header>
 

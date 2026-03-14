@@ -10,8 +10,6 @@ import {
     verificationMessageRule,
     verificationRoleMessage,
     moderationSettings,
-    reactionRoleMessage,
-    reactionRole,
     birthdayConfig,
     birthdayEntry,
     messageAlias,
@@ -33,8 +31,6 @@ const MAX_REWARDS = 300;
 const MAX_ACTIONS = 800;
 const MAX_VERIFICATION_RULES = 400;
 const MAX_VERIFICATION_ROLE_MESSAGES = 400;
-const MAX_REACTION_ROLE_MESSAGES = 400;
-const MAX_REACTION_ROLES = 1_000;
 const MAX_BIRTHDAY_ENTRIES = 2_500;
 const MAX_ALIASES = 500;
 const MAX_COMMAND_CONFIGS = 500;
@@ -50,8 +46,8 @@ const importPayloadSchema = z.object({
     verificationRules: z.array(z.record(z.string(), z.unknown())).max(MAX_VERIFICATION_RULES).default([]),
     verificationRoleMessages: z.array(z.record(z.string(), z.unknown())).max(MAX_VERIFICATION_ROLE_MESSAGES).default([]),
     moderationSettings: z.record(z.string(), z.unknown()).nullable().optional(),
-    reactionRoleMessages: z.array(z.record(z.string(), z.unknown())).max(MAX_REACTION_ROLE_MESSAGES).default([]),
-    reactionRoles: z.array(z.record(z.string(), z.unknown())).max(MAX_REACTION_ROLES).default([]),
+    reactionRoleMessages: z.array(z.record(z.string(), z.unknown())).default([]),
+    reactionRoles: z.array(z.record(z.string(), z.unknown())).default([]),
     birthdayConfig: z.record(z.string(), z.unknown()).nullable().optional(),
     birthdayEntries: z.array(z.record(z.string(), z.unknown())).max(MAX_BIRTHDAY_ENTRIES).default([]),
     messageAliases: z.array(z.record(z.string(), z.unknown())).max(MAX_ALIASES).default([]),
@@ -371,79 +367,6 @@ function sanitizeModerationSettings(
     };
 }
 
-function sanitizeReactionRoleMessages(items: Record<string, unknown>[], warnings: ImportWarnings): Array<Record<string, unknown>> {
-    const sanitized: Array<Record<string, unknown>> = [];
-    for (const item of items) {
-        const channelId = normalizeNullableDiscordId(item.channelId, warnings, "reactionRoleMessages.channelId.invalid");
-        if (!channelId) {
-            continue;
-        }
-
-        sanitized.push({
-            id: typeof item.id === "string" ? item.id : undefined,
-            guildId: undefined,
-            messageId: toStringOrNull(item.messageId),
-            channelId,
-            title: toStringOrNull(item.title),
-            content: toStringOrNull(item.content),
-            embed: item.embed ?? null,
-            color: Number.isFinite(Number(item.color)) ? Number(item.color) : null,
-            enabled: toBoolean(item.enabled, true),
-        });
-    }
-    return sanitized;
-}
-
-function sanitizeReactionRoles(
-    items: Record<string, unknown>[],
-    validReactionRoleMessageIds: Set<string>,
-    warnings: ImportWarnings
-): Array<Record<string, unknown>> {
-    const sanitized: Array<Record<string, unknown>> = [];
-    for (const item of items) {
-        if (typeof item.messageId !== "string" || typeof item.emoji !== "string") {
-            addWarning(warnings, "reactionRoles.requiredFields.invalid");
-            continue;
-        }
-
-        const channelId = normalizeNullableDiscordId(item.channelId, warnings, "reactionRoles.channelId.invalid");
-        const roleId = normalizeNullableDiscordId(item.roleId, warnings, "reactionRoles.roleId.invalid");
-        if (!channelId || !roleId) {
-            continue;
-        }
-
-        if (typeof item.reactionRoleMessageId === "string" && !validReactionRoleMessageIds.has(item.reactionRoleMessageId)) {
-            addWarning(warnings, "reactionRoles.reactionRoleMessageId.invalid");
-        }
-
-            const reactionRoleMessageId = typeof item.reactionRoleMessageId === "string"
-                && validReactionRoleMessageIds.has(item.reactionRoleMessageId)
-                ? item.reactionRoleMessageId
-                : null;
-
-        sanitized.push({
-                id: typeof item.id === "string" ? item.id : undefined,
-                guildId: undefined,
-                reactionRoleMessageId,
-                messageId: item.messageId,
-                channelId,
-                emoji: item.emoji,
-                roleId,
-                type: item.type === "ADD_ONLY"
-                    ? "ADD_ONLY"
-                    : item.type === "REMOVE_ONLY"
-                        ? "REMOVE_ONLY"
-                        : item.type === "UNIQUE"
-                            ? "UNIQUE"
-                            : "TOGGLE",
-                exclusiveRoleIds: normalizeCsvDiscordIds(item.exclusiveRoleIds, warnings, "reactionRoles.exclusiveRoleIds.invalid"),
-                description: toStringOrNull(item.description),
-                enabled: toBoolean(item.enabled, true),
-        });
-    }
-    return sanitized;
-}
-
 function sanitizeBirthdayConfig(
     item: Record<string, unknown> | null | undefined,
     warnings: ImportWarnings
@@ -576,13 +499,11 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
         const safeVerificationRules = sanitizeVerificationRules(payload.verificationRules, warnings);
         const safeVerificationRoleMessages = sanitizeVerificationRoleMessages(payload.verificationRoleMessages, warnings);
         const safeModerationSettings = sanitizeModerationSettings(payload.moderationSettings, warnings);
-        const safeReactionRoleMessages = sanitizeReactionRoleMessages(payload.reactionRoleMessages, warnings);
-        const reactionRoleMessageIds = new Set(
-            safeReactionRoleMessages
-                .map((message) => message.id)
-                .filter((id): id is string => typeof id === "string")
+        addWarning(
+            warnings,
+            "reactionRoles.removed",
+            payload.reactionRoleMessages.length + payload.reactionRoles.length > 0 ? 1 : 0
         );
-        const safeReactionRoles = sanitizeReactionRoles(payload.reactionRoles, reactionRoleMessageIds, warnings);
         const safeBirthdayConfig = sanitizeBirthdayConfig(payload.birthdayConfig, warnings);
         const safeBirthdayEntries = sanitizeBirthdayEntries(payload.birthdayEntries);
         const safeAliases = sanitizeMessageAliases(payload.messageAliases, auth.userId, warnings);
@@ -605,8 +526,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
             await tx.delete(roleAction).where(eq(roleAction.guildId, guildId));
             await tx.delete(verificationMessageRule).where(eq(verificationMessageRule.guildId, guildId));
             await tx.delete(verificationRoleMessage).where(eq(verificationRoleMessage.guildId, guildId));
-            await tx.delete(reactionRole).where(eq(reactionRole.guildId, guildId));
-            await tx.delete(reactionRoleMessage).where(eq(reactionRoleMessage.guildId, guildId));
             await tx.delete(birthdayEntry).where(eq(birthdayEntry.guildId, guildId));
             await tx.delete(messageAlias).where(eq(messageAlias.guildId, guildId));
             await tx.delete(commandConfig).where(eq(commandConfig.guildId, guildId));
@@ -642,14 +561,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
                     guildId,
                     ...safeModerationSettings,
                 });
-            }
-
-            if (safeReactionRoleMessages.length > 0) {
-                await tx.insert(reactionRoleMessage).values(safeReactionRoleMessages.map((message) => ({ ...message, guildId })));
-            }
-
-            if (safeReactionRoles.length > 0) {
-                await tx.insert(reactionRole).values(safeReactionRoles.map((item) => ({ ...item, guildId })));
             }
 
             if (safeBirthdayConfig) {

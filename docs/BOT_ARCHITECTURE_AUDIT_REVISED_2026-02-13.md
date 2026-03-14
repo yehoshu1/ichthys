@@ -107,7 +107,6 @@ The manifest and module-state model now provide a good source of truth for this 
   - `src/bot/commands/birthday.ts` (admin/test subcommand member permissions)
   - `src/bot/commands/boost.ts` (setup/claim subcommand member+bot permissions)
   - `src/bot/commands/verify.ts` (bot role-management permission)
-  - `src/bot/commands/reactionrole.ts` (add subcommand bot role-management permission)
 - Remaining command-specific creator-or-admin authorization standardized with shared helper:
   - `src/bot/services/resource-authorization-service.ts`
   - `src/bot/commands/delete.ts`

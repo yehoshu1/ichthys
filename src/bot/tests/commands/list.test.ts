@@ -17,19 +17,19 @@ const mockLogger = {
     error: vi.fn(),
 };
 
-vi.mock('../services/event-service', () => ({
+vi.mock('../../services/event-service', () => ({
     eventService: mockEventService,
 }));
 
-vi.mock('../services/poll-service', () => ({
+vi.mock('../../services/poll-service', () => ({
     pollService: mockPollService,
 }));
 
-vi.mock('../utils/date-parser', () => ({
+vi.mock('../../utils/date-parser', () => ({
     formatDiscordTimestamp: mockFormatDiscordTimestamp,
 }));
 
-vi.mock('../utils/logger', () => ({
+vi.mock('../../utils/logger', () => ({
     default: mockLogger,
 }));
 
@@ -62,7 +62,7 @@ describe('/list command', () => {
     });
 
     it('returns empty response message when no upcoming events exist', async () => {
-        const { execute } = await import('./list');
+        const { execute } = await import('../../commands/list');
         const interaction = createListInteraction({ type: 'events' });
 
         mockEventService.getEventsByGuild.mockResolvedValue([]);
@@ -74,7 +74,7 @@ describe('/list command', () => {
     });
 
     it('renders events embed with ID only inside field name', async () => {
-        const { execute } = await import('./list');
+        const { execute } = await import('../../commands/list');
         const interaction = createListInteraction({ type: 'events', limit: 1 });
 
         mockEventService.getEventsByGuild.mockResolvedValue([
@@ -107,7 +107,7 @@ describe('/list command', () => {
     });
 
     it('respects channel filtering for events', async () => {
-        const { execute } = await import('./list');
+        const { execute } = await import('../../commands/list');
         const interaction = createListInteraction({ type: 'events', channelId: 'channel-b' });
 
         mockEventService.getEventsByGuild.mockResolvedValue([
@@ -128,7 +128,7 @@ describe('/list command', () => {
     });
 
     it('renders polls embed with ID only inside field name', async () => {
-        const { execute } = await import('./list');
+        const { execute } = await import('../../commands/list');
         const interaction = createListInteraction({ type: 'polls', limit: 1 });
 
         mockPollService.getPollsByGuild.mockResolvedValue([

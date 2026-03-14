@@ -12,15 +12,15 @@ const mockLogger = {
     error: vi.fn(),
 };
 
-vi.mock('../services/event-service', () => ({
+vi.mock('../../services/event-service', () => ({
     eventService: mockEventService,
 }));
 
-vi.mock('../utils/date-parser', () => ({
+vi.mock('../../utils/date-parser', () => ({
     formatDiscordTimestamp: mockFormatDiscordTimestamp,
 }));
 
-vi.mock('../utils/logger', () => ({
+vi.mock('../../utils/logger', () => ({
     default: mockLogger,
 }));
 
@@ -50,7 +50,7 @@ describe('/remind command', () => {
     });
 
     it('returns not found when event does not exist', async () => {
-        const { execute } = await import('./remind');
+        const { execute } = await import('../../commands/remind');
         const interaction = createRemindInteraction({ eventId: 'missing-event', when: '10 minutes before' });
 
         mockEventService.getEventById.mockResolvedValue(undefined);
@@ -63,7 +63,7 @@ describe('/remind command', () => {
     });
 
     it('blocks reminders for events in another guild', async () => {
-        const { execute } = await import('./remind');
+        const { execute } = await import('../../commands/remind');
         const interaction = createRemindInteraction({ eventId: 'event-1', when: '10 minutes before', guildId: 'guild-a' });
 
         mockEventService.getEventById.mockResolvedValue({
@@ -79,7 +79,7 @@ describe('/remind command', () => {
     });
 
     it('validates unparseable reminder input', async () => {
-        const { execute } = await import('./remind');
+        const { execute } = await import('../../commands/remind');
         const interaction = createRemindInteraction({ eventId: 'event-1', when: 'sometime maybe' });
 
         mockEventService.getEventById.mockResolvedValue({
@@ -96,7 +96,7 @@ describe('/remind command', () => {
     });
 
     it('blocks reminders when requested reminder time is already in the past', async () => {
-        const { execute } = await import('./remind');
+        const { execute } = await import('../../commands/remind');
         const interaction = createRemindInteraction({ eventId: 'event-1', when: '2 hours before' });
 
         mockEventService.getEventById.mockResolvedValue({
@@ -112,7 +112,7 @@ describe('/remind command', () => {
     });
 
     it('returns unchanged message when same reminder already exists', async () => {
-        const { execute } = await import('./remind');
+        const { execute } = await import('../../commands/remind');
         const interaction = createRemindInteraction({ eventId: 'event-1', when: '10 minutes before' });
 
         mockEventService.getEventById.mockResolvedValue({
@@ -130,7 +130,7 @@ describe('/remind command', () => {
     });
 
     it('sets reminder and responds with confirmation embed', async () => {
-        const { execute } = await import('./remind');
+        const { execute } = await import('../../commands/remind');
         const interaction = createRemindInteraction({ eventId: 'event-1', when: '1 hour before' });
 
         const startTime = new Date(Date.now() + 180 * 60_000);

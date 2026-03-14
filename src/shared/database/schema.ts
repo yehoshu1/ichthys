@@ -14,9 +14,6 @@ import {
 
 export const roleActionTriggerEnum = pgEnum('role_action_trigger', ['ADD', 'REMOVE']);
 export const roleActionTypeEnum = pgEnum('role_action_type', ['DM', 'KICK', 'LOG', 'MSG', 'MESSAGE']);
-export const reactionRoleTypeEnum = pgEnum('reaction_role_type', ['TOGGLE', 'ADD_ONLY', 'REMOVE_ONLY', 'UNIQUE']);
-export const roleComponentTypeEnum = pgEnum('role_component_type', ['REACTION', 'BUTTON', 'DROPDOWN']);
-export const roleComponentStyleEnum = pgEnum('role_component_style', ['PRIMARY', 'SECONDARY', 'SUCCESS', 'DANGER']);
 export const welcomeTargetTypeEnum = pgEnum('welcome_target_type', ['CHANNEL', 'DM']);
 export const welcomeBackgroundTypeEnum = pgEnum('welcome_background_type', ['COLOR', 'GRADIENT', 'IMAGE']);
 export const welcomeAvatarShapeEnum = pgEnum('welcome_avatar_shape', ['CIRCLE', 'SQUARE', 'ROUNDED']);
@@ -430,52 +427,6 @@ export const moderationSettings = pgTable('moderation_settings', {
     guildIdUnique: uniqueIndex('moderation_settings_guild_unique').on(table.guildId),
 }));
 
-export const reactionRoleMessage = pgTable('reaction_role_message', {
-    id: uuid('id').defaultRandom().primaryKey(),
-    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
-    messageId: text('message_id'),
-    channelId: text('channel_id').notNull(),
-    title: text('title'),
-    content: text('content'),
-    embed: jsonb('embed'),
-    color: integer('color'),
-    // 🆕 Support for different component types
-    componentType: roleComponentTypeEnum('component_type').default('REACTION').notNull(),
-    maxSelections: integer('max_selections').default(1), // For dropdowns: how many roles can be selected
-    placeholder: text('placeholder'), // For dropdowns: placeholder text
-    enabled: boolean('enabled').default(true).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
-}, (table) => ({
-    guildIdIdx: index('reaction_role_message_guild_id_idx').on(table.guildId),
-    messageIdIdx: index('reaction_role_message_message_id_idx').on(table.messageId),
-}));
-
-export const reactionRole = pgTable('reaction_role', {
-    id: uuid('id').defaultRandom().primaryKey(),
-    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
-    reactionRoleMessageId: uuid('reaction_role_message_id').references(() => reactionRoleMessage.id, { onDelete: 'cascade' }),
-    messageId: text('message_id').notNull(),
-    channelId: text('channel_id').notNull(),
-    // 🆕 For reactions: emoji, for buttons: button label/emoji
-    emoji: text('emoji'),
-    label: text('label'), // 🆕 For buttons: button text
-    roleId: text('role_id').notNull(),
-    type: reactionRoleTypeEnum('type').default('TOGGLE').notNull(),
-    // 🆕 For buttons: style (PRIMARY, SECONDARY, SUCCESS, DANGER)
-    style: roleComponentStyleEnum('style').default('PRIMARY'),
-    exclusiveRoleIds: text('exclusive_role_ids').array(),
-    description: text('description'), // 🆕 For dropdowns: option description
-    enabled: boolean('enabled').default(true).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
-}, (table) => ({
-    guildMessageIdx: index('reaction_role_guild_message_idx').on(table.guildId, table.messageId),
-    messageEmojiUnique: uniqueIndex('reaction_role_message_emoji_unique').on(table.messageId, table.emoji),
-    guildIdIdx: index('reaction_role_guild_id_idx').on(table.guildId),
-    reactionRoleMessageIdx: index('reaction_role_reaction_role_message_idx').on(table.reactionRoleMessageId),
-}));
-
 // 🆕 Welcome System Configuration (ProBot-style)
 export const welcomeConfig = pgTable('welcome_config', {
     id: uuid('id').defaultRandom().primaryKey(),
@@ -782,12 +733,6 @@ export type NewCommandConfig = typeof commandConfig.$inferInsert;
 
 export type ModuleState = typeof moduleState.$inferSelect;
 export type NewModuleState = typeof moduleState.$inferInsert;
-
-export type ReactionRoleMessage = typeof reactionRoleMessage.$inferSelect;
-export type NewReactionRoleMessage = typeof reactionRoleMessage.$inferInsert;
-
-export type ReactionRole = typeof reactionRole.$inferSelect;
-export type NewReactionRole = typeof reactionRole.$inferInsert;
 
 export type WelcomeConfig = typeof welcomeConfig.$inferSelect;
 export type NewWelcomeConfig = typeof welcomeConfig.$inferInsert;
@@ -1173,5 +1118,3 @@ export type NewWebhookDelivery = typeof webhookDelivery.$inferInsert;
 
 export type ApiKey = typeof apiKey.$inferSelect;
 export type NewApiKey = typeof apiKey.$inferInsert;
-
-

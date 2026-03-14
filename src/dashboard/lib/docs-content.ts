@@ -14,7 +14,7 @@ export interface CommandOptionDoc {
 
 export interface SlashCommandDoc {
     command: string;
-    category: "public" | "config" | "moderation" | "reaction-roles";
+    category: "public" | "config" | "moderation";
     description: string;
     permission: string;
     options: CommandOptionDoc[];
@@ -767,69 +767,6 @@ export const slashCommands: SlashCommandDoc[] = [
         examples: ["/cases user:@Member", "/cases user:@Member active_only:true page:2"],
     },
     {
-        command: "/reactionrole create",
-        category: "reaction-roles",
-        description: "Create reaction-role message embed in target channel.",
-        permission: "Manage Roles",
-        options: [
-            { name: "channel", type: "text channel", required: true, description: "Message destination channel." },
-            { name: "title", type: "string", required: true, description: "Panel title." },
-            { name: "description", type: "string", required: false, description: "Panel description." },
-        ],
-        examples: ["/reactionrole create channel:#roles title:Choose your roles"],
-    },
-    {
-        command: "/reactionrole add",
-        category: "reaction-roles",
-        description: "Attach one emoji->role mapping to an existing message.",
-        permission: "Manage Roles",
-        options: [
-            { name: "message_id", type: "string", required: true, description: "Message ID hosting reaction roles." },
-            { name: "channel", type: "text channel", required: true, description: "Channel containing the message." },
-            { name: "role", type: "role", required: true, description: "Role to assign." },
-            { name: "emoji", type: "string", required: true, description: "Unicode or custom emoji." },
-            {
-                name: "type",
-                type: "string",
-                required: false,
-                description: "Reaction behavior mode.",
-                choices: ["TOGGLE", "ADD_ONLY", "REMOVE_ONLY", "UNIQUE"],
-            },
-            { name: "description", type: "string", required: false, description: "Optional helper text for mapping." },
-        ],
-        examples: ["/reactionrole add message_id:... channel:#roles role:@Gamer emoji:🎮 type:TOGGLE"],
-    },
-    {
-        command: "/reactionrole remove",
-        category: "reaction-roles",
-        description: "Remove one reaction-role mapping by message and emoji.",
-        permission: "Manage Roles",
-        options: [
-            { name: "message_id", type: "string", required: true, description: "Message ID." },
-            { name: "emoji", type: "string", required: true, description: "Mapped emoji." },
-        ],
-        examples: ["/reactionrole remove message_id:... emoji:🎮"],
-    },
-    {
-        command: "/reactionrole list",
-        category: "reaction-roles",
-        description: "List active reaction role mappings for the guild.",
-        permission: "Manage Roles",
-        options: [],
-        examples: ["/reactionrole list"],
-    },
-    {
-        command: "/reactionrole delete",
-        category: "reaction-roles",
-        description: "Delete all reaction-role mappings tied to a message.",
-        permission: "Manage Roles",
-        options: [
-            { name: "message_id", type: "string", required: true, description: "Message ID." },
-            { name: "channel", type: "text channel", required: true, description: "Channel containing the message." },
-        ],
-        examples: ["/reactionrole delete message_id:... channel:#roles"],
-    },
-    {
         command: "/create",
         category: "public",
         description: "Create a server event with scheduling, optional recurrence, role restrictions, and Discord mirroring.",
@@ -1251,41 +1188,6 @@ export const modules: ModuleDoc[] = [
             "Mute/unmute fails when mute role is missing or unmanaged.",
             "Auto-mod appears inactive when feature toggles are off.",
             "Bulk clear cannot delete messages older than 14 days.",
-        ],
-    },
-    {
-        slug: "reaction-roles",
-        title: "Reaction Roles",
-        summary: "Self-assign roles from message reactions. Dashboard supports creating and sending messages directly to Discord.",
-        dashboardRoute: "/dashboard/[guildId]/reaction-roles",
-        apiRoutes: [
-            "GET/POST /api/guilds/[guildId]/reaction-roles/messages",
-            "PATCH /api/guilds/[guildId]/reaction-roles/messages (send to Discord)",
-            "DELETE /api/guilds/[guildId]/reaction-roles/messages?id=<id>",
-            "GET/POST /api/guilds/[guildId]/reaction-roles",
-            "DELETE /api/guilds/[guildId]/reaction-roles?id=<id>",
-        ],
-        tables: ["reaction_role_message", "reaction_role"],
-        commandRefs: [
-            "/reactionrole create",
-            "/reactionrole add",
-            "/reactionrole remove",
-            "/reactionrole list",
-            "/reactionrole delete",
-        ],
-        runtimeRefs: ["events/messageReactionAdd.ts", "events/messageReactionRemove.ts"],
-        workflow: [
-            "Create message content and embed in dashboard Messages tab.",
-            "Send message to Discord using 'Send to Discord' button.",
-            "Add reaction roles in Roles tab (emoji + role mappings).",
-            "Bot automatically adds emoji reactions to message.",
-            "Test with non-admin member account.",
-        ],
-        failureModes: [
-            "Role not applied when bot lacks Manage Roles.",
-            "Role above bot in hierarchy prevents assignment.",
-            "Duplicate mapping blocked for same message+emoji pair.",
-            "Message not sent when bot lacks Send Messages permission.",
         ],
     },
     {

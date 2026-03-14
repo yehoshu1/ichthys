@@ -13,7 +13,7 @@ const mockLogger = {
     error: vi.fn(),
 };
 
-vi.mock('../services/event-service', () => ({
+vi.mock('../../services/event-service', () => ({
     eventService: mockEventService,
 }));
 
@@ -21,7 +21,7 @@ vi.mock('@shared/modules/state', () => ({
     isModuleEnabled: mockIsModuleEnabled,
 }));
 
-vi.mock('../utils/logger', () => ({
+vi.mock('../../utils/logger', () => ({
     default: mockLogger,
 }));
 
@@ -31,7 +31,7 @@ describe('event-start job', () => {
     });
 
     it('sends start embed with mention roles, attendees field, and assigns attendee role', async () => {
-        const { execute } = await import('./event-start');
+        const { execute } = await import('../../jobs/event-start');
 
         const send = vi.fn().mockResolvedValue(undefined);
         const fetchedMemberRoleAdd = vi.fn().mockResolvedValue(undefined);
@@ -105,7 +105,7 @@ describe('event-start job', () => {
     });
 
     it('skips events when events module is disabled', async () => {
-        const { execute } = await import('./event-start');
+        const { execute } = await import('../../jobs/event-start');
 
         const send = vi.fn();
         const channel = {
@@ -152,7 +152,7 @@ describe('event-start job', () => {
     });
 
     it('sends embed without role mentions when mentionOnStart is disabled', async () => {
-        const { execute } = await import('./event-start');
+        const { execute } = await import('../../jobs/event-start');
 
         const send = vi.fn().mockResolvedValue(undefined);
         const channel = {
@@ -204,7 +204,7 @@ describe('event-start job', () => {
     });
 
     it('logs warning and skips when channel cannot be resolved', async () => {
-        const { execute } = await import('./event-start');
+        const { execute } = await import('../../jobs/event-start');
 
         const guild = {
             id: 'guild-1',

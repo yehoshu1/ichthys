@@ -3,18 +3,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../components/ui/table";
 import { scripts, slashCommands } from "../../../../lib/docs-content";
 
-const categoryOrder: Array<"public" | "config" | "moderation" | "reaction-roles"> = [
+const categoryOrder: Array<"public" | "config" | "moderation"> = [
     "public",
     "config",
     "moderation",
-    "reaction-roles",
 ];
 
 const categoryLabel: Record<(typeof categoryOrder)[number], string> = {
     public: "Public",
     config: "Configuration",
     moderation: "Moderation",
-    "reaction-roles": "Reaction Roles",
 };
 
 export default function DocsDevCommandsPage() {

@@ -12,7 +12,7 @@ const mockLogger = {
     error: vi.fn(),
 };
 
-vi.mock('../services/event-service', () => ({
+vi.mock('../../services/event-service', () => ({
     eventService: mockEventService,
 }));
 
@@ -20,7 +20,7 @@ vi.mock('@shared/modules/state', () => ({
     isModuleEnabled: mockIsModuleEnabled,
 }));
 
-vi.mock('../utils/logger', () => ({
+vi.mock('../../utils/logger', () => ({
     default: mockLogger,
 }));
 
@@ -30,7 +30,7 @@ describe('event-complete job', () => {
     });
 
     it('marks active events complete when explicit end time has passed', async () => {
-        const { execute } = await import('./event-complete');
+        const { execute } = await import('../../jobs/event-complete');
 
         const now = Date.now();
         mockEventService.getActiveEvents.mockResolvedValue([
@@ -50,7 +50,7 @@ describe('event-complete job', () => {
     });
 
     it('uses duration fallback and default 60 minutes to complete overdue events', async () => {
-        const { execute } = await import('./event-complete');
+        const { execute } = await import('../../jobs/event-complete');
 
         const now = Date.now();
         mockEventService.getActiveEvents.mockResolvedValue([
@@ -78,7 +78,7 @@ describe('event-complete job', () => {
     });
 
     it('does not complete future events or disabled-module events', async () => {
-        const { execute } = await import('./event-complete');
+        const { execute } = await import('../../jobs/event-complete');
 
         const now = Date.now();
         mockEventService.getActiveEvents.mockResolvedValue([

@@ -24,7 +24,6 @@ For implementation-level detail per module, use:
 
 ### Role Management
 - [Role Actions](modules/role-actions.md)
-- [Reaction Roles](modules/reaction-roles.md)
 
 ### Moderation & Analytics
 - [Moderation](modules/moderation.md)
@@ -592,13 +591,6 @@ Create self-assignable roles via reactions, buttons, or dropdowns.
      - **Remove Only**: Can only remove role
      - **Unique**: Only one role from group
 5. Post the message
-
-#### Managing Reaction Roles
-
-- View all reaction role messages
-- Edit role mappings
-- Delete messages
-- Track assignment counts
 
 ---
 
