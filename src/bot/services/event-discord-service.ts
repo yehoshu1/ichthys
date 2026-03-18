@@ -181,10 +181,10 @@ export class EventDiscordService {
         const embed = await this.buildEventEmbed(event, guild);
         const buttons = this.buildRsvpButtons(event.id, !this.isEventInteractable(event.status));
 
-        // Build mention string
+        // Build mention string — only the create role (first entry in the array)
         let mentionContent = '';
         if (event.mentionOnCreate && event.mentionRoleIds?.length) {
-            mentionContent = event.mentionRoleIds.map(id => `<@&${id}>`).join(' ');
+            mentionContent = `<@&${event.mentionRoleIds[0]}>`;
         }
 
         const message = await channel.send({
