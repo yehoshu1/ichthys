@@ -1,5 +1,5 @@
 import { Client } from 'discord.js';
-import { eq, and, isNull, sql } from 'drizzle-orm';
+import { eq, and, isNull, lt, sql } from 'drizzle-orm';
 import { db } from '@shared/database/client';
 import { event } from '@shared/database/schema';
 import { isModuleEnabled } from '@shared/modules/state';
@@ -46,13 +46,18 @@ export class EventMessageSyncJob {
     }
 
     private async syncNewEvents(): Promise<void> {
-        // Find events without messageId (newly created events)
+        // Find events without messageId that were created at least 15 seconds ago.
+        // The 15-second buffer ensures the /event create command (which posts the
+        // message inline) has already stored the messageId before we attempt a
+        // fallback post here, preventing duplicate Discord messages.
+        const fifteenSecondsAgo = new Date(Date.now() - 15000);
         const newEvents = await db
             .select()
             .from(event)
             .where(and(
                 isNull(event.messageId),
-                eq(event.status, 'SCHEDULED')
+                eq(event.status, 'SCHEDULED'),
+                lt(event.createdAt, fifteenSecondsAgo)
             ))
             .limit(10);
 
