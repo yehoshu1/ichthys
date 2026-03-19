@@ -31,6 +31,8 @@ import {
     CalendarDays,
     BarChart3,
     Webhook,
+    Eye,
+    Clock,
     type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
@@ -77,6 +79,8 @@ const navIconById: Record<DashboardNavId, LucideIcon> = {
     aliases: MessageSquare,
     commands: TerminalSquare,
     moderation: Shield,
+    watchlist: Eye,
+    tools: Clock,
     logs: ScrollText,
     settings: Settings,
     docs: BookOpen,
