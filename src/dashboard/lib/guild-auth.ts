@@ -6,24 +6,20 @@ import logger from "./logger";
 import { requireGuildModuleEnabledForPath } from "./module-gate";
 import { requireSameOrigin } from "./csrf";
 import { buildRateLimitKey, checkRateLimit, DEFAULT_RATE_LIMIT } from "./rate-limit";
+import { evaluateRbac, getModuleIdFromPath, type DiscordGuildInfo } from "./rbac";
 
 const MANAGE_GUILD = 0x20n;
 const MANAGE_ROLES = 0x10000000n;
+const ADMINISTRATOR = 0x8n;
 const GUILD_CACHE_TTL_MS = 5 * 60_000; // 5 minutes
 const GUILD_CACHE_STALE_WINDOW_MS = 15 * 60_000; // Serve stale data on Discord rate limits
 const MAX_GUILD_CACHE_ENTRIES = 2_000;
 
 interface GuildAccessCacheEntry {
-    guildPermissions: Map<string, DiscordGuildPermissionPayload>;
+    guildPermissions: Map<string, DiscordGuildInfo>;
     expiresAt: number;
     staleUntil: number;
     cachedAt: number;
-}
-
-interface DiscordGuildPermissionPayload {
-    id: string;
-    owner: boolean;
-    permissions: string;
 }
 
 export interface GuildAuthSuccess {
@@ -37,7 +33,7 @@ interface GuildAuthFailure {
 }
 
 const guildAccessCache = new Map<string, GuildAccessCacheEntry>();
-const guildPermissionsInFlight = new Map<string, Promise<Map<string, DiscordGuildPermissionPayload> | GuildAuthFailure>>();
+const guildPermissionsInFlight = new Map<string, Promise<Map<string, DiscordGuildInfo> | GuildAuthFailure>>();
 
 function jsonError(status: number, error: string): GuildAuthFailure {
     return {
@@ -71,20 +67,22 @@ function cleanupGuildAccessCache(now: number): void {
 }
 
 function hasRequiredPermissions(
-    guild: DiscordGuildPermissionPayload | undefined,
+    guild: DiscordGuildInfo | undefined,
     requiredPermissions: bigint[]
 ): boolean {
     if (!guild) return false;
     if (guild.owner) return true;
 
     const permissions = BigInt(guild.permissions);
+    // ADMINISTRATOR implicitly grants all permissions
+    if ((permissions & ADMINISTRATOR) === ADMINISTRATOR) return true;
     return requiredPermissions.every((permission) => (permissions & permission) === permission);
 }
 
 async function getGuildPermissions(
     userId: string,
     accessToken: string
-): Promise<Map<string, DiscordGuildPermissionPayload> | GuildAuthFailure> {
+): Promise<Map<string, DiscordGuildInfo> | GuildAuthFailure> {
     const now = Date.now();
     cleanupGuildAccessCache(now);
     const cached = guildAccessCache.get(userId);
@@ -136,8 +134,8 @@ async function getGuildPermissions(
             return jsonError(503, `Failed to validate guild permissions - Discord API ${response.status}`);
         }
 
-        const guilds = await response.json() as DiscordGuildPermissionPayload[];
-        const guildPermissions = new Map<string, DiscordGuildPermissionPayload>();
+        const guilds = await response.json() as DiscordGuildInfo[];
+        const guildPermissions = new Map<string, DiscordGuildInfo>();
         for (const guild of guilds) guildPermissions.set(guild.id, guild);
 
         const cachedAt = Date.now();
@@ -189,7 +187,8 @@ export async function requireSession(req: NextRequest): Promise<GuildAuthSuccess
 async function requireGuildAccess(
     guildId: string,
     req: NextRequest,
-    requiredPermissions: bigint[]
+    requiredPermissions: bigint[],
+    options: { skipRbac?: boolean } = {}
 ): Promise<GuildAuthSuccess | GuildAuthFailure> {
     const sessionResult = await requireSession(req);
     if (isFailure(sessionResult)) {
@@ -216,9 +215,26 @@ async function requireGuildAccess(
             isOwner: guild?.owner,
             permissions: guild?.permissions
         });
-        if (!hasRequiredPermissions(guild, requiredPermissions)) {
-            logger.error("Permission denied", { guildId, userId: sessionResult.userId });
-            return jsonError(403, "Forbidden - You don't have MANAGE_GUILD permission");
+
+        const hasPerms = hasRequiredPermissions(guild, requiredPermissions);
+        if (!hasPerms) {
+            // Attempt RBAC delegation (unless this route skips it)
+            if (!options.skipRbac) {
+                const moduleId = getModuleIdFromPath(req.nextUrl.pathname);
+                const action = req.method === 'GET' ? 'view' : 'edit';
+                const rbacAllowed = await evaluateRbac(guildId, sessionResult.userId, moduleId, action, guild).catch((err) => {
+                    logger.error("RBAC evaluation error", { error: err instanceof Error ? err.message : String(err), guildId, userId: sessionResult.userId });
+                    return false as const;
+                });
+
+                if (!rbacAllowed) {
+                    logger.warn("Permission denied (RBAC)", { guildId, userId: sessionResult.userId, moduleId, action });
+                    return jsonError(403, "Forbidden - You don't have permission to access this resource");
+                }
+            } else {
+                logger.error("Permission denied (strict)", { guildId, userId: sessionResult.userId });
+                return jsonError(403, "Forbidden - You don't have MANAGE_GUILD permission");
+            }
         }
 
         const moduleGuardResponse = await requireGuildModuleEnabledForPath(guildId, req.nextUrl.pathname);
@@ -239,9 +255,36 @@ export async function requireGuildManageAccess(
     return requireGuildAccess(guildId, req, [MANAGE_GUILD]);
 }
 
+/**
+ * Strict access check: requires MANAGE_GUILD (or owner/ADMINISTRATOR).
+ * RBAC delegation is intentionally skipped — use this for the RBAC
+ * configuration endpoint itself and other routes that must never be delegatable.
+ */
+export async function requireGuildManageStrictAccess(
+    guildId: string,
+    req: NextRequest
+): Promise<GuildAuthSuccess | GuildAuthFailure> {
+    return requireGuildAccess(guildId, req, [MANAGE_GUILD], { skipRbac: true });
+}
+
 export async function requireGuildManageRolesAccess(
     guildId: string,
     req: NextRequest
 ): Promise<GuildAuthSuccess | GuildAuthFailure> {
     return requireGuildAccess(guildId, req, [MANAGE_GUILD, MANAGE_ROLES]);
+}
+
+/**
+ * Retrieve guild permissions for a user (for use in non-route contexts such
+ * as the /me/access endpoint).  Returns null if the user is not in the guild
+ * or if fetching fails.
+ */
+export async function getGuildInfoForUser(
+    userId: string,
+    accessToken: string,
+    guildId: string
+): Promise<DiscordGuildInfo | null> {
+    const result = await getGuildPermissions(userId, accessToken);
+    if (!(result instanceof Map)) return null;
+    return result.get(guildId) ?? null;
 }

@@ -15,6 +15,7 @@ export type DashboardNavId =
     | "moderation"
     | "logs"
     | "settings"
+    | "access"
     | "docs";
 
 export interface DashboardNavItem {
@@ -40,6 +41,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
     { id: "commands", name: "Commands", href: "/commands", moduleSlug: "settings-backups", keywords: ["command config", "aliases", "limits", "access"] },
     { id: "moderation", name: "Moderation", href: "/moderation", moduleSlug: "moderation", keywords: ["warn", "ban", "mute", "automod"] },
     { id: "settings", name: "Settings", href: "/settings", moduleSlug: "settings-backups", keywords: ["import", "export", "backup", "restore"] },
+    { id: "access", name: "Access Control", href: "/settings/access", keywords: ["rbac", "roles", "permissions", "delegate", "access control"] },
     { id: "webhooks", name: "Webhooks & API", href: "/webhooks", moduleSlug: "webhooks", keywords: ["webhook", "api", "integration", "endpoint", "automation"] },
     { id: "docs", name: "Documentation", href: "/docs", keywords: ["guides", "docs", "help"] },
 ];

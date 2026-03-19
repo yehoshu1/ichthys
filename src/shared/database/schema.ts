@@ -6,6 +6,7 @@ import {
     jsonb,
     pgEnum,
     pgTable,
+    primaryKey,
     text,
     timestamp,
     uniqueIndex,
@@ -1080,6 +1081,29 @@ export const apiKey = pgTable('api_key', {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// RBAC (Role-Based Access Control) for Dashboard
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const rbacDefaultAccessEnum = pgEnum('rbac_default_access', ['manage_guild_only', 'deny']);
+
+export const dashboardRbacConfig = pgTable('dashboard_rbac_config', {
+    guildId: text('guild_id').primaryKey(),
+    enabled: boolean('enabled').default(false).notNull(),
+    defaultAccess: rbacDefaultAccessEnum('default_access').default('manage_guild_only').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+});
+
+export const dashboardRbacRules = pgTable('dashboard_rbac_rules', {
+    guildId: text('guild_id').notNull().references(() => dashboardRbacConfig.guildId, { onDelete: 'cascade' }),
+    moduleId: text('module_id').notNull(),
+    allowedViewRoles: jsonb('allowed_view_roles').$type<string[]>().default([]).notNull(),
+    allowedEditRoles: jsonb('allowed_edit_roles').$type<string[]>().default([]).notNull(),
+}, (table) => ({
+    pk: primaryKey({ columns: [table.guildId, table.moduleId] }),
+    guildIdIdx: index('dashboard_rbac_rules_guild_id_idx').on(table.guildId),
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TYPE EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1118,3 +1142,9 @@ export type NewWebhookDelivery = typeof webhookDelivery.$inferInsert;
 
 export type ApiKey = typeof apiKey.$inferSelect;
 export type NewApiKey = typeof apiKey.$inferInsert;
+
+export type DashboardRbacConfig = typeof dashboardRbacConfig.$inferSelect;
+export type NewDashboardRbacConfig = typeof dashboardRbacConfig.$inferInsert;
+
+export type DashboardRbacRule = typeof dashboardRbacRules.$inferSelect;
+export type NewDashboardRbacRule = typeof dashboardRbacRules.$inferInsert;
