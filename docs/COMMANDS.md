@@ -189,9 +189,10 @@ Current slash command files: `31`
 - Permission: Everyone.
 - Options:
   - `user` (user, optional): The user to get the avatar of. Defaults to command user.
-  - `type` (string, optional): `server`, `global`, `banner`.
+  - `type` (string, optional): `server` (Server Avatar), `global` (Global Avatar), `banner_global` (Global Banner), `banner_server` (Server Banner).
 - Example: `/avatar`
-- Example: `/avatar user:@Member type:banner`
+- Example: `/avatar user:@Member type:banner_global`
+- Example: `/avatar user:@Member type:banner_server`
 - Example: `/avatar user:@Member type:server`
 
 ### `/server`

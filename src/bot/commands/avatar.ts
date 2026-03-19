@@ -17,7 +17,8 @@ const command: Command = {
                 .addChoices(
                     { name: 'Server Avatar', value: 'server' },
                     { name: 'Global Avatar', value: 'global' },
-                    { name: 'Banner', value: 'banner' }
+                    { name: 'Global Banner', value: 'banner_global' },
+                    { name: 'Server Banner', value: 'banner_server' }
                 )),
 
     async execute(interaction) {
@@ -30,20 +31,47 @@ const command: Command = {
             const member = interaction.guild?.members.cache.get(targetUser.id);
             let embed = new EmbedBuilder();
 
-            if (imageType === 'banner') {
-                // Fetch user to get banner (may need to fetch if not cached)
+            if (imageType === 'banner_global') {
+                // Fetch user to get global banner (may need to fetch if not cached)
                 const fetchedUser = await targetUser.fetch();
                 const bannerURL = fetchedUser.bannerURL({ size: 4096 });
 
                 if (!bannerURL) {
-                    await interaction.editReply({ content: '❌ This user does not have a banner.' });
+                    await interaction.editReply({ content: '❌ This user does not have a global banner.' });
                     return;
                 }
 
                 embed = embed
-                    .setTitle(`${targetUser.username}'s Banner`)
+                    .setTitle(`${targetUser.username}'s Global Banner`)
                     .setImage(bannerURL)
                     .setColor(fetchedUser.accentColor || '#5865F2');
+            } else if (imageType === 'banner_server') {
+                // Fetch member to get server-specific banner
+                const fetchedMember = member ?? await interaction.guild?.members.fetch(targetUser.id);
+                const bannerURL = fetchedMember?.bannerURL({ size: 4096 }) ?? null;
+                const isServerBanner = fetchedMember?.banner != null;
+
+                if (!isServerBanner) {
+                    // Fall back to global banner with a note
+                    const fetchedUser = await targetUser.fetch();
+                    const globalBannerURL = fetchedUser.bannerURL({ size: 4096 });
+
+                    if (!globalBannerURL) {
+                        await interaction.editReply({ content: '❌ This user does not have a server or global banner.' });
+                        return;
+                    }
+
+                    embed = embed
+                        .setTitle(`${targetUser.username}'s Banner`)
+                        .setImage(globalBannerURL)
+                        .setDescription('*This user does not have a server-specific banner. Showing global banner.*')
+                        .setColor(fetchedUser.accentColor || '#5865F2');
+                } else {
+                    embed = embed
+                        .setTitle(`${targetUser.username}'s Server Banner`)
+                        .setImage(bannerURL)
+                        .setColor(fetchedMember?.displayHexColor || '#5865F2');
+                }
             } else if (imageType === 'server' && member) {
                 // Server-specific avatar
                 const avatarURL = member.displayAvatarURL({ size: 4096 });
