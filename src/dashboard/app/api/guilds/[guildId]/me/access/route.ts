@@ -1,30 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession } from "@/lib/guild-auth";
-import { getGuildInfoForUser } from "@/lib/guild-auth";
-import { evaluateRbac, isHardBypassUser } from "@/lib/rbac";
+import { requireSession, getGuildInfoForUser } from "@/lib/guild-auth";
+import { evaluateRbacBatch, isHardBypassUser } from "@/lib/rbac";
+import { RBAC_MODULE_IDS, type RbacModuleId } from "@/lib/rbac-modules";
 import logger from "@/lib/logger";
-
-// The definitive list of modules exposed for RBAC evaluation.
-// These map to the API path segment immediately after /api/guilds/[guildId]/.
-const RBAC_MODULES = [
-    "welcome",
-    "verification",
-    "leveling",
-    "boosts",
-    "birthdays",
-    "role-actions",
-    "aliases",
-    "commands",
-    "moderation",
-    "settings",
-    "webhooks",
-    "events",
-    "polls",
-    "notifications",
-    "analytics",
-] as const;
-
-type RbacModuleId = (typeof RBAC_MODULES)[number];
 
 interface ModuleAccess {
     view: boolean;
@@ -42,6 +20,9 @@ interface AccessResponse {
  * Returns the authenticated user's view/edit access for each dashboard module.
  * Hard-bypass users (owner / ADMINISTRATOR / MANAGE_GUILD) get full access to
  * everything.  All others are evaluated via the RBAC system.
+ *
+ * Uses evaluateRbacBatch to fetch config and all rules in a single DB round-trip
+ * rather than issuing separate queries for each module.
  */
 export async function GET(
     req: NextRequest,
@@ -71,31 +52,37 @@ export async function GET(
 
     const isBypassUser = isHardBypassUser(guild ?? undefined);
 
-    // Build module access map
-    const modules = {} as Record<RbacModuleId, ModuleAccess>;
+    let moduleResults: Record<string, ModuleAccess>;
 
     if (isBypassUser) {
-        for (const moduleId of RBAC_MODULES) {
-            modules[moduleId] = { view: true, edit: true };
-        }
-    } else {
-        await Promise.all(
-            RBAC_MODULES.map(async (moduleId) => {
-                const [canView, canEdit] = await Promise.all([
-                    evaluateRbac(guildId, userId, moduleId, "view", guild ?? undefined).catch((err) => {
-                        logger.warn("RBAC view evaluation failed", { moduleId, guildId, userId, error: err instanceof Error ? err.message : String(err) });
-                        return false;
-                    }),
-                    evaluateRbac(guildId, userId, moduleId, "edit", guild ?? undefined).catch((err) => {
-                        logger.warn("RBAC edit evaluation failed", { moduleId, guildId, userId, error: err instanceof Error ? err.message : String(err) });
-                        return false;
-                    }),
-                ]);
-                modules[moduleId] = { view: canView, edit: canEdit };
-            })
+        // Bypass users get full access to every module without touching the DB.
+        moduleResults = Object.fromEntries(
+            RBAC_MODULE_IDS.map((id) => [id, { view: true, edit: true }])
         );
+    } else {
+        try {
+            moduleResults = await evaluateRbacBatch(
+                guildId,
+                userId,
+                RBAC_MODULE_IDS,
+                guild ?? undefined
+            );
+        } catch (error) {
+            logger.error("RBAC batch evaluation failed for /me/access", {
+                error: error instanceof Error ? error.message : String(error),
+                guildId,
+                userId,
+            });
+            // Fail safe: deny all modules on unexpected error.
+            moduleResults = Object.fromEntries(
+                RBAC_MODULE_IDS.map((id) => [id, { view: false, edit: false }])
+            );
+        }
     }
 
-    const response: AccessResponse = { isBypassUser, modules };
+    const response: AccessResponse = {
+        isBypassUser,
+        modules: moduleResults as Record<RbacModuleId, ModuleAccess>,
+    };
     return NextResponse.json(response);
 }

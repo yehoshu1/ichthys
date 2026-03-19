@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { db } from "@/lib/db";
-import { dashboardRbacConfig, dashboardRbacRules } from "@/lib/db";
+import { db, dashboardRbacConfig, dashboardRbacRules } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { requireGuildManageStrictAccess } from "@/lib/guild-auth";
+import { RBAC_MODULE_IDS } from "@/lib/rbac-modules";
 import logger from "@/lib/logger";
 
 // ─── Validation Schemas ────────────────────────────────────────────────────────
 
-const roleIdSchema = z.string().regex(/^\d{17,20}$/, "Invalid Discord role ID");
+// Discord snowflake IDs are 17–19 digits.
+const roleIdSchema = z.string().regex(/^\d{17,19}$/, "Invalid Discord role ID");
 
 const rbacRuleSchema = z.object({
-    moduleId: z.string().min(1).max(64),
+    // Only known module IDs are accepted; unknown strings are rejected.
+    moduleId: z.enum(RBAC_MODULE_IDS),
     allowedViewRoles: z.array(roleIdSchema).default([]),
     allowedEditRoles: z.array(roleIdSchema).default([]),
 });

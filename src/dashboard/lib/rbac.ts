@@ -28,11 +28,30 @@ const memberRolesCache = new Map<string, MemberRolesCacheEntry>();
 const MEMBER_CACHE_TTL_MS = 60_000; // 60 seconds
 const MAX_MEMBER_CACHE_ENTRIES = 5_000;
 
+/**
+ * Evicts all expired entries, then — if still over capacity — removes the
+ * entries that will expire soonest (i.e. those with the oldest cached data).
+ *
+ * Previously this only ran when the cache exceeded its maximum size, meaning
+ * expired entries would persist indefinitely in low-traffic deployments and
+ * grant stale permissions until the process restarted.
+ */
 function cleanupMemberRolesCache(now: number): void {
-    if (memberRolesCache.size <= MAX_MEMBER_CACHE_ENTRIES) return;
+    // Always evict expired entries to enforce the 60-second TTL.
     for (const [key, entry] of memberRolesCache.entries()) {
         if (entry.expiresAt <= now) {
             memberRolesCache.delete(key);
+        }
+    }
+
+    // If still over capacity after expiry cleanup, evict the entries that
+    // expire soonest (they hold the oldest cached data).
+    if (memberRolesCache.size > MAX_MEMBER_CACHE_ENTRIES) {
+        const entries = Array.from(memberRolesCache.entries())
+            .sort((a, b) => a[1].expiresAt - b[1].expiresAt);
+        const overflow = memberRolesCache.size - MAX_MEMBER_CACHE_ENTRIES;
+        for (let i = 0; i < overflow; i++) {
+            memberRolesCache.delete(entries[i][0]);
         }
     }
 }
@@ -130,7 +149,9 @@ export function getModuleIdFromPath(pathname: string): string {
  *  C. Fetch user's Discord role IDs via bot token
  *  D. Fetch dashboardRbacRules for (guildId, moduleId)
  *  E. If rule exists: check edit roles (edit implies view), then view roles
- *  F. If no rule: apply default_access (both options deny non-bypass users)
+ *  F. If no rule exists: deny. Both default_access values ('manage_guild_only'
+ *     and 'deny') result in denial for non-bypass users — bypass users already
+ *     returned true in Step A.
  */
 export async function evaluateRbac(
     guildId: string,
@@ -173,15 +194,92 @@ export async function evaluateRbac(
         const editRoles = rule.allowedEditRoles ?? [];
         const viewRoles = rule.allowedViewRoles ?? [];
 
-        // Edit access (edit implies view)
+        // Edit roles grant both edit and view access.
         if (editRoles.some((r) => userRoles.includes(r))) return true;
 
-        // View-only access
+        // View roles only grant view access.
         if (action === 'view' && viewRoles.some((r) => userRoles.includes(r))) return true;
 
         return false;
     }
 
-    // Step F: No rule — apply default_access (both values deny non-bypass users)
+    // Step F: No rule — deny. Bypass users already returned true in Step A,
+    // so regardless of default_access value, non-bypass users are denied.
     return false;
+}
+
+// ─── Batch RBAC Evaluation ─────────────────────────────────────────────────────
+
+export interface ModuleAccessResult {
+    view: boolean;
+    edit: boolean;
+}
+
+/**
+ * Evaluate a user's access for multiple modules in a single operation.
+ *
+ * Unlike calling evaluateRbac() for each module (which issues separate DB
+ * queries for every module), this function fetches the RBAC config once, the
+ * user's Discord roles once (using the shared 60-second cache), and all
+ * applicable rules in a single query — then evaluates everything in memory.
+ *
+ * Use this in the /me/access endpoint to avoid O(n) database round-trips.
+ */
+export async function evaluateRbacBatch(
+    guildId: string,
+    userId: string,
+    moduleIds: readonly string[],
+    guild: DiscordGuildInfo | undefined
+): Promise<Record<string, ModuleAccessResult>> {
+    const deny = (): ModuleAccessResult => ({ view: false, edit: false });
+    const allow = (): ModuleAccessResult => ({ view: true, edit: true });
+
+    // Step A: Hard bypass — all modules get full access immediately.
+    if (isHardBypassUser(guild)) {
+        return Object.fromEntries(moduleIds.map((id) => [id, allow()]));
+    }
+
+    // Step B: Fetch RBAC config once.
+    const [config] = await db
+        .select()
+        .from(dashboardRbacConfig)
+        .where(eq(dashboardRbacConfig.guildId, guildId))
+        .limit(1);
+
+    if (!config || !config.enabled) {
+        return Object.fromEntries(moduleIds.map((id) => [id, deny()]));
+    }
+
+    // Step C: Fetch user's role IDs once (uses 60-second cache).
+    const userRoles = await fetchBotMemberRoles(guildId, userId);
+
+    // Step D: Fetch all rules for this guild in a single query.
+    const allRules = await db
+        .select()
+        .from(dashboardRbacRules)
+        .where(eq(dashboardRbacRules.guildId, guildId));
+
+    const rulesByModule = new Map(allRules.map((r) => [r.moduleId, r]));
+
+    // Step E/F: Evaluate each module against the fetched rules.
+    const result: Record<string, ModuleAccessResult> = {};
+    for (const moduleId of moduleIds) {
+        const rule = rulesByModule.get(moduleId);
+
+        if (!rule) {
+            // Step F: No rule → deny (same as evaluateRbac Step F).
+            result[moduleId] = deny();
+            continue;
+        }
+
+        const editRoles = rule.allowedEditRoles ?? [];
+        const viewRoles = rule.allowedViewRoles ?? [];
+
+        const canEdit = editRoles.some((r) => userRoles.includes(r));
+        // Edit roles implicitly grant view access.
+        const canView = canEdit || viewRoles.some((r) => userRoles.includes(r));
+        result[moduleId] = { view: canView, edit: canEdit };
+    }
+
+    return result;
 }

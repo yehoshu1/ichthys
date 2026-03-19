@@ -9,7 +9,8 @@ import { Switch } from "../../../../../components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "../../../../../components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../components/ui/select";
 import { MultiSelect } from "../../../../../components/ui/multi-select";
-import { AlertTriangle, CheckCircle2, KeyRound, Loader2, Save, Info } from "lucide-react";
+import { AlertTriangle, CheckCircle2, KeyRound, Loader2, Save, Info, Eye, Pencil } from "lucide-react";
+import { RBAC_MODULE_IDS } from "../../../../../lib/rbac-modules";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -48,23 +49,35 @@ interface ModuleDef {
     description: string;
 }
 
-const MODULES: ModuleDef[] = [
-    { id: "welcome", name: "Welcome", description: "Join/leave messages and welcome cards" },
-    { id: "verification", name: "Verification", description: "Verification workflow and auto-kick" },
-    { id: "leveling", name: "Leveling", description: "XP, levels, and role rewards" },
-    { id: "boosts", name: "Boosts", description: "Boost tracking and rewards" },
-    { id: "birthdays", name: "Birthdays", description: "Birthday announcements" },
-    { id: "role-actions", name: "Role Actions", description: "Automated actions on role changes" },
-    { id: "aliases", name: "Aliases", description: "Auto-responder triggers" },
-    { id: "commands", name: "Commands", description: "Per-command configuration" },
-    { id: "moderation", name: "Moderation", description: "Warnings, mutes, bans, and cases" },
-    { id: "settings", name: "Settings", description: "Import/export and backups" },
-    { id: "webhooks", name: "Webhooks & API", description: "Outgoing webhooks and API keys" },
-    { id: "events", name: "Events", description: "Events, RSVPs, and reminders" },
-    { id: "polls", name: "Polls", description: "Standard, time, and anonymous polls" },
-    { id: "notifications", name: "Logs", description: "Notification events and deliveries" },
-    { id: "analytics", name: "Analytics", description: "Growth and activity analytics" },
-];
+/**
+ * Display metadata for each RBAC module.  The `id` values MUST match the
+ * entries in RBAC_MODULE_IDS so they remain in sync with the API.
+ */
+const MODULE_META: Record<string, Pick<ModuleDef, "name" | "description">> = {
+    welcome:       { name: "Welcome",        description: "Join/leave messages and welcome cards" },
+    verification:  { name: "Verification",   description: "Verification workflow and auto-kick" },
+    leveling:      { name: "Leveling",       description: "XP, levels, and role rewards" },
+    boosts:        { name: "Boosts",         description: "Boost tracking and rewards" },
+    birthdays:     { name: "Birthdays",      description: "Birthday announcements" },
+    "role-actions":{ name: "Role Actions",   description: "Automated actions on role changes" },
+    aliases:       { name: "Aliases",        description: "Auto-responder triggers" },
+    commands:      { name: "Commands",       description: "Per-command configuration" },
+    moderation:    { name: "Moderation",     description: "Warnings, mutes, bans, and cases" },
+    settings:      { name: "Settings",       description: "Import/export and backups" },
+    webhooks:      { name: "Webhooks & API", description: "Outgoing webhooks and API keys" },
+    events:        { name: "Events",         description: "Events, RSVPs, and reminders" },
+    polls:         { name: "Polls",          description: "Standard, time, and anonymous polls" },
+    notifications: { name: "Logs",           description: "Notification events and deliveries" },
+    analytics:     { name: "Analytics",      description: "Growth and activity analytics" },
+};
+
+// Derive the display list from the authoritative RBAC_MODULE_IDS constant so
+// the two never drift out of sync.
+const MODULES: ModuleDef[] = RBAC_MODULE_IDS.map((id) => ({
+    id,
+    name: MODULE_META[id]?.name ?? id,
+    description: MODULE_META[id]?.description ?? "",
+}));
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
@@ -109,7 +122,7 @@ export default function AccessControlPage() {
             }
             setRules(rulesMap);
         } catch (err: unknown) {
-            setLoadError(`Network error: ${err instanceof Error ? err.message : "Please check your connection."}`);
+            setLoadError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
         } finally {
             setIsLoading(false);
         }
@@ -282,6 +295,18 @@ export default function AccessControlPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                    {/* Legend */}
+                    <div className="flex flex-col sm:flex-row gap-3 text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+                        <div className="flex items-center gap-2">
+                            <Eye className="h-4 w-4 shrink-0" />
+                            <span><strong>View</strong> — read-only access to a module.</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Pencil className="h-4 w-4 shrink-0" />
+                            <span><strong>Edit</strong> — full access (automatically includes View).</span>
+                        </div>
+                    </div>
+
                     {MODULES.map((mod) => {
                         const rule = rules.get(mod.id);
                         const viewRoles = rule?.allowedViewRoles ?? [];
@@ -296,8 +321,8 @@ export default function AccessControlPage() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-1.5">
-                                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                                            View Roles
+                                        <Label className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
+                                            <Eye className="h-3 w-3" /> View Roles
                                         </Label>
                                         <MultiSelect
                                             options={roleOptions}
@@ -311,8 +336,8 @@ export default function AccessControlPage() {
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                                            Edit Roles
+                                        <Label className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
+                                            <Pencil className="h-3 w-3" /> Edit Roles <span className="normal-case">(includes View)</span>
                                         </Label>
                                         <MultiSelect
                                             options={roleOptions}

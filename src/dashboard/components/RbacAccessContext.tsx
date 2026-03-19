@@ -27,13 +27,29 @@ export interface RbacAccessContextValue {
 }
 
 const DEFAULT_FULL_ACCESS: ModuleAccess = { view: true, edit: true };
+const DEFAULT_NO_ACCESS: ModuleAccess = { view: false, edit: false };
 
 // ─── Context ───────────────────────────────────────────────────────────────────
 
+/**
+ * Static context default: deny all access.
+ *
+ * This only applies when a component uses `useRbacAccess` outside a
+ * `RbacAccessProvider` tree.  Within the dashboard layout the Provider is
+ * always present, so this value is not normally reached at runtime.
+ *
+ * We deliberately choose "deny" rather than "full access" so that any
+ * accidental usage outside the Provider fails safely (banner shows, forms
+ * are disabled) rather than silently granting permissions.
+ *
+ * The loading-state behaviour (full access while /me/access is in-flight) is
+ * controlled separately by the layout passing `isBypassUser: true` while
+ * `accessData` is null — not by this static default.
+ */
 const RbacAccessContext = createContext<RbacAccessContextValue>({
-    isBypassUser: true,
+    isBypassUser: false,
     modules: {},
-    getAccess: () => DEFAULT_FULL_ACCESS,
+    getAccess: () => DEFAULT_NO_ACCESS,
 });
 
 // ─── Provider ──────────────────────────────────────────────────────────────────
@@ -47,7 +63,7 @@ interface RbacAccessProviderProps {
 export function RbacAccessProvider({ isBypassUser, modules, children }: RbacAccessProviderProps) {
     function getAccess(moduleId: string): ModuleAccess {
         if (isBypassUser) return DEFAULT_FULL_ACCESS;
-        return modules[moduleId] ?? { view: false, edit: false };
+        return modules[moduleId] ?? DEFAULT_NO_ACCESS;
     }
 
     return (
