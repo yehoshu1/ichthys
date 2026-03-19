@@ -62,6 +62,7 @@ import {
     CalendarDays,
     Repeat,
     Palette,
+    ImageIcon,
 } from "lucide-react";
 import { ChannelSelect, RoleSelect, VoiceChannelSelect } from "../../../../components/DiscordSelectors";
 import { toast } from "sonner";
@@ -147,6 +148,7 @@ interface EventFormData {
     repeatFrequency: "NONE" | "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "YEARLY";
     repeatUntil: Date | null;
     mirrorToDiscord: boolean;
+    imageUrl: string;
 }
 
 const REPEAT_OPTIONS = [
@@ -306,6 +308,7 @@ function EventForm({
         repeatFrequency: event?.repeatFrequency || "NONE",
         repeatUntil: event?.repeatUntil ? new Date(event.repeatUntil) : null,
         mirrorToDiscord: event?.mirrorToDiscord ?? true,
+        imageUrl: event?.imageUrl || "",
     });
 
     useEffect(() => {
@@ -450,6 +453,7 @@ function EventForm({
                 endTime: formData.endTime?.toISOString() || undefined,
                 durationMinutes: formData.durationMinutes || undefined,
                 color: formData.color,
+                imageUrl: formData.imageUrl || undefined,
                 maxAttendees: formData.maxAttendees || undefined,
                 enableWaitlist: formData.enableWaitlist,
                 mentionRoleIds: allMentionRoleIds.length > 0 ? allMentionRoleIds : undefined,
@@ -693,6 +697,28 @@ function EventForm({
                         />
                     ))}
                 </div>
+            </div>
+
+            {/* Image URL */}
+            <div className="space-y-2">
+                <Label htmlFor="imageUrl">
+                    <span className="flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4" />
+                        Image URL
+                    </span>
+                </Label>
+                <Input
+                    id="imageUrl"
+                    type="url"
+                    value={formData.imageUrl}
+                    onChange={(e) =>
+                        setFormData({ ...formData, imageUrl: e.target.value })
+                    }
+                    placeholder="https://example.com/image.png"
+                />
+                <HelperText>
+                    Optional image to display on the event embed. Use a direct link to an image file (PNG, JPG, GIF, or WebP).
+                </HelperText>
             </div>
 
             {/* Max Attendees */}
@@ -1052,6 +1078,7 @@ function EventsList({
                     ).toISOString(), // Tomorrow
                     durationMinutes: event.durationMinutes,
                     color: event.color,
+                    imageUrl: event.imageUrl,
                     maxAttendees: event.maxAttendees,
                     enableWaitlist: event.enableWaitlist,
                     requiredRoleIds: event.requiredRoleIds,
