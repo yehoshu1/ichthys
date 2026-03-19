@@ -37,6 +37,7 @@ const MAX_COMMAND_CONFIGS = 500;
 
 const importPayloadSchema = z.object({
     version: z.number().int().min(1),
+    timestamp: z.string().optional(),
     guildId: z.string().optional(),
     config: z.record(z.string(), z.unknown()).nullable().optional(),
     welcomeTriggers: z.array(z.record(z.string(), z.unknown())).max(MAX_TRIGGERS).default([]),
