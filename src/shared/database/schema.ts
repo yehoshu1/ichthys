@@ -407,6 +407,22 @@ export const moderationCase = pgTable('moderation_case', {
     guildActionIdx: index('moderation_case_guild_action_idx').on(table.guildId, table.action),
 }));
 
+export const memberWatchlist = pgTable('member_watchlist', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    addedBy: text('added_by').notNull(),
+    reason: text('reason').notNull(),
+    notes: text('notes'),
+    severity: text('severity').default('LOW').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+}, (table) => ({
+    guildUserUnique: uniqueIndex('member_watchlist_guild_user_unique').on(table.guildId, table.userId),
+    guildIdIdx: index('member_watchlist_guild_id_idx').on(table.guildId),
+    userIdIdx: index('member_watchlist_user_id_idx').on(table.userId),
+}));
+
 export const moderationSettings = pgTable('moderation_settings', {
     id: uuid('id').defaultRandom().primaryKey(),
     guildId: text('guild_id').notNull().references(() => guildConfig.guildId, { onDelete: 'cascade' }),
@@ -715,6 +731,9 @@ export type NewModerationCase = typeof moderationCase.$inferInsert;
 
 export type ModerationSettings = typeof moderationSettings.$inferSelect;
 export type NewModerationSettings = typeof moderationSettings.$inferInsert;
+
+export type MemberWatchlist = typeof memberWatchlist.$inferSelect;
+export type NewMemberWatchlist = typeof memberWatchlist.$inferInsert;
 
 export type BirthdayConfig = typeof birthdayConfig.$inferSelect;
 export type NewBirthdayConfig = typeof birthdayConfig.$inferInsert;
