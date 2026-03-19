@@ -81,8 +81,8 @@ RUN groupadd -r appuser && useradd -r -g appuser -m appuser \
     && chmod -R 770 /app/logs /app/backups /app/data
 
 # Expose ports
-# Bot doesn't need exposed port, but Dashboard does (typically 3000)
-EXPOSE 3000
+# Bot doesn't need exposed port, but Dashboard does (runs on 4002 as configured in docker-compose.yml and README)
+EXPOSE 4002
 
 USER appuser
 
