@@ -24,6 +24,7 @@ interface EventDisplayData {
     description?: string | null;
     location?: string | null;
     locationChannelId?: string | null;
+    imageUrl?: string | null;
     startTime: Date;
     endTime?: Date | null;
     color?: string | null;
@@ -141,6 +142,10 @@ export class EventDiscordService {
             text: `Created by ${creator?.user.username || 'Unknown'}`,
             iconURL: creator?.user.displayAvatarURL(),
         });
+
+        if (eventData.imageUrl) {
+            embed.setImage(eventData.imageUrl);
+        }
 
         return embed;
     }
