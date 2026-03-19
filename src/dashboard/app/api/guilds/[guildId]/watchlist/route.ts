@@ -39,7 +39,6 @@ export async function GET(
         const adderIds = entries.map((e) => e.addedBy);
         const allIds = [...new Set([...userIds, ...adderIds])];
 
-        const botToken = process.env.DISCORD_TOKEN;
         const usersMap = await getDiscordUsers(allIds);
 
         const enriched = entries.map((entry) => ({
