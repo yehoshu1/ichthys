@@ -1,13 +1,22 @@
 "use client";
 
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "./ui/select";
+import * as React from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { MultiSelect } from "./ui/multi-select";
+import { Button } from "./ui/button";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "./ui/command";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "./ui/popover";
 import { cn } from "@/lib/utils";
 import { useDiscordData } from "./useDiscordData";
 import { AlertCircle } from "lucide-react";
@@ -100,14 +109,15 @@ export function RoleSelect({
     disabled = false,
     className
 }: RoleSelectProps) {
+    const [open, setOpen] = React.useState(false);
     const { data, loading, error, rolesById } = useDiscordData(guildId);
     const roles = data.roles;
     const normalizedValue = allowNone ? toSelectValue(value) : normalizeId(value);
 
     // Find the selected role name for display
     const selectedRole = rolesById.get(normalizedValue);
-    const displayValue = normalizedValue === NONE_OPTION 
-        ? "None" 
+    const displayValue = normalizedValue === NONE_OPTION
+        ? "None"
         : selectedRole?.name;
 
     if (error) {
@@ -115,30 +125,55 @@ export function RoleSelect({
     }
 
     return (
-        <Select
-            value={normalizedValue}
-            onValueChange={(nextValue) => onChange(fromSelectValue(nextValue))}
-            disabled={loading || disabled}
-        >
-            <SelectTrigger className={cn("w-full", className)}>
-                <SelectValue placeholder={loading ? "Loading roles..." : placeholder}>
-                    {displayValue || placeholder}
-                </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-                {allowNone && <SelectItem value={NONE_OPTION}>None</SelectItem>}
-                {roles.map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
-                        {role.name}
-                    </SelectItem>
-                ))}
-                {roles.length === 0 && !loading && (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                        No roles found
-                    </div>
-                )}
-            </SelectContent>
-        </Select>
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    disabled={loading || disabled}
+                    className={cn("w-full justify-between font-normal", className)}
+                >
+                    <span className={cn(!displayValue && "text-muted-foreground")}>
+                        {loading ? "Loading roles..." : (displayValue || placeholder)}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" aria-label="Role selection menu">
+                <Command>
+                    <CommandInput placeholder="Search roles..." />
+                    <CommandList>
+                        <CommandEmpty>{loading ? "Loading..." : "No roles found."}</CommandEmpty>
+                        <CommandGroup>
+                            {allowNone && (
+                                <CommandItem
+                                    onSelect={() => {
+                                        onChange(fromSelectValue(NONE_OPTION));
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <Check className={cn("mr-2 h-4 w-4", normalizedValue === NONE_OPTION ? "opacity-100" : "opacity-0")} />
+                                    None
+                                </CommandItem>
+                            )}
+                            {roles.map((role) => (
+                                <CommandItem
+                                    key={role.id}
+                                    onSelect={() => {
+                                        onChange(role.id);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <Check className={cn("mr-2 h-4 w-4", normalizedValue === role.id ? "opacity-100" : "opacity-0")} />
+                                    {role.name}
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
     );
 }
 
@@ -163,14 +198,15 @@ export function ChannelSelect({
     disabled = false,
     className
 }: ChannelSelectProps) {
+    const [open, setOpen] = React.useState(false);
     const { data, loading, error, channelsById } = useDiscordData(guildId);
     const channels = data.channels.filter((channel) => channelTypes.includes(channel.type));
     const normalizedValue = allowNone ? toSelectValue(value) : normalizeId(value);
 
     // Find the selected channel name for display
     const selectedChannel = channelsById.get(normalizedValue);
-    const displayValue = normalizedValue === NONE_OPTION 
-        ? "None" 
+    const displayValue = normalizedValue === NONE_OPTION
+        ? "None"
         : selectedChannel ? formatChannelLabel(selectedChannel) : undefined;
 
     if (error) {
@@ -178,30 +214,55 @@ export function ChannelSelect({
     }
 
     return (
-        <Select
-            value={normalizedValue}
-            onValueChange={(nextValue) => onChange(fromSelectValue(nextValue))}
-            disabled={loading || disabled}
-        >
-            <SelectTrigger className={cn("w-full", className)}>
-                <SelectValue placeholder={loading ? "Loading channels..." : placeholder}>
-                    {displayValue || placeholder}
-                </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-                {allowNone && <SelectItem value={NONE_OPTION}>None</SelectItem>}
-                {channels.map((channel) => (
-                    <SelectItem key={channel.id} value={channel.id}>
-                        {formatChannelLabel(channel)}
-                    </SelectItem>
-                ))}
-                {channels.length === 0 && !loading && (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                        No channels found
-                    </div>
-                )}
-            </SelectContent>
-        </Select>
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    disabled={loading || disabled}
+                    className={cn("w-full justify-between font-normal", className)}
+                >
+                    <span className={cn(!displayValue && "text-muted-foreground")}>
+                        {loading ? "Loading channels..." : (displayValue || placeholder)}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" aria-label="Channel selection menu">
+                <Command>
+                    <CommandInput placeholder="Search channels..." />
+                    <CommandList>
+                        <CommandEmpty>{loading ? "Loading..." : "No channels found."}</CommandEmpty>
+                        <CommandGroup>
+                            {allowNone && (
+                                <CommandItem
+                                    onSelect={() => {
+                                        onChange(fromSelectValue(NONE_OPTION));
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <Check className={cn("mr-2 h-4 w-4", normalizedValue === NONE_OPTION ? "opacity-100" : "opacity-0")} />
+                                    None
+                                </CommandItem>
+                            )}
+                            {channels.map((channel) => (
+                                <CommandItem
+                                    key={channel.id}
+                                    onSelect={() => {
+                                        onChange(channel.id);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <Check className={cn("mr-2 h-4 w-4", normalizedValue === channel.id ? "opacity-100" : "opacity-0")} />
+                                    {formatChannelLabel(channel)}
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
     );
 }
 
