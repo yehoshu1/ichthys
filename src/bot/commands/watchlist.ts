@@ -3,6 +3,7 @@ import {
     PermissionFlagsBits,
     ChatInputCommandInteraction,
     EmbedBuilder,
+    GuildMember,
 } from 'discord.js';
 import type { Command } from '../types/Command';
 import { db } from '../../shared/database/client';
@@ -19,7 +20,7 @@ const SEVERITY_EMOJIS: Record<string, string> = {
 export const data = new SlashCommandBuilder()
     .setName('watchlist')
     .setDescription('Manage the staff watchlist for suspicious members')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addSubcommand((sub) =>
         sub
             .setName('add')
@@ -79,6 +80,15 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const guild = interaction.guild;
     if (!guild) {
         await interaction.reply({ content: 'This command can only be used in a server.', ephemeral: true });
+        return;
+    }
+
+    const member = interaction.member as GuildMember;
+    if (
+        !member.permissions.has(PermissionFlagsBits.ManageMessages) &&
+        !member.permissions.has(PermissionFlagsBits.ManageGuild)
+    ) {
+        await interaction.reply({ content: 'You need the **Manage Messages** or **Manage Server** permission to use this command.', ephemeral: true });
         return;
     }
 

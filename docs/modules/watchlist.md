@@ -52,7 +52,7 @@ All endpoints require **Manage Server** permission.
 
 ## Bot Commands
 
-All commands require **Manage Server** permission.
+All commands require **Manage Messages** or **Manage Server** permission.
 
 ### `/watchlist add`
 Add a member to the watchlist (or update their entry if they are already listed).
