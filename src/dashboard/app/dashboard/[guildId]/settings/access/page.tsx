@@ -88,6 +88,7 @@ export default function AccessControlPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const [loadErrorTitle, setLoadErrorTitle] = useState("Access Denied");
     const [saveStatus, setSaveStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
     // Config state
@@ -100,13 +101,17 @@ export default function AccessControlPage() {
     const loadData = useCallback(async () => {
         setIsLoading(true);
         setLoadError(null);
+        setLoadErrorTitle("Access Denied");
         try {
             const res = await fetch(`/api/guilds/${guildId}/rbac`);
             if (!res.ok) {
+                const body = await res.json().catch(() => ({ error: null })) as { error?: string | null };
                 if (res.status === 403) {
-                    setLoadError("You need Manage Server permission to configure access control.");
+                    setLoadErrorTitle("Access Denied");
+                    setLoadError(body.error ?? "You need Manage Server permission to configure access control.");
                 } else {
-                    setLoadError("Failed to load access control settings.");
+                    setLoadErrorTitle("Unable to Load Access Control");
+                    setLoadError(body.error ?? `Failed to load access control settings (HTTP ${res.status}).`);
                 }
                 return;
             }
@@ -192,7 +197,7 @@ export default function AccessControlPage() {
             <div className="container max-w-4xl py-8">
                 <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Access Denied</AlertTitle>
+                    <AlertTitle>{loadErrorTitle}</AlertTitle>
                     <AlertDescription>{loadError}</AlertDescription>
                 </Alert>
             </div>

@@ -6,6 +6,40 @@ import path from 'path';
 // Load environment variables
 config();
 
+const SNOWFLAKE_PATTERN = /^\d{17,19}$/;
+const PLACEHOLDER_VALUES = new Set([
+    '',
+    'your_guild_id_here',
+    'your_test_guild_id',
+]);
+
+function getRequiredEnv(name: 'DISCORD_TOKEN' | 'DISCORD_CLIENT_ID'): string {
+    const value = process.env[name]?.trim();
+    if (!value) {
+        console.error(`❌ Missing required environment variable: ${name}`);
+        process.exit(1);
+    }
+
+    return value;
+}
+
+function getTargetGuildId(): string | null {
+    const rawGuildId = process.env.GUILD_ID?.trim();
+    if (!rawGuildId || PLACEHOLDER_VALUES.has(rawGuildId)) {
+        if (rawGuildId) {
+            console.warn(`⚠️ Ignoring placeholder GUILD_ID value "${rawGuildId}" and deploying globally instead.`);
+        }
+        return null;
+    }
+
+    if (!SNOWFLAKE_PATTERN.test(rawGuildId)) {
+        console.error(`❌ Invalid GUILD_ID "${rawGuildId}". Expected a Discord snowflake (17-19 digits).`);
+        process.exit(1);
+    }
+
+    return rawGuildId;
+}
+
 const commands = [];
 const commandsPath = path.join(__dirname, '../bot/commands');
 const commandFiles = fs.readdirSync(commandsPath).filter((file) =>
@@ -30,7 +64,10 @@ for (const file of commandFiles) {
 }
 
 // Create REST client
-const rest = new REST().setToken(process.env.DISCORD_TOKEN!);
+const discordToken = getRequiredEnv('DISCORD_TOKEN');
+const clientId = getRequiredEnv('DISCORD_CLIENT_ID');
+const targetGuildId = getTargetGuildId();
+const rest = new REST().setToken(discordToken);
 
 // Deploy commands
 (async () => {
@@ -40,15 +77,15 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN!);
         let data: any;
 
         // Deploy to specific guild (faster for testing) or globally
-        if (process.env.GUILD_ID) {
+        if (targetGuildId) {
             data = await rest.put(
-                Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID!, process.env.GUILD_ID),
+                Routes.applicationGuildCommands(clientId, targetGuildId),
                 { body: commands },
             );
-            console.log(`✅ Successfully reloaded commands to guild ${process.env.GUILD_ID}`);
+            console.log(`✅ Successfully reloaded commands to guild ${targetGuildId}`);
         } else {
             data = await rest.put(
-                Routes.applicationCommands(process.env.DISCORD_CLIENT_ID!),
+                Routes.applicationCommands(clientId),
                 { body: commands },
             );
             console.log(`✅ Successfully reloaded commands globally (may take up to 1 hour to propagate)`);

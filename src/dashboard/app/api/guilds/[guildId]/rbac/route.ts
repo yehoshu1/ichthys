@@ -6,6 +6,19 @@ import { requireGuildManageStrictAccess } from "@/lib/guild-auth";
 import { RBAC_MODULE_IDS } from "@/lib/rbac-modules";
 import logger from "@/lib/logger";
 
+function getRbacStorageError(error: unknown): string | null {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+        message.includes('dashboard_rbac_config') ||
+        message.includes('dashboard_rbac_rules') ||
+        message.includes('rbac_default_access')
+    ) {
+        return "Access control storage is not ready. Run the latest database migrations.";
+    }
+
+    return null;
+}
+
 // ─── Validation Schemas ────────────────────────────────────────────────────────
 
 // Discord snowflake IDs are 17–19 digits.
@@ -106,6 +119,10 @@ export async function GET(
             error: error instanceof Error ? error.message : String(error),
             guildId,
         });
+        const storageError = getRbacStorageError(error);
+        if (storageError) {
+            return NextResponse.json({ error: storageError }, { status: 503 });
+        }
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -186,6 +203,10 @@ export async function PUT(
             error: error instanceof Error ? error.message : String(error),
             guildId,
         });
+        const storageError = getRbacStorageError(error);
+        if (storageError) {
+            return NextResponse.json({ error: storageError }, { status: 503 });
+        }
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

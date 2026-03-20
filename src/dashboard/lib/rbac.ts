@@ -16,6 +16,7 @@ export interface DiscordGuildInfo {
 }
 
 export type RbacAction = 'view' | 'edit';
+export type RbacDefaultAccess = 'manage_guild_only' | 'deny';
 
 // ─── Bot Member Role Cache ──────────────────────────────────────────────────────
 
@@ -126,6 +127,28 @@ export function isHardBypassUser(guild: DiscordGuildInfo | undefined): boolean {
     return false;
 }
 
+export function resolveDefaultModuleAccess(
+    defaultAccess: RbacDefaultAccess,
+    guild: DiscordGuildInfo | undefined
+): ModuleAccessResult {
+    if (defaultAccess === 'manage_guild_only' && isHardBypassUser(guild)) {
+        return { view: true, edit: true };
+    }
+
+    return { view: false, edit: false };
+}
+
+function resolveRuleAccess(rule: { allowedViewRoles?: string[] | null; allowedEditRoles?: string[] | null }, userRoles: string[]): ModuleAccessResult {
+    const editRoles = rule.allowedEditRoles ?? [];
+    const viewRoles = rule.allowedViewRoles ?? [];
+
+    const canEdit = editRoles.some((r) => userRoles.includes(r));
+    // Edit roles implicitly grant view access.
+    const canView = canEdit || viewRoles.some((r) => userRoles.includes(r));
+
+    return { view: canView, edit: canEdit };
+}
+
 // ─── Module ID Extraction ──────────────────────────────────────────────────────
 
 /**
@@ -149,9 +172,7 @@ export function getModuleIdFromPath(pathname: string): string {
  *  C. Fetch user's Discord role IDs via bot token
  *  D. Fetch dashboardRbacRules for (guildId, moduleId)
  *  E. If rule exists: check edit roles (edit implies view), then view roles
- *  F. If no rule exists: deny. Both default_access values ('manage_guild_only'
- *     and 'deny') result in denial for non-bypass users — bypass users already
- *     returned true in Step A.
+ *  F. If no rule exists: fall back to dashboardRbacConfig.defaultAccess.
  */
 export async function evaluateRbac(
     guildId: string,
@@ -191,21 +212,13 @@ export async function evaluateRbac(
 
     // Step E: Rule exists — check role intersections
     if (rule) {
-        const editRoles = rule.allowedEditRoles ?? [];
-        const viewRoles = rule.allowedViewRoles ?? [];
-
-        // Edit roles grant both edit and view access.
-        if (editRoles.some((r) => userRoles.includes(r))) return true;
-
-        // View roles only grant view access.
-        if (action === 'view' && viewRoles.some((r) => userRoles.includes(r))) return true;
-
-        return false;
+        const access = resolveRuleAccess(rule, userRoles);
+        return action === 'edit' ? access.edit : access.view;
     }
 
-    // Step F: No rule — deny. Bypass users already returned true in Step A,
-    // so regardless of default_access value, non-bypass users are denied.
-    return false;
+    // Step F: No rule — use configured fallback.
+    const fallbackAccess = resolveDefaultModuleAccess(config.defaultAccess, guild);
+    return action === 'edit' ? fallbackAccess.edit : fallbackAccess.view;
 }
 
 // ─── Batch RBAC Evaluation ─────────────────────────────────────────────────────
@@ -231,7 +244,6 @@ export async function evaluateRbacBatch(
     moduleIds: readonly string[],
     guild: DiscordGuildInfo | undefined
 ): Promise<Record<string, ModuleAccessResult>> {
-    const deny = (): ModuleAccessResult => ({ view: false, edit: false });
     const allow = (): ModuleAccessResult => ({ view: true, edit: true });
 
     // Step A: Hard bypass — all modules get full access immediately.
@@ -247,7 +259,7 @@ export async function evaluateRbacBatch(
         .limit(1);
 
     if (!config || !config.enabled) {
-        return Object.fromEntries(moduleIds.map((id) => [id, deny()]));
+        return Object.fromEntries(moduleIds.map((id) => [id, { view: false, edit: false }]));
     }
 
     // Step C: Fetch user's role IDs once (uses 60-second cache).
@@ -267,18 +279,12 @@ export async function evaluateRbacBatch(
         const rule = rulesByModule.get(moduleId);
 
         if (!rule) {
-            // Step F: No rule → deny (same as evaluateRbac Step F).
-            result[moduleId] = deny();
+            // Step F: No rule → use configured fallback (same as evaluateRbac Step F).
+            result[moduleId] = resolveDefaultModuleAccess(config.defaultAccess, guild);
             continue;
         }
 
-        const editRoles = rule.allowedEditRoles ?? [];
-        const viewRoles = rule.allowedViewRoles ?? [];
-
-        const canEdit = editRoles.some((r) => userRoles.includes(r));
-        // Edit roles implicitly grant view access.
-        const canView = canEdit || viewRoles.some((r) => userRoles.includes(r));
-        result[moduleId] = { view: canView, edit: canEdit };
+        result[moduleId] = resolveRuleAccess(rule, userRoles);
     }
 
     return result;

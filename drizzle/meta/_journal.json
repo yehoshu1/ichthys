@@ -43,6 +43,13 @@
       "when": 1773490000000,
       "tag": "0009_remove_reaction_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774015000000,
+      "tag": "0010_dashboard_rbac",
+      "breakpoints": true
     }
   ]
 }
