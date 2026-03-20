@@ -13,6 +13,8 @@ export type DashboardNavId =
     | "aliases"
     | "commands"
     | "moderation"
+    | "watchlist"
+    | "tools"
     | "logs"
     | "settings"
     | "access"
@@ -40,6 +42,8 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
     { id: "aliases", name: "Aliases", href: "/aliases", moduleSlug: "aliases", keywords: ["auto responder", "trigger", "alias"] },
     { id: "commands", name: "Commands", href: "/commands", moduleSlug: "settings-backups", keywords: ["command config", "aliases", "limits", "access"] },
     { id: "moderation", name: "Moderation", href: "/moderation", moduleSlug: "moderation", keywords: ["warn", "ban", "mute", "automod"] },
+    { id: "watchlist", name: "Watchlist", href: "/watchlist", moduleSlug: "moderation", keywords: ["watchlist", "watch", "suspicious", "monitor", "flag", "tracking"] },
+    { id: "tools", name: "Timestamp", href: "/tools", keywords: ["timestamp", "discord timestamp", "time", "converter", "unix", "timezone", "tools"] },
     { id: "settings", name: "Settings", href: "/settings", moduleSlug: "settings-backups", keywords: ["import", "export", "backup", "restore"] },
     { id: "access", name: "Access Control", href: "/settings/access", keywords: ["rbac", "roles", "permissions", "delegate", "access control"] },
     { id: "webhooks", name: "Webhooks & API", href: "/webhooks", moduleSlug: "webhooks", keywords: ["webhook", "api", "integration", "endpoint", "automation"] },

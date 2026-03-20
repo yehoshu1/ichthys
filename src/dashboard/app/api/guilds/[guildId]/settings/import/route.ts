@@ -37,6 +37,7 @@ const MAX_COMMAND_CONFIGS = 500;
 
 const importPayloadSchema = z.object({
     version: z.number().int().min(1),
+    timestamp: z.string().optional(),
     guildId: z.string().optional(),
     config: z.record(z.string(), z.unknown()).nullable().optional(),
     welcomeTriggers: z.array(z.record(z.string(), z.unknown())).max(MAX_TRIGGERS).default([]),
@@ -58,7 +59,6 @@ const ALLOWED_CONFIG_KEYS = new Set([
     "welcomeEnabled", "autoRoleId", "joinMessageChannelId", "joinMessage", "joinMessageEmbed",
     "leaveMessageChannelId", "leaveMessage", "leaveMessageEmbed",
     "verificationEnabled", "unverifiedRoleId", "verificationRoleId", "verificationGraceDays", "verificationKickDmEnabled", "verificationMessage", "verificationMessageEmbed",
-    "lastMemberSync",
     "boostEnabled", "boostAnnouncementChannelId", "boostRoleId", "boostRoleName", "boostRoleColorPrimary", "boostRoleColorSecondary", "boostClaimRequired",
     "boostWelcomeMessage", "boostWelcomeMessageEmbed", "boostReBoostMessage", "boostReBoostMessageEmbed", "boostRoleRemovalDays", "boostRoleRemovalDmEnabled",
     "levelingEnabled", "textXpMin", "textXpMax", "textXpCooldown", "voiceXpPerMinute", "levelUpNotifEnabled", "levelUpChannelId", "levelUpMessage", "levelUpMessageEmbed",

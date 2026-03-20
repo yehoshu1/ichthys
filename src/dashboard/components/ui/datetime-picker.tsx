@@ -1,12 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { CalendarIcon } from "@radix-ui/react-icons";
+import { ChevronDownIcon } from "lucide-react";
 import { format } from "date-fns";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
     Popover,
     PopoverContent,
@@ -20,191 +22,129 @@ interface DateTimePickerProps {
     disabled?: boolean;
     className?: string;
     minDate?: Date;
+    allowClear?: boolean;
 }
 
 export function DateTimePicker({
     value,
     onChange,
-    placeholder = "MM/DD/YYYY hh:mm aa",
+    placeholder = "Pick a date and time",
     disabled = false,
     className,
     minDate,
+    allowClear = false,
 }: DateTimePickerProps) {
     const [date, setDate] = React.useState<Date | undefined>(value || undefined);
-    const [isOpen, setIsOpen] = React.useState(false);
+    const [calendarOpen, setCalendarOpen] = React.useState(false);
 
-    // Update internal state when value prop changes
     React.useEffect(() => {
         setDate(value || undefined);
     }, [value]);
 
-    const hours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-    const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+    const timeValue = date
+        ? `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`
+        : "";
 
     const handleDateSelect = (selectedDate: Date | undefined) => {
         if (selectedDate) {
-            // Preserve time from existing date if available
+            const newDate = new Date(selectedDate);
             if (date) {
-                selectedDate.setHours(date.getHours(), date.getMinutes());
+                newDate.setHours(date.getHours(), date.getMinutes(), 0, 0);
+            } else {
+                newDate.setHours(0, 0, 0, 0);
             }
-            setDate(selectedDate);
-            onChange?.(selectedDate);
+            setDate(newDate);
+            onChange?.(newDate);
+            setCalendarOpen(false);
         } else {
             setDate(undefined);
             onChange?.(null);
         }
     };
 
-    const handleTimeChange = (
-        type: "hour" | "minute" | "ampm",
-        val: string
-    ) => {
-        const currentDate = date || new Date();
-        const newDate = new Date(currentDate);
-
-        if (type === "hour") {
-            const hour = parseInt(val);
-            const isPM = newDate.getHours() >= 12;
-            newDate.setHours((hour % 12) + (isPM ? 12 : 0));
-        } else if (type === "minute") {
-            newDate.setMinutes(parseInt(val));
-        } else if (type === "ampm") {
-            const currentHours = newDate.getHours();
-            const isPM = val === "PM";
-            const hour12 = currentHours % 12;
-            newDate.setHours(hour12 + (isPM ? 12 : 0));
-        }
-
-        setDate(newDate);
-        onChange?.(newDate);
+    const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const timeStr = e.target.value;
+        if (!timeStr) return;
+        const base = date ? new Date(date) : new Date();
+        const [hours, minutes] = timeStr.split(":").map(Number);
+        base.setHours(hours, minutes, 0, 0);
+        const updated = new Date(base);
+        setDate(updated);
+        onChange?.(updated);
     };
 
-    const isDisabled = (day: Date) => {
+    const isDisabledDay = (day: Date) => {
         if (!minDate) return false;
         const normalizedMinDate = new Date(minDate);
         normalizedMinDate.setHours(0, 0, 0, 0);
         return day < normalizedMinDate;
     };
 
+    const handleClear = () => {
+        setDate(undefined);
+        setCalendarOpen(false);
+        onChange?.(null);
+    };
+
     return (
-        <Popover open={isOpen} onOpenChange={setIsOpen}>
-            <PopoverTrigger asChild>
+        <FieldGroup
+            className={cn(
+                "flex w-full flex-col gap-3 sm:flex-row sm:items-end",
+                className
+            )}
+        >
+            <Field className="min-w-0 flex-1">
+                <FieldLabel className="sr-only">Date</FieldLabel>
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            disabled={disabled}
+                            className={cn(
+                                "w-full justify-between font-normal",
+                                !date && "text-muted-foreground"
+                            )}
+                        >
+                            {date ? format(date, "PPP") : <span>{placeholder}</span>}
+                            <ChevronDownIcon className="h-4 w-4 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+                        <Calendar
+                            mode="single"
+                            selected={date}
+                            captionLayout="dropdown"
+                            defaultMonth={date}
+                            onSelect={handleDateSelect}
+                            disabled={isDisabledDay}
+                        />
+                    </PopoverContent>
+                </Popover>
+            </Field>
+
+            <Field className="w-full sm:w-36">
+                <FieldLabel className="sr-only">Time</FieldLabel>
+                <Input
+                    type="time"
+                    disabled={disabled}
+                    value={timeValue}
+                    onChange={handleTimeChange}
+                    className="w-full appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                />
+            </Field>
+
+            {allowClear && date ? (
                 <Button
+                    type="button"
                     variant="outline"
                     disabled={disabled}
-                    className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !date && "text-muted-foreground",
-                        className
-                    )}
+                    onClick={handleClear}
+                    className="w-full sm:w-auto"
                 >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? (
-                        format(date, "MM/dd/yyyy hh:mm aa")
-                    ) : (
-                        <span>{placeholder}</span>
-                    )}
+                    Clear
                 </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-                <div className="flex">
-                    <Calendar
-                        mode="single"
-                        selected={date}
-                        onSelect={handleDateSelect}
-                        disabled={isDisabled}
-                        initialFocus
-                    />
-                    <div className="flex border-l border-border">
-                        {/* Hours */}
-                        <div className="w-[60px] border-r border-border overflow-y-auto max-h-[300px]">
-                            <div className="flex flex-col p-1">
-                                {hours.map((hour) => (
-                                    <Button
-                                        key={hour}
-                                        type="button"
-                                        size="sm"
-                                        variant={
-                                            date && date.getHours() % 12 === hour % 12
-                                                ? "default"
-                                                : "ghost"
-                                        }
-                                        className="h-8 text-xs justify-center"
-                                        onClick={() => handleTimeChange("hour", hour.toString())}
-                                    >
-                                        {hour}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-                        
-                        {/* Minutes */}
-                        <div className="w-[60px] border-r border-border overflow-y-auto max-h-[300px]">
-                            <div className="flex flex-col p-1">
-                                {minutes.map((minute) => (
-                                    <Button
-                                        key={minute}
-                                        type="button"
-                                        size="sm"
-                                        variant={
-                                            date && date.getMinutes() === minute
-                                                ? "default"
-                                                : "ghost"
-                                        }
-                                        className="h-8 text-xs justify-center"
-                                        onClick={() =>
-                                            handleTimeChange("minute", minute.toString())
-                                        }
-                                    >
-                                        {minute.toString().padStart(2, "0")}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-                        
-                        {/* AM/PM */}
-                        <div className="w-[60px] overflow-y-auto max-h-[300px]">
-                            <div className="flex flex-col p-1">
-                                {["AM", "PM"].map((ampm) => (
-                                    <Button
-                                        key={ampm}
-                                        type="button"
-                                        size="sm"
-                                        variant={
-                                            date &&
-                                                ((ampm === "AM" && date.getHours() < 12) ||
-                                                    (ampm === "PM" && date.getHours() >= 12))
-                                                ? "default"
-                                                : "ghost"
-                                        }
-                                        className="h-8 text-xs justify-center"
-                                        onClick={() => handleTimeChange("ampm", ampm)}
-                                    >
-                                        {ampm}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex justify-between gap-2 p-3 border-t">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                            setDate(undefined);
-                            onChange?.(null);
-                        }}
-                    >
-                        Clear
-                    </Button>
-                    <Button type="button" size="sm" onClick={() => setIsOpen(false)}>
-                        Done
-                    </Button>
-                </div>
-            </PopoverContent>
-        </Popover>
+            ) : null}
+        </FieldGroup>
     );
 }
 
@@ -228,7 +168,6 @@ export function DatePicker({
     const [date, setDate] = React.useState<Date | undefined>(value || undefined);
     const [isOpen, setIsOpen] = React.useState(false);
 
-    // Update internal state when value prop changes
     React.useEffect(() => {
         setDate(value || undefined);
     }, [value]);
@@ -244,7 +183,7 @@ export function DatePicker({
         }
     };
 
-    const isDisabled = (day: Date) => {
+    const isDisabledDay = (day: Date) => {
         if (!minDate) return false;
         const normalizedMinDate = new Date(minDate);
         normalizedMinDate.setHours(0, 0, 0, 0);
@@ -258,22 +197,23 @@ export function DatePicker({
                     variant="outline"
                     disabled={disabled}
                     className={cn(
-                        "w-full justify-start text-left font-normal",
+                        "w-full justify-between font-normal",
                         !date && "text-muted-foreground",
                         className
                     )}
                 >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
                     {date ? format(date, "MMM d, yyyy") : <span>{placeholder}</span>}
+                    <ChevronDownIcon className="h-4 w-4 opacity-50" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
+            <PopoverContent className="w-auto overflow-hidden p-0" align="start">
                 <Calendar
                     mode="single"
                     selected={date}
+                    captionLayout="dropdown"
+                    defaultMonth={date}
                     onSelect={handleDateSelect}
-                    disabled={isDisabled}
-                    initialFocus
+                    disabled={isDisabledDay}
                 />
             </PopoverContent>
         </Popover>
