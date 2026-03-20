@@ -14,7 +14,7 @@ Run scripts with `npm run <script>`.
 | `build` | Compile bot TypeScript (`tsconfig.bot.json`) into `dist/`. | Production bot build |
 | `dev` | Run bot in watch mode (`tsx watch`). | Bot local development |
 | `dev:all` | Run bot + dashboard together. | Full-stack local development |
-| `dashboard:dev` | Run Next.js dashboard on port `4000` in webpack mode. | Dashboard local development |
+| `dashboard:dev` | Run Next.js dashboard on port `4002` in webpack mode (or `PORT` if set). | Dashboard local development |
 | `dashboard:build` | Build dashboard for production. | CI/CD and release build |
 | `dashboard:start` | Start built dashboard. | Production runtime |
 | `start` | Start compiled bot from `dist`. | Production runtime |

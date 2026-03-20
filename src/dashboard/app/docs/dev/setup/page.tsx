@@ -26,7 +26,7 @@ const envRows = [
     {
         key: "NEXTAUTH_URL",
         required: "Yes",
-        description: "Public base URL for auth callback resolution. Local default: http://localhost:4000.",
+        description: "Public base URL for auth callback resolution. Local default: http://localhost:4002.",
     },
     {
         key: "DATABASE_URL",
@@ -57,7 +57,7 @@ export default function DocsDevSetupPage() {
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                     <p>Recommended baseline: Node 22.x + npm 11.9.0.</p>
-                    <p>Local dashboard URL: <code>http://localhost:4000</code>.</p>
+                    <p>Local dashboard URL: <code>http://localhost:4002</code>.</p>
                     <p>Primary bootstrap flow: copy env, install deps, apply DB migrations, start dev processes.</p>
                 </CardContent>
             </Card>

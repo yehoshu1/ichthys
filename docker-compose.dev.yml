@@ -42,7 +42,7 @@ services:
       target: dev
     restart: no
     ports:
-      - "4000:4000"
+      - "${PORT:-4002}:${PORT:-4002}"
     volumes:
       - ./logs:/app/logs
       - ./src:/app/src

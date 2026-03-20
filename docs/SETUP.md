@@ -39,7 +39,7 @@ npm -v
 4. In **OAuth2** tab:
 - Copy `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET`.
 - Add redirect URI for local dashboard auth:
-- `http://localhost:4000/api/auth/callback/discord`
+- `http://localhost:4002/api/auth/callback/discord`
 
 ## 2. Configure Environment Variables
 
@@ -79,7 +79,7 @@ openssl rand -base64 32
 ### Common Local Values
 
 ```env
-NEXTAUTH_URL=http://localhost:4000
+NEXTAUTH_URL=http://localhost:4002
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=ixoye
@@ -169,7 +169,7 @@ npm run dashboard:dev
 
 Endpoints:
 
-- Dashboard: <http://localhost:4000>
+- Dashboard: <http://localhost:4002>
 - Bot: no HTTP endpoint (Discord gateway client)
 
 ## 6. Docker Development
@@ -323,7 +323,7 @@ docker compose -f docker-compose.dev.yml up -d --build
 
 ## NextAuth callback issues
 
-- Ensure `NEXTAUTH_URL` matches actual dashboard URL.
+- Ensure `NEXTAUTH_URL` matches the actual dashboard URL.
 - Ensure Discord redirect URI exactly matches callback path.
 
 ## Documentation Map
