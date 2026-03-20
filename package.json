@@ -23,7 +23,7 @@
     "guard:module-ownership": "tsx scripts/check-module-ownership.ts",
     "module:remove:dry-run": "tsx scripts/module-remove-dry-run.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node scripts/run-migrations.js",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:backup": "tsx scripts/backup-db.ts",
