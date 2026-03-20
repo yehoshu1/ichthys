@@ -79,51 +79,52 @@ export function DateTimePicker({
     };
 
     return (
-        <div className={cn("flex gap-2", className)}>
-            {/* Date field */}
-            <FieldGroup className="flex-row gap-2 flex-1">
-                <Field className="flex-1">
-                    <FieldLabel className="sr-only">Date</FieldLabel>
-                    <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                        <PopoverTrigger asChild>
-                            <Button
-                                variant="outline"
-                                disabled={disabled}
-                                className={cn(
-                                    "w-full justify-between font-normal",
-                                    !date && "text-muted-foreground"
-                                )}
-                            >
-                                {date ? format(date, "MMM d, yyyy") : <span>{placeholder}</span>}
-                                <ChevronDownIcon className="h-4 w-4 opacity-50" />
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto overflow-hidden p-0" align="start">
-                            <Calendar
-                                mode="single"
-                                selected={date}
-                                captionLayout="dropdown"
-                                defaultMonth={date}
-                                onSelect={handleDateSelect}
-                                disabled={isDisabledDay}
-                            />
-                        </PopoverContent>
-                    </Popover>
-                </Field>
+        <FieldGroup
+            className={cn(
+                "flex w-full flex-col gap-3 sm:flex-row sm:items-end",
+                className
+            )}
+        >
+            <Field className="min-w-0 flex-1">
+                <FieldLabel className="sr-only">Date</FieldLabel>
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            disabled={disabled}
+                            className={cn(
+                                "w-full justify-between font-normal",
+                                !date && "text-muted-foreground"
+                            )}
+                        >
+                            {date ? format(date, "PPP") : <span>{placeholder}</span>}
+                            <ChevronDownIcon className="h-4 w-4 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+                        <Calendar
+                            mode="single"
+                            selected={date}
+                            captionLayout="dropdown"
+                            defaultMonth={date}
+                            onSelect={handleDateSelect}
+                            disabled={isDisabledDay}
+                        />
+                    </PopoverContent>
+                </Popover>
+            </Field>
 
-                {/* Time field */}
-                <Field className="w-32">
-                    <FieldLabel className="sr-only">Time</FieldLabel>
-                    <Input
-                        type="time"
-                        disabled={disabled}
-                        value={timeValue}
-                        onChange={handleTimeChange}
-                        className="appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                    />
-                </Field>
-            </FieldGroup>
-        </div>
+            <Field className="w-full sm:w-36">
+                <FieldLabel className="sr-only">Time</FieldLabel>
+                <Input
+                    type="time"
+                    disabled={disabled}
+                    value={timeValue}
+                    onChange={handleTimeChange}
+                    className="w-full appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                />
+            </Field>
+        </FieldGroup>
     );
 }
 

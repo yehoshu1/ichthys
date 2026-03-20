@@ -255,16 +255,35 @@ function CreateEventButton({ guildId }: { guildId: string }) {
                     Create Event
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Create New Event</DialogTitle>
-                    <DialogDescription>
-                        Schedule a new event for your server members.
-                    </DialogDescription>
-                </DialogHeader>
+            <EventDialogShell
+                title="Create New Event"
+                description="Schedule a new event for your server members."
+            >
                 <EventForm guildId={guildId} onSuccess={() => setOpen(false)} />
-            </DialogContent>
+            </EventDialogShell>
         </Dialog>
+    );
+}
+
+function EventDialogShell({
+    title,
+    description,
+    children,
+}: {
+    title: string;
+    description: React.ReactNode;
+    children: React.ReactNode;
+}) {
+    return (
+        <DialogContent className="flex max-h-[90vh] w-[min(96vw,72rem)] max-w-[min(96vw,72rem)] flex-col gap-0 overflow-hidden p-0">
+            <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-6 pr-14">
+                <DialogTitle>{title}</DialogTitle>
+                <DialogDescription>{description}</DialogDescription>
+            </DialogHeader>
+            <div className="min-h-0 overflow-y-auto px-6 pb-6 pr-4 pt-5">
+                {children}
+            </div>
+        </DialogContent>
     );
 }
 
@@ -514,10 +533,10 @@ function EventForm({
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-7">
             {/* Template Selector */}
             {!event && templates.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                     <Label>Use Template (Optional)</Label>
                     <Select onValueChange={applyTemplate}>
                         <SelectTrigger>
@@ -535,7 +554,7 @@ function EventForm({
             )}
 
             {/* Title */}
-            <div className="space-y-2">
+            <div className="space-y-2.5">
                 <Label htmlFor="title">
                     Event Title <span className="text-red-500">*</span>
                 </Label>
@@ -551,7 +570,7 @@ function EventForm({
             </div>
 
             {/* Description */}
-            <div className="space-y-2">
+            <div className="space-y-2.5">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                     id="description"
@@ -565,7 +584,7 @@ function EventForm({
             </div>
 
             {/* Channel */}
-            <div className="space-y-2">
+            <div className="space-y-2.5">
                 <Label>
                     Channel <span className="text-red-500">*</span>
                 </Label>
@@ -580,8 +599,8 @@ function EventForm({
             </div>
 
             {/* Time Settings */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <div className="space-y-3">
                     <Label>
                         Start Time <span className="text-red-500">*</span>
                     </Label>
@@ -596,7 +615,7 @@ function EventForm({
                         placeholder="Select start date and time"
                     />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                     <Label>End Time</Label>
                     <DateTimePicker
                         value={formData.endTime}
@@ -610,9 +629,9 @@ function EventForm({
             </div>
 
             {/* Duration Quick Select */}
-            <div className="space-y-2">
+            <div className="space-y-3">
                 <Label>Quick Duration</Label>
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex flex-wrap gap-2.5">
                     {[15, 30, 60, 90, 120, 180, 240].map((mins) => (
                         <Button
                             key={mins}
@@ -635,8 +654,8 @@ function EventForm({
             </div>
 
             {/* Location */}
-            <div className="space-y-2">
-                <Label htmlFor="location">
+            <div className="space-y-4">
+                <Label htmlFor="location" className="flex pb-1">
                     <span className="flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
                         Location
@@ -652,8 +671,8 @@ function EventForm({
                 />
             </div>
 
-            <div className="space-y-2">
-                <Label>
+            <div className="space-y-4">
+                <Label className="flex pb-1">
                     <span className="flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
                         Voice Channel Location
@@ -668,20 +687,20 @@ function EventForm({
                     allowNone={true}
                     placeholder="Select a voice/stage channel..."
                 />
-                <HelperText>
+                <HelperText className="pt-1">
                     If set, mirrored Discord Scheduled Events will use this voice/stage channel as the native location.
                 </HelperText>
             </div>
 
             {/* Event Color */}
-            <div className="space-y-2">
-                <Label>
+            <div className="space-y-4">
+                <Label className="flex pb-1">
                     <span className="flex items-center gap-2">
                         <Palette className="h-4 w-4" />
                         Event Color
                     </span>
                 </Label>
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex flex-wrap gap-2.5">
                     {EVENT_COLORS.map((color) => (
                         <button
                             key={color.value}
@@ -700,8 +719,8 @@ function EventForm({
             </div>
 
             {/* Image URL */}
-            <div className="space-y-2">
-                <Label htmlFor="imageUrl">
+            <div className="space-y-4">
+                <Label htmlFor="imageUrl" className="flex pb-1">
                     <span className="flex items-center gap-2">
                         <ImageIcon className="h-4 w-4" />
                         Image URL
@@ -716,7 +735,7 @@ function EventForm({
                     }
                     placeholder="https://example.com/image.png"
                 />
-                <HelperText>
+                <HelperText className="pt-1">
                     Optional image to display on the event embed. Use a direct link to an image file (PNG, JPG, GIF, or WebP).
                 </HelperText>
             </div>
@@ -775,10 +794,10 @@ function EventForm({
             </div>
 
             {/* Role Restrictions */}
-            <div className="space-y-4 border-t pt-4">
+            <div className="space-y-4 border-t pt-6">
                 <Label className="text-base">Role Restrictions</Label>
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                     <Label>Required Roles (must have one)</Label>
                     <RoleMultiSelect
                         guildId={guildId}
@@ -793,7 +812,7 @@ function EventForm({
                     />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                     <Label>Blocked Roles (cannot join)</Label>
                     <RoleMultiSelect
                         guildId={guildId}
@@ -808,7 +827,7 @@ function EventForm({
                     />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                     <LabelWithTooltip
                         label="Auto-assign Role"
                         tooltip="Role to automatically assign to attendees when they RSVP Yes"
@@ -826,7 +845,7 @@ function EventForm({
             </div>
 
             {/* Discord Integration */}
-            <div className="space-y-4 border-t pt-4">
+            <div className="space-y-4 border-t pt-6">
                 <Label className="text-base">Discord Integration</Label>
 
                 <div className="flex items-center justify-between">
@@ -844,7 +863,7 @@ function EventForm({
             </div>
 
             {/* Mention Settings */}
-            <div className="space-y-4 border-t pt-4">
+            <div className="space-y-4 border-t pt-6">
                 <Label className="text-base">Mention Settings</Label>
 
                 <div className="space-y-4">
@@ -862,7 +881,7 @@ function EventForm({
                     </div>
 
                     {formData.mentionOnCreate && (
-                        <div className="space-y-2 pl-6">
+                        <div className="space-y-2.5 pl-6">
                             <Label>Mention Roles on Create</Label>
                             <RoleMultiSelect
                                 guildId={guildId}
@@ -892,7 +911,7 @@ function EventForm({
                     </div>
 
                     {formData.mentionOnStart && (
-                        <div className="space-y-2 pl-6">
+                        <div className="space-y-2.5 pl-6">
                             <Label>Mention Roles on Start</Label>
                             <RoleMultiSelect
                                 guildId={guildId}
@@ -911,7 +930,7 @@ function EventForm({
             </div>
 
             {/* Repeat Settings */}
-            <div className="space-y-4 border-t pt-4">
+            <div className="space-y-4 border-t pt-6">
                 <Label className="text-base flex items-center gap-2">
                     <Repeat className="h-4 w-4" />
                     Recurring Event
@@ -939,7 +958,7 @@ function EventForm({
                 </Select>
 
                 {formData.repeatFrequency !== "NONE" && (
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                         <Label>Repeat Until</Label>
                         <DatePicker
                             value={formData.repeatUntil}
@@ -957,7 +976,7 @@ function EventForm({
             </div>
 
             {/* Save as Template */}
-            <div className="space-y-4 border-t pt-4">
+            <div className="space-y-4 border-t pt-6">
                 <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                         <Label>Save as Template</Label>
@@ -972,7 +991,7 @@ function EventForm({
                 </div>
 
                 {saveAsTemplate && (
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                         <Label htmlFor="templateName">
                             Template Name <span className="text-red-500">*</span>
                         </Label>
@@ -987,7 +1006,7 @@ function EventForm({
                 )}
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="gap-2 border-t pt-6">
                 <DialogClose asChild>
                     <Button type="button" variant="outline">
                         Cancel
@@ -1178,13 +1197,10 @@ function EventsList({
                 open={!!editingEvent}
                 onOpenChange={(open) => !open && setEditingEvent(null)}
             >
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Edit Event</DialogTitle>
-                        <DialogDescription>
-                            Update the event details.
-                        </DialogDescription>
-                    </DialogHeader>
+                <EventDialogShell
+                    title="Edit Event"
+                    description="Update the event details."
+                >
                     {editingEvent && (
                         <EventForm
                             guildId={guildId}
@@ -1195,7 +1211,7 @@ function EventsList({
                             }}
                         />
                     )}
-                </DialogContent>
+                </EventDialogShell>
             </Dialog>
         </>
     );
@@ -1255,13 +1271,10 @@ function CalendarTab({ guildId }: { guildId: string }) {
 
             {/* Create Dialog */}
             <Dialog open={creatingEvent} onOpenChange={setCreatingEvent}>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Create New Event</DialogTitle>
-                        <DialogDescription>
-                            {selectedDate && `Creating event for ${format(selectedDate, "MMMM d, yyyy")}`}
-                        </DialogDescription>
-                    </DialogHeader>
+                <EventDialogShell
+                    title="Create New Event"
+                    description={selectedDate && `Creating event for ${format(selectedDate, "MMMM d, yyyy")}`}
+                >
                     <EventForm
                         guildId={guildId}
                         initialDate={selectedDate}
@@ -1271,7 +1284,7 @@ function CalendarTab({ guildId }: { guildId: string }) {
                             fetchEvents();
                         }}
                     />
-                </DialogContent>
+                </EventDialogShell>
             </Dialog>
 
             {/* Edit Dialog */}
@@ -1279,13 +1292,10 @@ function CalendarTab({ guildId }: { guildId: string }) {
                 open={!!editingEvent}
                 onOpenChange={(open) => !open && setEditingEvent(null)}
             >
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Edit Event</DialogTitle>
-                        <DialogDescription>
-                            Update the event details.
-                        </DialogDescription>
-                    </DialogHeader>
+                <EventDialogShell
+                    title="Edit Event"
+                    description="Update the event details."
+                >
                     {editingEvent && (
                         <EventForm
                             guildId={guildId}
@@ -1296,7 +1306,7 @@ function CalendarTab({ guildId }: { guildId: string }) {
                             }}
                         />
                     )}
-                </DialogContent>
+                </EventDialogShell>
             </Dialog>
         </>
     );

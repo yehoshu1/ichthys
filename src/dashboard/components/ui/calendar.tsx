@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { DayPicker } from "react-day-picker";
+import { DayPicker, getDefaultClassNames } from "react-day-picker";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
@@ -13,30 +13,64 @@ function Calendar({
     className,
     classNames,
     showOutsideDays = true,
+    captionLayout = "label",
     ...props
 }: CalendarProps) {
+    const defaultClassNames = getDefaultClassNames();
+
     return (
         <DayPicker
             showOutsideDays={showOutsideDays}
+            captionLayout={captionLayout}
             className={cn("p-3", className)}
             classNames={{
-                months: "flex flex-col sm:flex-row gap-4",
-                month: "space-y-4",
-                month_caption: "flex justify-center pt-1 relative items-center",
-                caption_label: "text-sm font-medium",
-                nav: "space-x-1 flex items-center",
+                root: cn("w-fit", defaultClassNames.root),
+                months: cn("relative flex flex-col gap-4 sm:flex-row", defaultClassNames.months),
+                month: cn("flex w-full flex-col gap-4", defaultClassNames.month),
+                month_caption: cn(
+                    "flex h-9 w-full items-center justify-center px-9",
+                    defaultClassNames.month_caption
+                ),
+                caption_label: cn(
+                    "font-medium select-none",
+                    captionLayout === "label"
+                        ? "text-sm"
+                        : "flex items-center gap-1 rounded-md text-sm [&>svg]:text-muted-foreground",
+                    defaultClassNames.caption_label
+                ),
+                dropdowns: cn(
+                    "flex h-9 items-center justify-center gap-1.5 text-sm font-medium",
+                    defaultClassNames.dropdowns
+                ),
+                dropdown_root: cn(
+                    "relative rounded-md",
+                    defaultClassNames.dropdown_root
+                ),
+                dropdown: cn(
+                    "absolute inset-0 opacity-0",
+                    defaultClassNames.dropdown
+                ),
+                nav: cn(
+                    "absolute inset-x-0 top-0 flex h-9 w-full items-center justify-between gap-1",
+                    defaultClassNames.nav
+                ),
                 button_previous: cn(
                     buttonVariants({ variant: "outline" }),
-                    "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 absolute left-1"
+                    "size-7 bg-transparent p-0 opacity-50 hover:opacity-100"
                 ),
                 button_next: cn(
                     buttonVariants({ variant: "outline" }),
-                    "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 absolute right-1"
+                    "size-7 bg-transparent p-0 opacity-50 hover:opacity-100"
                 ),
-                month_grid: "w-full border-collapse space-y-1",
+                month_grid: cn("w-full border-collapse", defaultClassNames.month_grid),
+                weekdays: cn("flex", defaultClassNames.weekdays),
                 weekday:
-                    "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem] text-center",
-                day: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+                    cn("w-9 rounded-md text-center text-[0.8rem] font-normal text-muted-foreground", defaultClassNames.weekday),
+                week: cn("mt-2 flex w-full", defaultClassNames.week),
+                day: cn(
+                    "relative h-9 w-9 p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md",
+                    defaultClassNames.day
+                ),
                 day_button: cn(
                     buttonVariants({ variant: "ghost" }),
                     "h-9 w-9 p-0 font-normal aria-selected:opacity-100"
