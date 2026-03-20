@@ -88,6 +88,7 @@ export default function VerificationPage() {
     const [newRoleMessageText, setNewRoleMessageText] = useState("");
     const [roleMessageError, setRoleMessageError] = useState<string | null>(null);
     const [addingRoleMessage, setAddingRoleMessage] = useState(false);
+    const [editingRoleMessageId, setEditingRoleMessageId] = useState<string | null>(null);
     const { rolesById, channelsById } = useDiscordData(guildId);
 
     const [stats, setStats] = useState<VerificationStats>({
@@ -249,8 +250,13 @@ export default function VerificationPage() {
         setAddingRoleMessage(true);
         setRoleMessageError(null);
         try {
-            const res = await fetch(`/api/guilds/${guildId}/verification/role-messages`, {
-                method: "POST",
+            const url = editingRoleMessageId
+                ? `/api/guilds/${guildId}/verification/role-messages/${editingRoleMessageId}`
+                : `/api/guilds/${guildId}/verification/role-messages`;
+            const method = editingRoleMessageId ? "PATCH" : "POST";
+
+            const res = await fetch(url, {
+                method,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     roleId: newRoleMessageRoleId,
@@ -259,17 +265,24 @@ export default function VerificationPage() {
                 }),
             });
             if (res.ok) {
-                const newRule = await res.json();
-                setRoleMessages([...roleMessages, newRule]);
+                const updatedRule = await res.json();
+                if (editingRoleMessageId) {
+                    setRoleMessages(roleMessages.map(rule =>
+                        rule.id === editingRoleMessageId ? updatedRule : rule
+                    ));
+                } else {
+                    setRoleMessages([...roleMessages, updatedRule]);
+                }
                 setNewRoleMessageRoleId("");
                 setNewRoleMessageText("");
+                setEditingRoleMessageId(null);
             } else {
                 const data = await res.json().catch(() => ({}));
-                setRoleMessageError(data.error || "Failed to add role message.");
+                setRoleMessageError(data.error || "Failed to save role message.");
             }
         } catch (err) {
             console.error(err);
-            setRoleMessageError("Failed to add role message.");
+            setRoleMessageError("Failed to save role message.");
         } finally {
             setAddingRoleMessage(false);
         }
@@ -298,10 +311,27 @@ export default function VerificationPage() {
             });
             if (res.ok) {
                 setRoleMessages(roleMessages.filter(r => r.id !== ruleId));
+                if (editingRoleMessageId === ruleId) {
+                    resetRoleMessageForm();
+                }
             }
         } catch (err) {
             console.error(err);
         }
+    }
+
+    function startEditRoleMessage(rule: RoleMessageRule) {
+        setEditingRoleMessageId(rule.id);
+        setNewRoleMessageRoleId(rule.roleId);
+        setNewRoleMessageText(rule.message);
+        setRoleMessageError(null);
+    }
+
+    function resetRoleMessageForm() {
+        setEditingRoleMessageId(null);
+        setNewRoleMessageRoleId("");
+        setNewRoleMessageText("");
+        setRoleMessageError(null);
     }
 
     function startEditRule(rule: VerificationRule) {
@@ -463,14 +493,23 @@ export default function VerificationPage() {
                                             </div>
                                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{rule.message}</p>
                                         </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => deleteRoleMessage(rule.id)}
-                                            className="text-destructive hover:text-destructive"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => startEditRoleMessage(rule)}
+                                            >
+                                                Edit
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => deleteRoleMessage(rule.id)}
+                                                className="text-destructive hover:text-destructive"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 ))}
                                 {roleMessages.length === 0 && (
@@ -479,7 +518,9 @@ export default function VerificationPage() {
                             </div>
 
                             <div className="space-y-4 rounded-lg border border-dashed p-4">
-                                <h4 className="text-sm font-medium">Add Role Message</h4>
+                                <h4 className="text-sm font-medium">
+                                    {editingRoleMessageId ? "Edit Role Message" : "Add Role Message"}
+                                </h4>
                                 <div className="space-y-2">
                                     <Label>Role</Label>
                                     <RoleSelect
@@ -503,8 +544,14 @@ export default function VerificationPage() {
                                     disabled={addingRoleMessage || !newRoleMessageRoleId || !newRoleMessageText}
                                     className="w-full"
                                 >
-                                    <Plus className="mr-2 h-4 w-4" /> Add Role Message
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    {editingRoleMessageId ? "Save Changes" : "Add Role Message"}
                                 </Button>
+                                {editingRoleMessageId && (
+                                    <Button variant="ghost" onClick={resetRoleMessageForm} className="w-full">
+                                        Cancel Edit
+                                    </Button>
+                                )}
                                 {roleMessageError && (
                                     <p className="text-sm text-destructive">{roleMessageError}</p>
                                 )}
