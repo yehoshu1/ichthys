@@ -142,12 +142,17 @@ The project includes a production-ready Docker setup with PostgreSQL, automated 
     docker compose up -d
     ```
 
-3.  **Deploy slash commands** (inside container):
+3.  **Run database migrations manually** (inside container):
+    ```bash
+    docker exec ixoye-app node /app/scripts/run-migrations.js
+    ```
+
+4.  **Deploy slash commands manually** (inside container):
     ```bash
     docker exec ixoye-app node /app/scripts/deployCommands.js
     ```
 
-4.  **Check logs**:
+5.  **Check logs**:
     ```bash
     docker logs ixoye-app -f
     ```
