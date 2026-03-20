@@ -67,7 +67,7 @@ import { Textarea } from "../../../../components/ui/textarea";
 import { format, addDays, addMinutes, setHours, setMinutes, startOfDay } from "date-fns";
 import { LabelWithTooltip, HelperText } from "../../../../components/HelpTooltip";
 
-import { DateTimePicker, DatePicker } from "../../../../components/ui/datetime-picker";
+import { DateTimePicker, DatePicker, TimePicker } from "../../../../components/ui/datetime-picker";
 import { RoleMultiSelect } from "../../../../components/DiscordSelectors";
 
 // Types
@@ -1307,12 +1307,11 @@ function TimePollForm({
                                         />
                                         <span className="text-sm font-medium">{weekday.label}</span>
                                     </div>
-                                    <Input
-                                        type="time"
+                                    <TimePicker
                                         value={formatTimeInput(window.startHour, window.startMinute)}
                                         disabled={!window.enabled}
-                                        onChange={(event) => {
-                                            const parsed = parseTimeInput(event.target.value);
+                                        onChange={(value) => {
+                                            const parsed = parseTimeInput(value ?? "");
                                             if (!parsed) return;
                                             setFormData((prev) => ({
                                                 ...prev,
@@ -1326,13 +1325,13 @@ function TimePollForm({
                                                 },
                                             }));
                                         }}
+                                        placeholder="Start"
                                     />
-                                    <Input
-                                        type="time"
+                                    <TimePicker
                                         value={formatTimeInput(window.endHour, window.endMinute)}
                                         disabled={!window.enabled}
-                                        onChange={(event) => {
-                                            const parsed = parseTimeInput(event.target.value);
+                                        onChange={(value) => {
+                                            const parsed = parseTimeInput(value ?? "");
                                             if (!parsed) return;
                                             setFormData((prev) => ({
                                                 ...prev,
@@ -1346,6 +1345,7 @@ function TimePollForm({
                                                 },
                                             }));
                                         }}
+                                        placeholder="End"
                                     />
                                 </div>
                             );

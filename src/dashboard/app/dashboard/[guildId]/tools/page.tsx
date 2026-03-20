@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "../../../../components/ui/card";
 import { Clock, Copy, Check, Calendar } from "lucide-react";
 import { toast } from "sonner";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+import { DateTimePicker } from "../../../../components/ui/datetime-picker";
 import { cn } from "../../../../lib/utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -181,12 +182,6 @@ function FormatRow({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function TimestampConverterPage() {
-    // Local datetime string for the <input type="datetime-local">
-    const [localInput, setLocalInput] = useState<string>(() => {
-        const now = new Date();
-        // Format as "YYYY-MM-DDThh:mm" for datetime-local
-        return format(now, "yyyy-MM-dd'T'HH:mm");
-    });
     const [date, setDate] = useState<Date>(() => new Date());
     const [unix, setUnix] = useState<number>(() =>
         getUnixSeconds(new Date())
@@ -199,14 +194,10 @@ export default function TimestampConverterPage() {
         return () => clearInterval(timer);
     }, []);
 
-    function handleInputChange(value: string) {
-        setLocalInput(value);
+    function handleDateChange(value: Date | null) {
         if (!value) return;
-        const parsed = new Date(value);
-        if (!isNaN(parsed.getTime())) {
-            setDate(parsed);
-            setUnix(getUnixSeconds(parsed));
-        }
+        setDate(value);
+        setUnix(getUnixSeconds(value));
     }
 
     return (
@@ -228,18 +219,10 @@ export default function TimestampConverterPage() {
                 <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
                         <div className="relative flex-1">
-                            <input
-                                type="datetime-local"
-                                value={localInput}
-                                onChange={(e) =>
-                                    handleInputChange(e.target.value)
-                                }
-                                className={cn(
-                                    "w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
-                                    "ring-offset-background placeholder:text-muted-foreground",
-                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                    "disabled:cursor-not-allowed disabled:opacity-50"
-                                )}
+                            <DateTimePicker
+                                value={date}
+                                onChange={handleDateChange}
+                                placeholder="Select date and time"
                             />
                         </div>
                         <div className="flex items-center gap-2 text-muted-foreground text-sm shrink-0">

@@ -1,19 +1,188 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, Clock3Icon } from "lucide-react";
 import { format } from "date-fns";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+
+const HOURS = Array.from({ length: 24 }, (_, index) => index.toString().padStart(2, "0"));
+const MINUTES = Array.from({ length: 60 }, (_, index) => index.toString().padStart(2, "0"));
+
+function parseTimeValue(value?: string | null): { hour: string; minute: string } | null {
+    if (!value) return null;
+    const match = value.match(/^(\d{2}):(\d{2})$/);
+    if (!match) return null;
+
+    return {
+        hour: match[1],
+        minute: match[2],
+    };
+}
+
+function formatTimeValue(date?: Date | null): string {
+    if (!date) return "";
+
+    return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+}
+
+interface TimePickerProps {
+    value?: string | null;
+    onChange?: (value: string | null) => void;
+    placeholder?: string;
+    disabled?: boolean;
+    className?: string;
+    allowClear?: boolean;
+}
+
+export function TimePicker({
+    value,
+    onChange,
+    placeholder = "Select time",
+    disabled = false,
+    className,
+    allowClear = false,
+}: TimePickerProps) {
+    const parsedValue = React.useMemo(() => parseTimeValue(value), [value]);
+    const [isOpen, setIsOpen] = React.useState(false);
+    const [hour, setHour] = React.useState(parsedValue?.hour ?? "");
+    const [minute, setMinute] = React.useState(parsedValue?.minute ?? "");
+
+    React.useEffect(() => {
+        setHour(parsedValue?.hour ?? "");
+        setMinute(parsedValue?.minute ?? "");
+    }, [parsedValue]);
+
+    function commit(nextHour: string, nextMinute: string) {
+        if (!nextHour || !nextMinute) {
+            return;
+        }
+
+        onChange?.(`${nextHour}:${nextMinute}`);
+    }
+
+    function handleHourChange(nextHour: string) {
+        setHour(nextHour);
+        if (minute) {
+            commit(nextHour, minute);
+        }
+    }
+
+    function handleMinuteChange(nextMinute: string) {
+        setMinute(nextMinute);
+        if (hour) {
+            commit(hour, nextMinute);
+        }
+    }
+
+    function handleNow() {
+        const now = new Date();
+        const nextHour = now.getHours().toString().padStart(2, "0");
+        const nextMinute = now.getMinutes().toString().padStart(2, "0");
+
+        setHour(nextHour);
+        setMinute(nextMinute);
+        onChange?.(`${nextHour}:${nextMinute}`);
+        setIsOpen(false);
+    }
+
+    function handleClear() {
+        setHour("");
+        setMinute("");
+        onChange?.(null);
+        setIsOpen(false);
+    }
+
+    return (
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    type="button"
+                    variant="outline"
+                    disabled={disabled}
+                    className={cn(
+                        "w-full justify-between font-normal",
+                        !parsedValue && "text-muted-foreground",
+                        className
+                    )}
+                >
+                    <span>{parsedValue ? `${hour}:${minute}` : placeholder}</span>
+                    <Clock3Icon className="h-4 w-4 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 p-3" align="start">
+                <FieldGroup className="flex-row items-end gap-3">
+                    <Field className="min-w-0 flex-1">
+                        <FieldLabel className="text-xs uppercase tracking-wide text-muted-foreground">
+                            Hour
+                        </FieldLabel>
+                        <Select value={hour} onValueChange={handleHourChange} disabled={disabled}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="HH" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    {HOURS.map((item) => (
+                                        <SelectItem key={item} value={item}>
+                                            {item}
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                    </Field>
+
+                    <Field className="min-w-0 flex-1">
+                        <FieldLabel className="text-xs uppercase tracking-wide text-muted-foreground">
+                            Minute
+                        </FieldLabel>
+                        <Select value={minute} onValueChange={handleMinuteChange} disabled={disabled}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="MM" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    {MINUTES.map((item) => (
+                                        <SelectItem key={item} value={item}>
+                                            {item}
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                </FieldGroup>
+
+                <div className="mt-3 flex items-center justify-between gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={handleNow} disabled={disabled}>
+                        Now
+                    </Button>
+                    {allowClear ? (
+                        <Button type="button" variant="ghost" size="sm" onClick={handleClear} disabled={disabled}>
+                            Clear
+                        </Button>
+                    ) : null}
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+}
 
 interface DateTimePickerProps {
     value?: Date | null;
@@ -41,9 +210,7 @@ export function DateTimePicker({
         setDate(value || undefined);
     }, [value]);
 
-    const timeValue = date
-        ? `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`
-        : "";
+    const timeValue = formatTimeValue(date);
 
     const handleDateSelect = (selectedDate: Date | undefined) => {
         if (selectedDate) {
@@ -62,8 +229,7 @@ export function DateTimePicker({
         }
     };
 
-    const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const timeStr = e.target.value;
+    const handleTimeChange = (timeStr: string | null) => {
         if (!timeStr) return;
         const base = date ? new Date(date) : new Date();
         const [hours, minutes] = timeStr.split(":").map(Number);
@@ -122,14 +288,13 @@ export function DateTimePicker({
                 </Popover>
             </Field>
 
-            <Field className="w-full sm:w-36">
+            <Field className="w-full sm:w-40">
                 <FieldLabel className="sr-only">Time</FieldLabel>
-                <Input
-                    type="time"
-                    disabled={disabled}
+                <TimePicker
                     value={timeValue}
                     onChange={handleTimeChange}
-                    className="w-full appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                    disabled={disabled}
+                    placeholder="Select time"
                 />
             </Field>
 

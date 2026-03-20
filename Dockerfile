@@ -64,6 +64,7 @@ RUN apt-get update && apt-get install -y procps && npm install -g pm2 && rm -rf 
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/package-lock.json ./
 RUN npm install --legacy-peer-deps || npm ci --legacy-peer-deps
+COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/dashboard/.next ./src/dashboard/.next
 COPY --from=builder /app/src/dashboard/next.config.js ./src/dashboard/next.config.js
@@ -86,5 +87,5 @@ EXPOSE 4002
 
 USER appuser
 
-# Start PM2
-CMD ["pm2-runtime", "start", "ecosystem.config.js"]
+# Run migrations, then start PM2
+CMD ["sh", "/app/scripts/prod-start.sh"]
