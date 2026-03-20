@@ -540,7 +540,7 @@ Current slash command files: `47`
 ### `/watchlist add`
 
 - Description: Add a member to the staff watchlist for tracking suspicious members.
-- Permission: `Manage Server`.
+- Permission: `Manage Messages` or `Manage Server`.
 - Options:
   - `member` (user, required): Member to watch.
   - `reason` (string, required): Why this member is being watched (max 500 chars).
@@ -553,7 +553,7 @@ Current slash command files: `47`
 ### `/watchlist remove`
 
 - Description: Remove a member from the watchlist.
-- Permission: `Manage Server`.
+- Permission: `Manage Messages` or `Manage Server`.
 - Options:
   - `member` (user, required): Member to remove.
 - Example: `/watchlist remove member:@Member`
@@ -561,7 +561,7 @@ Current slash command files: `47`
 ### `/watchlist view`
 
 - Description: View the watchlist entry for a specific member.
-- Permission: `Manage Server`.
+- Permission: `Manage Messages` or `Manage Server`.
 - Options:
   - `member` (user, required): Member to look up.
 - Example: `/watchlist view member:@Member`
@@ -569,7 +569,7 @@ Current slash command files: `47`
 ### `/watchlist list`
 
 - Description: List all members currently on the server watchlist.
-- Permission: `Manage Server`.
+- Permission: `Manage Messages` or `Manage Server`.
 - Options: None.
 - Example: `/watchlist list`
 - Notes:
@@ -578,7 +578,7 @@ Current slash command files: `47`
 ### `/watchlist note`
 
 - Description: Add or update notes for an existing watchlist entry.
-- Permission: `Manage Server`.
+- Permission: `Manage Messages` or `Manage Server`.
 - Options:
   - `member` (user, required): Member to update.
   - `note` (string, required): Note to add (max 1000 chars).
