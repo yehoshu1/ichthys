@@ -17,6 +17,7 @@ export type DashboardNavId =
     | "tools"
     | "logs"
     | "settings"
+    | "access"
     | "docs";
 
 export interface DashboardNavItem {
@@ -44,6 +45,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
     { id: "watchlist", name: "Watchlist", href: "/watchlist", moduleSlug: "moderation", keywords: ["watchlist", "watch", "suspicious", "monitor", "flag", "tracking"] },
     { id: "tools", name: "Timestamp", href: "/tools", keywords: ["timestamp", "discord timestamp", "time", "converter", "unix", "timezone", "tools"] },
     { id: "settings", name: "Settings", href: "/settings", moduleSlug: "settings-backups", keywords: ["import", "export", "backup", "restore"] },
+    { id: "access", name: "Access Control", href: "/settings/access", keywords: ["rbac", "roles", "permissions", "delegate", "access control"] },
     { id: "webhooks", name: "Webhooks & API", href: "/webhooks", moduleSlug: "webhooks", keywords: ["webhook", "api", "integration", "endpoint", "automation"] },
     { id: "docs", name: "Documentation", href: "/docs", keywords: ["guides", "docs", "help"] },
 ];

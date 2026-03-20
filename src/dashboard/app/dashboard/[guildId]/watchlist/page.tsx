@@ -103,7 +103,7 @@ function SeverityBadge({ severity }: { severity: Severity }) {
 
 function UserAvatar({
     user,
-    userId,
+    userId: _userId,
 }: {
     user: WatchlistUser | null;
     userId: string;

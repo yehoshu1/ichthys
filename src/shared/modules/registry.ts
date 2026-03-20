@@ -52,8 +52,10 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
             '/api/guilds/[guildId]/discord-data',
             '/api/guilds/[guildId]/members',
             '/api/guilds/[guildId]/modules',
+            '/api/guilds/[guildId]/me',
+            '/api/guilds/[guildId]/rbac',
         ],
-        tables: ['guild_config'],
+        tables: ['guild_config', 'dashboard_rbac_config', 'dashboard_rbac_rules'],
         requiredEnv: ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID'],
     },
     {

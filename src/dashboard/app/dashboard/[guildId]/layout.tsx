@@ -31,6 +31,7 @@ import {
     CalendarDays,
     BarChart3,
     Webhook,
+    KeyRound,
     Eye,
     Clock,
     type LucideIcon,
@@ -50,6 +51,7 @@ import { toast } from "sonner";
 import GlobalSearchModal from "../../../components/GlobalSearchModal";
 import { DASHBOARD_NAV_ITEMS, DashboardNavId } from "../../../lib/search/dashboard-nav";
 import type { SearchOpenMethod } from "../../../lib/search/telemetry";
+import { RbacAccessProvider } from "../../../components/RbacAccessContext";
 
 interface ModuleStateResponse {
     modules: Array<{
@@ -63,6 +65,35 @@ interface GuildInfoResponse {
     iconUrl?: string | null;
     isBotMember?: boolean | null;
 }
+
+interface ModuleAccess {
+    view: boolean;
+    edit: boolean;
+}
+
+interface AccessResponse {
+    isBypassUser: boolean;
+    modules: Record<string, ModuleAccess>;
+}
+
+// Map from nav item IDs to RBAC module IDs (API path segment)
+const NAV_TO_RBAC_MODULE: Partial<Record<DashboardNavId, string>> = {
+    welcome: "welcome",
+    verification: "verification",
+    leveling: "leveling",
+    boosts: "boosts",
+    birthdays: "birthdays",
+    "role-actions": "role-actions",
+    aliases: "aliases",
+    commands: "commands",
+    moderation: "moderation",
+    settings: "settings",
+    webhooks: "webhooks",
+    events: "events",
+    polls: "polls",
+    notifications: "notifications",
+    overview: "analytics",
+};
 
 const navIconById: Record<DashboardNavId, LucideIcon> = {
     overview: LayoutDashboard,
@@ -83,6 +114,7 @@ const navIconById: Record<DashboardNavId, LucideIcon> = {
     tools: Clock,
     logs: ScrollText,
     settings: Settings,
+    access: KeyRound,
     docs: BookOpen,
 };
 
@@ -134,6 +166,7 @@ export default function DashboardLayout({
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchOpenMethod, setSearchOpenMethod] = useState<SearchOpenMethod>("unknown");
     const [moduleEnabledById, setModuleEnabledById] = useState<Record<string, boolean>>({});
+    const [accessData, setAccessData] = useState<AccessResponse | null>(null);
     const fetchInProgress = useRef(false);
 
     const openSearch = (method: SearchOpenMethod): void => {
@@ -249,7 +282,37 @@ export default function DashboardLayout({
             });
     }, [guildId]);
 
-    const navItems = DASHBOARD_NAV_ITEMS;
+    useEffect(() => {
+        if (!guildId) return;
+
+        fetch(`/api/guilds/${guildId}/me/access`)
+            .then(async (res) => {
+                if (!res.ok) return null;
+                return (await res.json()) as AccessResponse;
+            })
+            .then((payload) => {
+                if (payload) setAccessData(payload);
+            })
+            .catch((err: unknown) => {
+                // Non-fatal: keep all nav items visible if access data cannot be fetched.
+                console.warn("Failed to fetch RBAC access data:", err);
+            });
+    }, [guildId]);
+
+    function isNavItemVisible(item: { id: DashboardNavId }): boolean {
+        // Access Control is exclusively for bypass users; hidden until confirmed.
+        if (item.id === "access") {
+            return accessData?.isBypassUser === true;
+        }
+        // Bypass users and unresolved access: show everything else.
+        if (!accessData || accessData.isBypassUser) return true;
+        // Find the RBAC module ID for this nav item (O(1) lookup).
+        const rbacModuleId = NAV_TO_RBAC_MODULE[item.id];
+        if (!rbacModuleId) return true; // No RBAC mapping → always visible
+        return accessData.modules[rbacModuleId]?.view ?? false;
+    }
+
+    const navItems = DASHBOARD_NAV_ITEMS.filter(isNavItemVisible);
 
     // Show Loading State (Prevents dashboard content from rendering prematurely)
     if (isLoading) {
@@ -572,7 +635,12 @@ export default function DashboardLayout({
                 {/* Page Content */}
                 <main className="flex-1 overflow-y-auto p-4 md:p-8">
                     <div className="mx-auto max-w-6xl">
-                        {children}
+                        <RbacAccessProvider
+                            isBypassUser={accessData?.isBypassUser ?? true}
+                            modules={accessData?.modules ?? {}}
+                        >
+                            {children}
+                        </RbacAccessProvider>
                     </div>
                 </main>
             </div>
