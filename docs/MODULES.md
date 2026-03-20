@@ -21,6 +21,7 @@ This section breaks down every major Ixoye module with implementation-level deta
 
 ### Moderation & Analytics
 - [Moderation](modules/moderation.md)
+- [Watchlist](modules/watchlist.md) - Staff watchlist for tracking suspicious members
 - [Analytics](modules/analytics.md)
 - [Action Logs](modules/logs.md)
 

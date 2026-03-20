@@ -126,7 +126,7 @@ async function flushActivityBuffer(): Promise<void> {
                 .onConflictDoUpdate({
                     target: [messageActivity.guildId, messageActivity.date, messageActivity.hour],
                     set: {
-                        messageCount: sql`message_count + excluded.message_count`,
+                        messageCount: sql`message_activity.message_count + excluded.message_count`,
                         updatedAt: new Date(),
                     },
                 });
