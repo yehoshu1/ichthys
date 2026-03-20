@@ -50,6 +50,13 @@
       "when": 1774015000000,
       "tag": "0010_dashboard_rbac",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774026000000,
+      "tag": "0011_member_watchlist",
+      "breakpoints": true
     }
   ]
 }
