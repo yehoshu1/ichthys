@@ -32,6 +32,7 @@ Automated moderation:
 
 - `moderation_settings` (module settings)
 - `moderation_case` (manual action history)
+- `member_watchlist` (staff watchlist entries)
 - `action_log` (automation/action traces)
 
 ## Related Bot Code
@@ -75,6 +76,11 @@ Automated moderation:
 
 **Records:**
 - `/cases` - List moderation cases for user
+- `/watchlist add` - Add member to staff watchlist
+- `/watchlist remove` - Remove member from watchlist
+- `/watchlist view` - View watchlist entry for a member
+- `/watchlist list` - List all watchlisted members
+- `/watchlist note` - Add or update notes on a watchlist entry
 
 ### Command Files
 

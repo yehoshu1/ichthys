@@ -45,7 +45,7 @@ Run scripts with `npm run <script>`.
 
 ## Slash Command Overview
 
-Current slash command files: `31`
+Current slash command files: `47`
 
 ### Public Commands (Anyone)
 
@@ -84,6 +84,11 @@ Current slash command files: `31`
 - `/unlock`
 - `/slowmode`
 - `/setnick`
+- `/watchlist add`
+- `/watchlist remove`
+- `/watchlist view`
+- `/watchlist list`
+- `/watchlist note`
 
 ### Admin Commands
 
@@ -531,6 +536,53 @@ Current slash command files: `31`
   - `page` (integer, optional, min 1): Page number.
 - Example: `/cases user:@Member`
 - Example: `/cases user:@Member active_only:true page:2`
+
+### `/watchlist add`
+
+- Description: Add a member to the staff watchlist for tracking suspicious members.
+- Permission: `Manage Server`.
+- Options:
+  - `member` (user, required): Member to watch.
+  - `reason` (string, required): Why this member is being watched (max 500 chars).
+  - `severity` (string, optional): `LOW` (default), `MEDIUM`, `HIGH`.
+  - `notes` (string, optional): Additional context (max 1000 chars).
+- Example: `/watchlist add member:@Member reason:Suspicious activity severity:MEDIUM`
+- Notes:
+  - If the member is already on the watchlist, their entry is updated.
+
+### `/watchlist remove`
+
+- Description: Remove a member from the watchlist.
+- Permission: `Manage Server`.
+- Options:
+  - `member` (user, required): Member to remove.
+- Example: `/watchlist remove member:@Member`
+
+### `/watchlist view`
+
+- Description: View the watchlist entry for a specific member.
+- Permission: `Manage Server`.
+- Options:
+  - `member` (user, required): Member to look up.
+- Example: `/watchlist view member:@Member`
+
+### `/watchlist list`
+
+- Description: List all members currently on the server watchlist.
+- Permission: `Manage Server`.
+- Options: None.
+- Example: `/watchlist list`
+- Notes:
+  - Shows summary counts for each severity level.
+
+### `/watchlist note`
+
+- Description: Add or update notes for an existing watchlist entry.
+- Permission: `Manage Server`.
+- Options:
+  - `member` (user, required): Member to update.
+  - `note` (string, required): Note to add (max 1000 chars).
+- Example: `/watchlist note member:@Member note:Seen spamming again today`
 
 ---
 
