@@ -624,6 +624,7 @@ function EventForm({
                         }
                         placeholder="Select end date and time"
                         minDate={formData.startTime || undefined}
+                        allowClear={true}
                     />
                 </div>
             </div>

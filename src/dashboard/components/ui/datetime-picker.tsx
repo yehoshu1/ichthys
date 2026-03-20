@@ -22,6 +22,7 @@ interface DateTimePickerProps {
     disabled?: boolean;
     className?: string;
     minDate?: Date;
+    allowClear?: boolean;
 }
 
 export function DateTimePicker({
@@ -31,6 +32,7 @@ export function DateTimePicker({
     disabled = false,
     className,
     minDate,
+    allowClear = false,
 }: DateTimePickerProps) {
     const [date, setDate] = React.useState<Date | undefined>(value || undefined);
     const [calendarOpen, setCalendarOpen] = React.useState(false);
@@ -76,6 +78,12 @@ export function DateTimePicker({
         const normalizedMinDate = new Date(minDate);
         normalizedMinDate.setHours(0, 0, 0, 0);
         return day < normalizedMinDate;
+    };
+
+    const handleClear = () => {
+        setDate(undefined);
+        setCalendarOpen(false);
+        onChange?.(null);
     };
 
     return (
@@ -124,6 +132,18 @@ export function DateTimePicker({
                     className="w-full appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                 />
             </Field>
+
+            {allowClear && date ? (
+                <Button
+                    type="button"
+                    variant="outline"
+                    disabled={disabled}
+                    onClick={handleClear}
+                    className="w-full sm:w-auto"
+                >
+                    Clear
+                </Button>
+            ) : null}
         </FieldGroup>
     );
 }
