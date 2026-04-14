@@ -20,6 +20,8 @@ const roleActionSchema = z.object({
     kickReason: optionalTextSchema,
     logChannelId: nullableDiscordIdSchema,
     enabled: z.boolean().optional(),
+    requiredRoleIds: z.array(z.string().trim().min(1)).optional(),
+    requiredRoleLogic: z.enum(["AND", "OR"]).optional(),
 }).strict();
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
@@ -65,6 +67,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
                     kickReason: body.kickReason || null,
                     logChannelId: body.logChannelId || null,
                     enabled: body.enabled ?? true,
+                    requiredRoleIds: body.requiredRoleIds ?? [],
+                    requiredRoleLogic: body.requiredRoleLogic || "AND",
                     updatedAt: new Date(),
                 })
                 .where(and(eq(roleAction.id, body.id), eq(roleAction.guildId, guildId)))
@@ -92,6 +96,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
             kickReason: body.kickReason || null,
             logChannelId: body.logChannelId || null,
             enabled: body.enabled ?? true,
+            requiredRoleIds: body.requiredRoleIds ?? [],
+            requiredRoleLogic: body.requiredRoleLogic || "AND",
         }).returning();
         await emitDashboardSettingsChanged({
             guildId,

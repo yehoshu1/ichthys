@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { RoleSelect, ChannelSelect } from "../../../../components/DiscordSelectors";
+import { RoleSelect, ChannelSelect, RoleMultiSelect } from "../../../../components/DiscordSelectors";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
 import { Card, CardHeader, CardContent, CardFooter, CardTitle } from "../../../../components/ui/card";
@@ -26,6 +26,8 @@ interface RoleAction {
     kickReason: string | null;
     logChannelId: string | null;
     enabled: boolean;
+    requiredRoleIds: string[];
+    requiredRoleLogic: "AND" | "OR";
 }
 
 export default function RoleActionsPage() {
@@ -128,6 +130,8 @@ export default function RoleActionsPage() {
                             kickReason: "",
                             logChannelId: "",
                             enabled: true,
+                            requiredRoleIds: [],
+                            requiredRoleLogic: "AND",
                         });
                         setModalOpen(true);
                     }}
@@ -216,6 +220,8 @@ export default function RoleActionsPage() {
                                     kickReason: "",
                                     logChannelId: "",
                                     enabled: true,
+                                    requiredRoleIds: [],
+                                    requiredRoleLogic: "AND",
                                 });
                                 setModalOpen(true);
                             }}
@@ -302,6 +308,37 @@ export default function RoleActionsPage() {
                                     min={0}
                                 />
                                 <HelperText>Set to 0 for immediate action, or use 60 to wait 1 hour.</HelperText>
+                            </div>
+
+                            <div className="space-y-2">
+                                <LabelWithTooltip
+                                    label="Required Roles (Optional)"
+                                    tooltip="The action only triggers if the user has these roles at the time of the role change. Leave empty to always trigger."
+                                />
+                                <RoleMultiSelect
+                                    guildId={guildId}
+                                    values={editingAction?.requiredRoleIds || []}
+                                    onChange={(values) => setEditingAction({ ...editingAction!, requiredRoleIds: values })}
+                                    placeholder="No condition — always trigger"
+                                />
+                                {(editingAction?.requiredRoleIds?.length ?? 0) > 0 && (
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-muted-foreground">Logic</Label>
+                                        <Select
+                                            value={editingAction?.requiredRoleLogic || "AND"}
+                                            onValueChange={(value) => setEditingAction({ ...editingAction!, requiredRoleLogic: value as "AND" | "OR" })}
+                                        >
+                                            <SelectTrigger className="h-8 text-xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="AND">AND — user must have ALL selected roles</SelectItem>
+                                                <SelectItem value="OR">OR — user must have ANY selected role</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+                                <HelperText>Only trigger this action if the member currently holds these roles.</HelperText>
                             </div>
 
                             {(editingAction?.actionType === "DM" || editingAction?.actionType === "LOG" || editingAction?.actionType === "KICK" || editingAction?.actionType === "MSG") && (
