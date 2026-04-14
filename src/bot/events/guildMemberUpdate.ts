@@ -354,6 +354,12 @@ const event: Event<Events.GuildMemberUpdate> = {
     }
 };
 
+/**
+ * Checks whether a member satisfies the required role conditions for a role action.
+ * - If no required roles are specified, the condition passes unconditionally (backward compatible).
+ * - AND logic: the member must have ALL of the required roles.
+ * - OR logic: the member must have AT LEAST ONE of the required roles.
+ */
 function checkRequiredRoles(member: GuildMember, action: typeof roleAction.$inferSelect): boolean {
     if (!action.requiredRoleIds || action.requiredRoleIds.length === 0) return true;
     if (action.requiredRoleLogic === 'OR') {
