@@ -98,6 +98,7 @@ const event: Event<Events.GuildMemberUpdate> = {
                         const role = removedRoles.get(roleId);
                         const actions = removeActionsByRole.get(roleId) || [];
                         for (const action of actions) {
+                            if (!checkRequiredRoles(newMember, action)) continue;
                             await executeRoleAction(newMember, action);
                         }
 
@@ -301,6 +302,7 @@ const event: Event<Events.GuildMemberUpdate> = {
 
                     try {
                         for (const action of actions) {
+                            if (!checkRequiredRoles(newMember, action)) continue;
                             await executeRoleAction(newMember, action);
                         }
                     } catch (error) {
@@ -351,6 +353,20 @@ const event: Event<Events.GuildMemberUpdate> = {
         }
     }
 };
+
+/**
+ * Checks whether a member satisfies the required role conditions for a role action.
+ * - If no required roles are specified, the condition passes unconditionally (backward compatible).
+ * - AND logic: the member must have ALL of the required roles.
+ * - OR logic: the member must have AT LEAST ONE of the required roles.
+ */
+function checkRequiredRoles(member: GuildMember, action: typeof roleAction.$inferSelect): boolean {
+    if (!action.requiredRoleIds || action.requiredRoleIds.length === 0) return true;
+    if (action.requiredRoleLogic === 'OR') {
+        return action.requiredRoleIds.some(roleId => member.roles.cache.has(roleId));
+    }
+    return action.requiredRoleIds.every(roleId => member.roles.cache.has(roleId));
+}
 
 async function handleBoost(member: GuildMember, boostDate: Date, type: 'new' | 'reboost') {
     try {
