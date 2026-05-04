@@ -321,7 +321,7 @@ export default function RoleActionsPage() {
                                     onChange={(values) => setEditingAction({ ...editingAction!, requiredRoleIds: values })}
                                     placeholder="No condition — always trigger"
                                 />
-                                {editingAction.requiredRoleIds.length > 0 && (
+                                {editingAction?.requiredRoleIds.length > 0 && (
                                     <div className="space-y-1">
                                         <Label className="text-xs text-muted-foreground">Logic</Label>
                                         <Select
