@@ -1,4 +1,4 @@
-import type { ButtonInteraction, RoleSelectMenuInteraction, ChannelSelectMenuInteraction } from 'discord.js';
+import type { ButtonInteraction } from 'discord.js';
 import { ComponentRouter } from '../component-router';
 import { guildConfigService } from '../../services/guildConfigService';
 import { buildSetupPanel } from '../../utils/setupPanel';
