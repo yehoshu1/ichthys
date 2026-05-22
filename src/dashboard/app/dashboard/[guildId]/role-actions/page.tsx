@@ -56,9 +56,12 @@ export default function RoleActionsPage() {
         }
     }
 
+    const [error, setError] = useState<string | null>(null);
+
     async function handleSave() {
         if (!editingAction?.roleId || !editingAction?.actionType) return;
         setSaving(true);
+        setError(null);
         try {
             const res = await fetch(`/api/guilds/${guildId}/role-actions`, {
                 method: "POST",
@@ -69,9 +72,17 @@ export default function RoleActionsPage() {
                 await fetchActions();
                 setModalOpen(false);
                 setEditingAction(null);
+            } else {
+                const data = await res.json().catch(() => null);
+                const msg = data?.details
+                    ? data.details.map((d: any) => `${d.path}: ${d.message}`).join(", ")
+                    : data?.error || `Save failed (${res.status})`;
+                setError(msg);
+                console.error("Role action save failed:", data);
             }
         } catch (err) {
             console.error(err);
+            setError("Network error — please try again.");
         } finally {
             setSaving(false);
         }
@@ -133,6 +144,7 @@ export default function RoleActionsPage() {
                             requiredRoleIds: [],
                             requiredRoleLogic: "AND",
                         });
+                        setError(null);
                         setModalOpen(true);
                     }}
                 >
@@ -189,6 +201,7 @@ export default function RoleActionsPage() {
                         <CardFooter className="flex gap-2 pt-3">
                             <Button variant="secondary" size="sm" className="w-full" onClick={() => {
                                 setEditingAction(action);
+                                setError(null);
                                 setModalOpen(true);
                             }}>
                                 <Pencil className="mr-2 h-3 w-3" /> Edit
@@ -397,6 +410,11 @@ export default function RoleActionsPage() {
                                 </div>
                             )}
                         </CardContent>
+                        {error && (
+                            <div className="mx-6 rounded-md bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
+                                {error}
+                            </div>
+                        )}
                         <CardFooter className="flex justify-end gap-2">
                             <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
                             <Button onClick={handleSave} disabled={saving}>

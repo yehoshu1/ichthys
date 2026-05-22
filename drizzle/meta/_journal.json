@@ -57,6 +57,13 @@
       "when": 1774026000000,
       "tag": "0011_member_watchlist",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779441600000,
+      "tag": "0012_add_role_action_required_role_columns",
+      "breakpoints": true
     }
   ]
 }

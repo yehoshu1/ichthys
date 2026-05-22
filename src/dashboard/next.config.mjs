@@ -168,6 +168,7 @@ const nextConfig = {
 
 const withMDX = createMDX({
     configPath: path.resolve(__dirname, "source.config.ts"),
+    outDir: path.resolve(__dirname, ".source"),
 });
 
 export default withMDX(nextConfig);
