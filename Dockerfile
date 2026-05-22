@@ -67,7 +67,7 @@ RUN npm install --legacy-peer-deps || npm ci --legacy-peer-deps
 COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/dashboard/.next ./src/dashboard/.next
-COPY --from=builder /app/src/dashboard/next.config.js ./src/dashboard/next.config.js
+COPY --from=builder /app/src/dashboard/next.config.mjs ./src/dashboard/next.config.mjs
 # COPY --from=builder /app/public ./public
 COPY --from=builder /app/ecosystem.config.js ./
 # Copy database schema for drizzle-kit if needed

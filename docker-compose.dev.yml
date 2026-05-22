@@ -85,7 +85,7 @@ services:
         - action: rebuild
           path: ./Dockerfile
         - action: rebuild
-          path: ./next.config.js
+          path: ./src/dashboard/next.config.mjs
 
   ixoye-pg-backup-dev:
     image: postgres:17
