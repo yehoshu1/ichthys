@@ -5,10 +5,6 @@ import { Badge } from "../../../../../components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../components/ui/card";
 import { modules } from "../../../../../lib/docs-content";
 
-export function generateStaticParams() {
-    return modules.map((module) => ({ module: module.slug }));
-}
-
 export default async function DevModuleDetailPage({
     params,
 }: {

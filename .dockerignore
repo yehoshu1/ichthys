@@ -1,5 +1,7 @@
 node_modules
 .next
+**/.next
+src/dashboard/.source
 dist
 .env
 .git
@@ -7,3 +9,5 @@ dist
 .vscode
 npm-debug.log
 .DS_Store
+*.tsbuildinfo
+logs

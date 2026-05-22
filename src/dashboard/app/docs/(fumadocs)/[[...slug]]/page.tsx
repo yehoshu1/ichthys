@@ -32,13 +32,6 @@ export default async function Page(props: {
     );
 }
 
-export async function generateStaticParams() {
-    const generated = source.generateParams();
-    const hasRoot = generated.some((param) => !param.slug || param.slug.length === 0);
-
-    return hasRoot ? generated : [{ slug: [] }, ...generated];
-}
-
 export async function generateMetadata(props: {
     params: Promise<{ slug?: string[] }>;
 }) {

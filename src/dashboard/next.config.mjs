@@ -51,6 +51,9 @@ for (const file of envCandidates) {
 const nextConfig = {
     reactStrictMode: true,
     transpilePackages: ["discord.js"],
+    typescript: {
+        ignoreBuildErrors: process.env.SKIP_NEXT_TYPECHECK === "1",
+    },
     images: {
         remotePatterns: [
             {
@@ -172,4 +175,3 @@ const withMDX = createMDX({
 });
 
 export default withMDX(nextConfig);
-
