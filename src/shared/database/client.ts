@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
 // eslint-disable-next-line no-restricted-imports
-const logger = { error: console.error.bind(console), warn: console.warn.bind(console), debug: console.debug.bind(console) };
+const consoleLogger = { error: console.error.bind(console), warn: console.warn.bind(console), debug: console.debug.bind(console) };
 
 function buildDatabaseUrl(): string {
     if (process.env.DATABASE_URL) {
@@ -57,12 +57,12 @@ export const pool = new Pool({
 });
 
 pool.on('error', (error) => {
-    logger.error('Unexpected PostgreSQL pool error:', error);
+    consoleLogger.error('Unexpected PostgreSQL pool error:', error);
 });
 
 pool.on('connect', (client) => {
     client.on('error', (err) => {
-        logger.error('PostgreSQL client error:', err);
+        consoleLogger.error('PostgreSQL client error:', err);
     });
 });
 
@@ -74,7 +74,7 @@ pool.on('acquire', () => {
             waiting: pool.waitingCount
         };
         if (metrics.waiting > 0) {
-            logger.warn('PostgreSQL pool contention:', metrics);
+            consoleLogger.warn('PostgreSQL pool contention:', metrics);
         }
     }
 });
@@ -89,7 +89,7 @@ function registerShutdownHook(): void {
 
     const shutdown = async () => {
         await pool.end().catch((error) => {
-            logger.error('Error closing PostgreSQL pool:', error);
+            consoleLogger.error('Error closing PostgreSQL pool:', error);
         });
     };
 
@@ -121,7 +121,7 @@ export async function checkPoolHealth(): Promise<{ healthy: boolean; metrics: Po
             metrics: getPoolMetrics()
         };
     } catch (error) {
-        logger.error('Pool health check failed:', error);
+        consoleLogger.error('Pool health check failed:', error);
         return {
             healthy: false,
             metrics: getPoolMetrics()
