@@ -48,7 +48,7 @@ RUN npm run build
 ENV NEXT_TELEMETRY_DISABLED=1
 # Next.js requires .env file to exist even if empty
 RUN touch .env && mkdir -p src/dashboard && touch src/dashboard/.env
-RUN npm run dashboard:build
+RUN bash -lc 'npm run dashboard:build & pid=$!; while kill -0 "$pid" 2>/dev/null; do echo "[build] dashboard build in progress..."; sleep 15; done; wait "$pid"'
 RUN rm -rf /app/src/dashboard/.next/cache /app/src/dashboard/.next/types /app/src/dashboard/.next/trace-build /app/src/dashboard/.next/diagnostics
 
 # Runner stage
