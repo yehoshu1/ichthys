@@ -49,6 +49,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Next.js requires .env file to exist even if empty
 RUN touch .env && mkdir -p src/dashboard && touch src/dashboard/.env
 RUN npm run dashboard:build
+RUN rm -rf /app/src/dashboard/.next/cache /app/src/dashboard/.next/types /app/src/dashboard/.next/trace-build /app/src/dashboard/.next/diagnostics
 
 # Runner stage
 FROM base AS runner
@@ -63,7 +64,9 @@ RUN apt-get update && apt-get install -y procps && npm install -g pm2 && rm -rf 
 # Copy necessary files
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/package-lock.json ./
-RUN npm install --legacy-peer-deps || npm ci --legacy-peer-deps
+RUN npm ci --omit=dev --legacy-peer-deps --no-audit --no-fund \
+    && npm cache clean --force \
+    && rm -rf /root/.npm /tmp/*
 COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/dashboard/.next ./src/dashboard/.next
@@ -78,6 +81,10 @@ COPY --from=builder /app/ecosystem.config.js ./
 COPY --from=builder /app/src/shared/database ./src/shared/database
 COPY --from=builder /app/drizzle.config.ts ./
 COPY --from=builder /app/scripts ./scripts
+
+# Runtime does not need source maps or npm caches.
+RUN rm -rf /app/node_modules/.cache \
+    && find /app/node_modules -type f -name '*.map' -delete
 
 # Create unprivileged runtime user and writable directories
 RUN groupadd -r appuser && useradd -r -g appuser -m appuser \
