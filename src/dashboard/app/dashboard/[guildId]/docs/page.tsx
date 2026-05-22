@@ -34,7 +34,7 @@ export default function GuildDocsPage() {
                     icon={<BookOpen className="h-5 w-5 text-primary" />}
                 />
                 <NavCard
-                    href="/docs/setup"
+                    href="/docs/getting-started"
                     title="Getting Started"
                     description="Onboarding checklist for roles, permissions, and first-time configuration."
                     icon={<Wrench className="h-5 w-5 text-primary" />}
