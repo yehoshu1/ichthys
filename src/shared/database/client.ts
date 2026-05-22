@@ -1,7 +1,8 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
-import logger from '../../bot/utils/logger';
+// eslint-disable-next-line no-restricted-imports
+const logger = { error: console.error.bind(console), warn: console.warn.bind(console), debug: console.debug.bind(console) };
 
 function buildDatabaseUrl(): string {
     if (process.env.DATABASE_URL) {
