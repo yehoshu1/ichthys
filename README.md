@@ -41,10 +41,13 @@ A powerful, production-ready Discord bot with a comprehensive web dashboard for 
 
 ## 📂 Documentation
 
-- **[Setup Guide](docs/SETUP.md)**: How to install, configure, and run the bot locally or in production.
-- **[Dashboard Guide](docs/DASHBOARD.md)**: A walkthrough of the web dashboard features and configuration.
-- **[Commands Reference](docs/COMMANDS.md)**: Complete npm and slash command catalog with options and examples.
-- **[Module Docs](docs/MODULES.md)**: Deep-dive pages for each module and subsystem.
+- **[Getting Started](/docs/getting-started)**: How to install, configure, and run the bot locally or in production.
+- **[Dashboard Guide](/docs/dashboard)**: A walkthrough of the web dashboard features and configuration.
+- **[Commands Reference](/docs/commands)**: Complete npm and slash command catalog with options and examples.
+- **[Feature Guides](/docs/modules)**: Deep-dive pages for each module and subsystem.
+
+The docs live at `/docs` when the dashboard is running, and the MDX sources are
+under `src/dashboard/content/docs/`.
 
 ## 🛠️ Quick Start
 

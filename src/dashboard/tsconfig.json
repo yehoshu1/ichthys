@@ -6,6 +6,9 @@
       "@/*": [
         "./*"
       ],
+      "@/.source": [
+        "./.source/server.ts"
+      ],
       "@shared/*": [
         "../shared/*"
       ]

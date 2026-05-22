@@ -45,6 +45,12 @@
             ],
             "@shared/*": [
                 "./src/shared/*"
+            ],
+            "@/.source": [
+                "./src/dashboard/.source/server.ts"
+            ],
+            "@/mdx-components": [
+                "./src/dashboard/mdx-components.tsx"
             ]
         },
         "allowJs": true,

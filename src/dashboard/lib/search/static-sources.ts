@@ -49,7 +49,7 @@ function createDocsEntries(): SearchEntry[] {
             source: "docs",
             title: "Getting Started",
             description: "User setup sequence and onboarding checklist",
-            href: "/docs/setup",
+            href: "/docs/getting-started",
             keywords: ["setup", "getting started", "onboarding"],
             priority: 81,
         },
@@ -110,7 +110,7 @@ function createDocsEntries(): SearchEntry[] {
         source: "docs",
         title: section.title,
         description: section.bullets?.[0] ?? section.commands?.[0] ?? "Setup guidance",
-        href: "/docs/setup",
+        href: "/docs/getting-started",
         keywords: [
             section.title,
             ...(section.bullets ?? []),
