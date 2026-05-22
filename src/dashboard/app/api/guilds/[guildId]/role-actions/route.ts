@@ -22,7 +22,7 @@ const roleActionSchema = z.object({
     enabled: z.boolean().optional(),
     requiredRoleIds: z.array(z.string().trim().min(1)).optional(),
     requiredRoleLogic: z.enum(["AND", "OR"]).optional(),
-}).strict();
+});
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
