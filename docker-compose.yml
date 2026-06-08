@@ -53,7 +53,7 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      DASHBOARD_URL: https://ixoyebot.presper.xyz
+      DASHBOARD_URL: https://bot.ichthys.qzz.io
       METRICS_TOKEN: ${METRICS_TOKEN:-}
       REDIS_URL: ${REDIS_URL:-}
       PG_SSL: "false"
@@ -70,12 +70,12 @@ services:
         condition: service_healthy
     labels:
       - traefik.docker.network=dokploy-network
-      - traefik.http.routers.extra-ixoyebot-3pki8t-13-web.rule=Host(`ixoye.presper.xyz`)
+      - traefik.http.routers.extra-ixoyebot-3pki8t-13-web.rule=Host(`bot.ichthys.qzz.io`)
       - traefik.http.routers.extra-ixoyebot-3pki8t-13-web.entrypoints=web
       - traefik.http.services.extra-ixoyebot-3pki8t-13-web.loadbalancer.server.port=4002
       - traefik.http.routers.extra-ixoyebot-3pki8t-13-web.service=extra-ixoyebot-3pki8t-13-web
       - traefik.http.routers.extra-ixoyebot-3pki8t-13-web.middlewares=redirect-to-https@file
-      - traefik.http.routers.extra-ixoyebot-3pki8t-13-websecure.rule=Host(`ixoye.presper.xyz`)
+      - traefik.http.routers.extra-ixoyebot-3pki8t-13-websecure.rule=Host(`bot.ichthys.qzz.io`)
       - traefik.http.routers.extra-ixoyebot-3pki8t-13-websecure.entrypoints=websecure
       - traefik.http.services.extra-ixoyebot-3pki8t-13-websecure.loadbalancer.server.port=4002
       - traefik.http.routers.extra-ixoyebot-3pki8t-13-websecure.service=extra-ixoyebot-3pki8t-13-websecure
