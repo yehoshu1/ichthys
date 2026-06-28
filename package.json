@@ -122,5 +122,10 @@
     "tsx": "^4.20.6",
     "typescript": "^5.8.3",
     "vitest": "^1.6.0"
+  },
+  "overrides": {
+    "fumadocs-mdx": {
+      "vite": "^5.4.21"
+    }
   }
 }

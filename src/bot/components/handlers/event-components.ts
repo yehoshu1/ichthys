@@ -136,15 +136,19 @@ async function handleEventRsvp(interaction: ButtonInteraction): Promise<void> {
                 { name: 'Server', value: interaction.guild?.name || 'Unknown', inline: false }
             );
 
-        const reminderRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder().setCustomId(`dm_reminder:${eventId}:0`).setLabel('On event start').setStyle(ButtonStyle.Primary),
             new ButtonBuilder().setCustomId(`dm_reminder:${eventId}:10`).setLabel('10 minutes before').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`dm_reminder:${eventId}:60`).setLabel('1 hour before').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`dm_reminder:${eventId}:1440`).setLabel('1 day before').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`dm_reminder:${eventId}:10080`).setLabel('1 week before').setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId(`dm_reminder:${eventId}:60`).setLabel('1 hour before').setStyle(ButtonStyle.Secondary)
         );
 
-        await interaction.user.send({ embeds: [dmEmbed], components: [reminderRow] });
+        const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder().setCustomId(`dm_reminder:${eventId}:1440`).setLabel('1 day before').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`dm_reminder:${eventId}:10080`).setLabel('1 week before').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`reminder:custom:${eventId}`).setLabel('Custom').setStyle(ButtonStyle.Secondary)
+        );
+
+        await interaction.user.send({ embeds: [dmEmbed], components: [row1, row2] });
     } catch (dmError) {
         logger.warn(`Could not send DM to ${interaction.user.id}:`, dmError);
     }

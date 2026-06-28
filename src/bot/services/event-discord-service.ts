@@ -150,8 +150,8 @@ export class EventDiscordService {
         return embed;
     }
 
-    buildRsvpButtons(eventId: string, disabled = false): ActionRowBuilder<ButtonBuilder> {
-        const row = new ActionRowBuilder<ButtonBuilder>();
+    buildEventButtons(eventId: string, disabled = false): ActionRowBuilder<ButtonBuilder>[] {
+        const row1 = new ActionRowBuilder<ButtonBuilder>();
 
         const yesButton = new ButtonBuilder()
             .setCustomId(`event:rsvp:${eventId}:YES`)
@@ -171,8 +171,22 @@ export class EventDiscordService {
             .setStyle(ButtonStyle.Danger)
             .setDisabled(disabled);
 
-        row.addComponents(yesButton, maybeButton, noButton);
-        return row;
+        row1.addComponents(yesButton, maybeButton, noButton);
+        
+        const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`event:reminder:${eventId}`)
+                .setLabel('⏰ Set Reminder')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(disabled),
+            new ButtonBuilder()
+                .setCustomId(`event:details:${eventId}`)
+                .setLabel('📋 Details')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(disabled)
+        );
+
+        return [row1, row2];
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -184,7 +198,7 @@ export class EventDiscordService {
         if (!channel) return null;
 
         const embed = await this.buildEventEmbed(event, guild);
-        const buttons = this.buildRsvpButtons(event.id, !this.isEventInteractable(event.status));
+        const buttons = this.buildEventButtons(event.id, !this.isEventInteractable(event.status));
 
         // Build mention string — only the create role (first entry in the array)
         let mentionContent = '';
@@ -195,7 +209,7 @@ export class EventDiscordService {
         const message = await channel.send({
             content: mentionContent || undefined,
             embeds: [embed],
-            components: [buttons],
+            components: [...buttons],
         });
 
         // Store message ID
@@ -215,11 +229,11 @@ export class EventDiscordService {
             if (!message) return null;
 
             const embed = await this.buildEventEmbed(event, guild);
-            const buttons = this.buildRsvpButtons(event.id, !this.isEventInteractable(event.status));
+            const buttons = this.buildEventButtons(event.id, !this.isEventInteractable(event.status));
 
             await message.edit({
                 embeds: [embed],
-                components: [buttons],
+                components: [...buttons],
             });
 
             return message;

@@ -249,7 +249,7 @@ export default function RoleActionsPage() {
             {modalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
                     <Card className="w-full max-w-lg shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
-                        <ScrollArea className="flex-1">
+                        <div className="flex-1 overflow-y-auto min-h-0">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                             <CardTitle>{editingAction?.id ? "Edit Action" : "New Role Action"}</CardTitle>
                             <Button variant="ghost" size="icon" onClick={() => setModalOpen(false)}>
@@ -423,7 +423,7 @@ export default function RoleActionsPage() {
                                 {saving ? "Saving..." : "Save Action"}
                             </Button>
                         </CardFooter>
-                        </ScrollArea>
+                        </div>
                     </Card>
                 </div>
             )}

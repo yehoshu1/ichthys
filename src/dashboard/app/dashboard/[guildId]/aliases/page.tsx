@@ -335,7 +335,7 @@ export default function AliasesPage() {
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-2xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
-                            <ScrollArea className="flex-1">
+                            <div className="flex-1 overflow-y-auto min-h-0">
                                 <div className="p-6">
                             <DialogHeader>
                                 <DialogTitle>{editingAlias ? "Edit Alias" : "Create New Alias"}</DialogTitle>
@@ -552,7 +552,7 @@ export default function AliasesPage() {
                                 </DialogFooter>
                             </form>
                                 </div>
-                            </ScrollArea>
+                            </div>
                         </DialogContent>
                     </Dialog>
                 </CardHeader>

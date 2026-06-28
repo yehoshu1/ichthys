@@ -404,7 +404,7 @@ export default function DashboardLayout({
                     </Link>
                 </div>
 
-                <ScrollArea className="flex-1">
+                <div className="flex-1 overflow-y-auto min-h-0">
                     <nav className="space-y-1 px-4 py-6">
                         <div className="px-3 mb-2 text-xs font-semibold uppercase text-muted-foreground">
                             Menu
@@ -439,7 +439,7 @@ export default function DashboardLayout({
                             );
                         })}
                     </nav>
-                </ScrollArea>
+                </div>
 
                 <div className="border-t p-4">
                     <Button
@@ -507,7 +507,7 @@ export default function DashboardLayout({
                                         <span className="text-primary">Ixoye</span> Dashboard
                                     </h1>
                                 </div>
-                                <ScrollArea className="flex-1">
+                                <div className="flex-1 overflow-y-auto min-h-0">
                                     <nav className="space-y-1 px-4 py-6">
                                         {navItems.map((item) => {
                                             const ItemIcon = navIconById[item.id];
@@ -540,7 +540,7 @@ export default function DashboardLayout({
                                             );
                                         })}
                                     </nav>
-                                </ScrollArea>
+                                </div>
                                 <div className="border-t p-4 shrink-0">
                                     <Button
                                         variant="ghost"
@@ -638,7 +638,7 @@ export default function DashboardLayout({
                     </div>
                 </header>
 
-                <ScrollArea className="flex-1">
+                <div className="flex-1 overflow-y-auto min-h-0">
                     <main className="p-4 md:p-8">
                         <div className="mx-auto max-w-6xl">
                             <RbacAccessProvider
@@ -651,7 +651,7 @@ export default function DashboardLayout({
                             </RbacAccessProvider>
                         </div>
                     </main>
-                </ScrollArea>
+                </div>
             </div>
 
             <GlobalSearchModal

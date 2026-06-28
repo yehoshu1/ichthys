@@ -69,8 +69,9 @@ import { LabelWithTooltip, HelperText } from "../../../../components/HelpTooltip
 import { ScrollArea } from "../../../../components/ui/scroll-area";
 
 import { DateTimePicker, DatePicker, TimePicker } from "../../../../components/ui/datetime-picker";
-import { RoleMultiSelect } from "../../../../components/DiscordSelectors";
+import { RoleMultiSelect, ChannelSelect } from "../../../../components/DiscordSelectors";
 import { FadeInStagger, FadeInItem } from "../../../../components/MotionWrapper";
+import { useDiscordData } from "../../../../components/useDiscordData";
 
 // Types
 interface Poll {
@@ -357,7 +358,7 @@ function CreatePollButton({ guildId }: { guildId: string }) {
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-w-3xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
-                <ScrollArea className="flex-1">
+                <div className="flex-1 overflow-y-auto min-h-0">
                     <div className="p-6">
                 <DialogHeader>
                     <DialogTitle>Create New Poll</DialogTitle>
@@ -396,7 +397,7 @@ function CreatePollButton({ guildId }: { guildId: string }) {
                     <StandardPollForm guildId={guildId} pollType={pollType} onSuccess={() => setOpen(false)} />
                 )}
                     </div>
-                </ScrollArea>
+                </div>
             </DialogContent>
         </Dialog>
     );
@@ -1671,7 +1672,7 @@ function PollsList({ guildId, status }: { guildId: string; status: "active" | "e
                 onOpenChange={(open) => !open && setEditingPoll(null)}
             >
                 <DialogContent className="max-w-2xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
-                    <ScrollArea className="flex-1">
+                    <div className="flex-1 overflow-y-auto min-h-0">
                         <div className="p-6">
                     <DialogHeader>
                         <DialogTitle>Edit Poll</DialogTitle>
@@ -1699,7 +1700,7 @@ function PollsList({ guildId, status }: { guildId: string; status: "active" | "e
                         )
                     )}
                         </div>
-                    </ScrollArea>
+                    </div>
                 </DialogContent>
             </Dialog>
 
@@ -1709,7 +1710,7 @@ function PollsList({ guildId, status }: { guildId: string; status: "active" | "e
                 onOpenChange={(open) => !open && setViewingPoll(null)}
             >
                 <DialogContent className="max-w-2xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
-                    <ScrollArea className="flex-1">
+                    <div className="flex-1 overflow-y-auto min-h-0">
                         <div className="p-6">
                     <DialogHeader>
                         <DialogTitle>Poll Results</DialogTitle>
@@ -1717,7 +1718,7 @@ function PollsList({ guildId, status }: { guildId: string; status: "active" | "e
                     </DialogHeader>
                     {viewingPoll && <PollResults poll={viewingPoll} />}
                         </div>
-                    </ScrollArea>
+                    </div>
                 </DialogContent>
             </Dialog>
         </>
@@ -1738,6 +1739,7 @@ function PollCard({
     onView: () => void;
 }) {
     const isEnded = poll.endTime && new Date(poll.endTime) < new Date();
+    const { rolesById } = useDiscordData(poll.guildId);
 
     return (
         <Card className="overflow-hidden">
@@ -1770,6 +1772,20 @@ function PollCard({
                             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                                 {poll.description}
                             </p>
+                        )}
+                        
+                        {poll.allowedRoleIds && poll.allowedRoleIds.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1 mt-2">
+                                <span className="text-xs text-muted-foreground mr-1">Restricted to:</span>
+                                {poll.allowedRoleIds.map(roleId => {
+                                    const role = rolesById.get(roleId);
+                                    return (
+                                        <Badge key={roleId} variant="secondary" className="text-xs font-normal" style={{ backgroundColor: role?.color ? `${role.color}20` : undefined, color: role?.color && role.color !== '#000000' ? role.color : undefined }}>
+                                            {role?.name || roleId}
+                                        </Badge>
+                                    );
+                                })}
+                            </div>
                         )}
 
                         <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-muted-foreground">

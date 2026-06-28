@@ -337,7 +337,7 @@ function WebhooksTab({ guildId }: { guildId: string }) {
             {/* Create Dialog */}
             <Dialog open={showCreate} onOpenChange={setShowCreate}>
                 <DialogContent className="max-w-2xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
-                    <ScrollArea className="flex-1">
+                    <div className="flex-1 overflow-y-auto min-h-0">
                         <div className="p-6">
                     <DialogHeader>
                         <DialogTitle>Create Webhook</DialogTitle>
@@ -353,7 +353,7 @@ function WebhooksTab({ guildId }: { guildId: string }) {
                         }}
                     />
                         </div>
-                    </ScrollArea>
+                    </div>
                 </DialogContent>
             </Dialog>
 
@@ -363,7 +363,7 @@ function WebhooksTab({ guildId }: { guildId: string }) {
                 onOpenChange={(open) => !open && setEditingWebhook(null)}
             >
                 <DialogContent className="max-w-2xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
-                    <ScrollArea className="flex-1">
+                    <div className="flex-1 overflow-y-auto min-h-0">
                         <div className="p-6">
                     <DialogHeader>
                         <DialogTitle>Edit Webhook</DialogTitle>
@@ -379,7 +379,7 @@ function WebhooksTab({ guildId }: { guildId: string }) {
                         />
                     )}
                         </div>
-                    </ScrollArea>
+                    </div>
                 </DialogContent>
             </Dialog>
 
@@ -987,7 +987,7 @@ function ApiKeysTab({ guildId }: { guildId: string }) {
             {/* Create Dialog */}
             <Dialog open={showCreate} onOpenChange={setShowCreate}>
                 <DialogContent className="max-w-2xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
-                    <ScrollArea className="flex-1">
+                    <div className="flex-1 overflow-y-auto min-h-0">
                         <div className="p-6">
                     <DialogHeader>
                         <DialogTitle>Create API Key</DialogTitle>
@@ -1004,7 +1004,7 @@ function ApiKeysTab({ guildId }: { guildId: string }) {
                         }}
                     />
                         </div>
-                    </ScrollArea>
+                    </div>
                 </DialogContent>
             </Dialog>
         </>

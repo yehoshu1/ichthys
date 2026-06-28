@@ -10,10 +10,11 @@ import {
 } from 'discord.js';
 import { Command } from '../types/Command';
 import { eventService } from '../services/event-service';
-import { isSupportedPostChannel } from '../services/event-poll-settings-service';
+import { isSupportedPostChannel, getEventPollSettingsForGuild } from '../services/event-poll-settings-service';
 import { getCommandPolicyContext } from '../services/command-policy-service';
 import { parseNaturalLanguageDate, formatDiscordTimestamp } from '../utils/date-parser';
 import logger from '../utils/logger';
+import { eventDiscordService } from '../services/event-discord-service';
 
 export const data = new SlashCommandBuilder()
     .setName('create')
@@ -146,9 +147,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             return;
         }
 
+        const settings = await getEventPollSettingsForGuild(guild.id);
+        const timezone = settings?.serverTimezone || 'UTC';
+
         // Parse date/time
         const dateTimeInput = interaction.options.getString('datetime', true);
-        const startTime = parseNaturalLanguageDate(dateTimeInput);
+        const startTime = parseNaturalLanguageDate(dateTimeInput, timezone);
 
         if (!startTime || startTime < new Date()) {
             await sendCreateResponse(interaction, 'Invalid date/time. Please use a future date/time (e.g., "tomorrow 6pm", "in 3 hours").');
@@ -173,7 +177,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         let repeatUntil: Date | undefined = undefined;
 
         if (repeatInput !== 'NONE' && repeatUntilInput) {
-            const parsedRepeatUntil = parseNaturalLanguageDate(repeatUntilInput);
+            const parsedRepeatUntil = parseNaturalLanguageDate(repeatUntilInput, timezone);
             repeatUntil = parsedRepeatUntil ?? undefined;
             if (!repeatUntil || repeatUntil <= startTime) {
                 await sendCreateResponse(interaction, 'Invalid repeat until date. It must be after the event start time.');
@@ -216,52 +220,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
         const createdEvent = await eventService.createEvent(eventData, guild);
 
-        // Build the event embed
-        const embed = buildEventEmbed(createdEvent);
-
-        // Create RSVP buttons
-        const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`event:rsvp:${createdEvent.id}:YES`)
-                .setLabel('✅ Going')
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setCustomId(`event:rsvp:${createdEvent.id}:MAYBE`)
-                .setLabel('🤔 Maybe')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId(`event:rsvp:${createdEvent.id}:NO`)
-                .setLabel('❌ Not Going')
-                .setStyle(ButtonStyle.Secondary)
-        );
-
-        const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`event:reminder:${createdEvent.id}`)
-                .setLabel('⏰ Set Reminder')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`event:details:${createdEvent.id}`)
-                .setLabel('📋 Details')
-                .setStyle(ButtonStyle.Secondary)
-        );
-
-        // Build mention string
-        const mentionRole = interaction.options.getRole('mention_on_create');
-        const content = mentionRole ? `<@&${mentionRole.id}>` : undefined;
-
-        // Send the event message
+        // Send the event message using the centralized discord service
         let postedEventMessage = false;
         try {
-            const message = await (channel as TextChannel).send({
-                content,
-                embeds: [embed],
-                components: [row1, row2],
-            });
-
-            // Update event with message ID
-            await eventService.setEventMessageId(createdEvent.id, message.id);
-            postedEventMessage = true;
+            const message = await eventDiscordService.createEventMessage(createdEvent, guild);
+            postedEventMessage = !!message;
         } catch (sendError) {
             logger.error('Failed to send created event message:', sendError);
         }
@@ -366,86 +329,7 @@ function delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function buildEventEmbed(event: any): EmbedBuilder {
-    const embed = new EmbedBuilder()
-        .setTitle('📅 ' + event.title)
-        .setColor('#5865F2')
-        .setTimestamp(event.createdAt);
 
-    if (event.description) {
-        embed.setDescription(event.description);
-    }
-
-    // Add time fields
-    embed.addFields(
-        { 
-            name: '🕐 Starts', 
-            value: `${formatDiscordTimestamp(event.startTime, 'F')}\n${formatDiscordTimestamp(event.startTime, 'R')}`,
-            inline: false 
-        }
-    );
-
-    if (event.endTime) {
-        embed.addFields({
-            name: '🕐 Ends',
-            value: formatDiscordTimestamp(event.endTime, 'F'),
-            inline: false,
-        });
-    }
-
-    if (event.locationChannelId) {
-        embed.addFields({ name: '📍 Voice Location', value: `<#${event.locationChannelId}>`, inline: true });
-    }
-
-    if (event.location) {
-        embed.addFields({ name: '📍 Location', value: event.location, inline: true });
-    }
-
-    if (event.maxAttendees) {
-        embed.addFields({ 
-            name: '👥 Spots', 
-            value: `${event.maxAttendees} max${event.enableWaitlist ? ' (with waitlist)' : ''}`, 
-            inline: true 
-        });
-    }
-
-    if (event.requiredRoleIds?.length) {
-        embed.addFields({ 
-            name: '🔒 Required Role', 
-            value: `<@&${event.requiredRoleIds[0]}>`, 
-            inline: true 
-        });
-    }
-
-    if (event.attendeeRoleId) {
-        embed.addFields({
-            name: '🎁 Attendee Role',
-            value: `<@&${event.attendeeRoleId}>`,
-            inline: true,
-        });
-    }
-
-    if (event.repeatFrequency && event.repeatFrequency !== 'NONE') {
-        embed.addFields({
-            name: '🔄 Repeats',
-            value: event.repeatFrequency.charAt(0) + event.repeatFrequency.slice(1).toLowerCase(),
-            inline: true,
-        });
-    }
-
-    // RSVP counts will be updated dynamically
-    embed.addFields({
-        name: 'Attendees',
-        value: '✅ 0 going | 🤔 0 maybe | ❌ 0 not going',
-        inline: false,
-    });
-
-    if (event.imageUrl) {
-        embed.setImage(event.imageUrl);
-    }
-
-    return embed;
-}
 
 function parseDuration(input: string): number | undefined {
     const patterns = [
