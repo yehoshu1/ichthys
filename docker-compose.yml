@@ -53,7 +53,7 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      DASHBOARD_URL: https://bot.ichthys.qzz.io
+      DASHBOARD_URL: ${DASHBOARD_URL:-http://localhost:4002}
       METRICS_TOKEN: ${METRICS_TOKEN:-}
       REDIS_URL: ${REDIS_URL:-}
       PG_SSL: "false"
@@ -70,16 +70,16 @@ services:
         condition: service_healthy
     labels:
       - traefik.docker.network=dokploy-network
-      - traefik.http.routers.extra-ixoyebot-3pki8t-13-web.rule=Host(`bot.ichthys.qzz.io`)
-      - traefik.http.routers.extra-ixoyebot-3pki8t-13-web.entrypoints=web
-      - traefik.http.services.extra-ixoyebot-3pki8t-13-web.loadbalancer.server.port=4002
-      - traefik.http.routers.extra-ixoyebot-3pki8t-13-web.service=extra-ixoyebot-3pki8t-13-web
-      - traefik.http.routers.extra-ixoyebot-3pki8t-13-web.middlewares=redirect-to-https@file
-      - traefik.http.routers.extra-ixoyebot-3pki8t-13-websecure.rule=Host(`bot.ichthys.qzz.io`)
-      - traefik.http.routers.extra-ixoyebot-3pki8t-13-websecure.entrypoints=websecure
-      - traefik.http.services.extra-ixoyebot-3pki8t-13-websecure.loadbalancer.server.port=4002
-      - traefik.http.routers.extra-ixoyebot-3pki8t-13-websecure.service=extra-ixoyebot-3pki8t-13-websecure
-      - traefik.http.routers.extra-ixoyebot-3pki8t-13-websecure.tls.certresolver=letsencrypt
+      - traefik.http.routers.ixoye-web.rule=Host(`${DOMAIN:-bot.example.com}`)
+      - traefik.http.routers.ixoye-web.entrypoints=web
+      - traefik.http.services.ixoye-web.loadbalancer.server.port=4002
+      - traefik.http.routers.ixoye-web.service=ixoye-web
+      - traefik.http.routers.ixoye-web.middlewares=redirect-to-https@file
+      - traefik.http.routers.ixoye-websecure.rule=Host(`${DOMAIN:-bot.example.com}`)
+      - traefik.http.routers.ixoye-websecure.entrypoints=websecure
+      - traefik.http.services.ixoye-websecure.loadbalancer.server.port=4002
+      - traefik.http.routers.ixoye-websecure.service=ixoye-websecure
+      - traefik.http.routers.ixoye-websecure.tls.certresolver=letsencrypt
       - traefik.enable=true
     networks:
       - dokploy-network

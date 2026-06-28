@@ -44,8 +44,15 @@
     "bot",
     "typescript"
   ],
-  "author": "",
-  "license": "MIT",
+  "author": "Your Name <your.email@example.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/ixoye-discord-bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/ixoye-discord-bot/issues"
+  },
+  "license": "GPL-3.0",
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-dialog": "^1.1.15",
