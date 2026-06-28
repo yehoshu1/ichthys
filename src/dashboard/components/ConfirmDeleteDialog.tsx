@@ -29,6 +29,8 @@ export function ConfirmDeleteDialog({
     children,
     confirmText = "Continue",
 }: ConfirmDeleteDialogProps) {
+
+
     return (
         <AlertDialog>
             <AlertDialogTrigger asChild>

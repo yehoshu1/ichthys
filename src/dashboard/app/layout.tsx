@@ -6,7 +6,7 @@ import AuthProvider from "../components/AuthProvider";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "../components/TooltipContext";
-
+import { FixRadixScroll } from "../components/FixRadixScroll";
 const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-sans" });
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-display" });
 
@@ -42,6 +42,7 @@ export default function RootLayout({
             </head>
             <body>
                 <AuthProvider>
+                    <FixRadixScroll />
                     <TooltipProvider>
                         <ErrorBoundary>
                             {children}

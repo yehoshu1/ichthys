@@ -61,7 +61,7 @@ import {
     Calendar,
     List,
 } from "lucide-react";
-import { ChannelSelect } from "../../../../components/DiscordSelectors";
+
 import { toast } from "sonner";
 import { Badge } from "../../../../components/ui/badge";
 import { Textarea } from "../../../../components/ui/textarea";
