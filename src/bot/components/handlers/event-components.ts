@@ -144,7 +144,6 @@ async function handleEventRsvp(interaction: ButtonInteraction): Promise<void> {
 
         const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder().setCustomId(`dm_reminder:${eventId}:1440`).setLabel('1 day before').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`dm_reminder:${eventId}:10080`).setLabel('1 week before').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`reminder:custom:${eventId}`).setLabel('Custom').setStyle(ButtonStyle.Secondary)
         );
 
@@ -175,7 +174,6 @@ async function handleEventReminder(interaction: ButtonInteraction): Promise<void
 
     const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId(`reminder:preset:${eventId}:1440`).setLabel('1 day before').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId(`reminder:preset:${eventId}:10080`).setLabel('1 week before').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId(`reminder:custom:${eventId}`).setLabel('Custom').setStyle(ButtonStyle.Secondary)
     );
 

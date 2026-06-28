@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "../../../../components/ui/dialog";
 import { MessageSquare, Plus, Trash, Edit, Eye, EyeOff, Clock, Hash, User, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmDeleteDialog } from "../../../../components/ConfirmDeleteDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { Badge } from "../../../../components/ui/badge";
 import { ScrollArea } from "../../../../components/ui/scroll-area";
@@ -646,13 +647,19 @@ export default function AliasesPage() {
                                                         <Eye className="h-4 w-4 text-green-500" />
                                                     )}
                                                 </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleDelete(alias.id)}
+                                                <ConfirmDeleteDialog
+                                                    onConfirm={() => handleDelete(alias.id)}
+                                                    title="Delete Alias"
+                                                    description={`Are you sure you want to delete the alias for ${alias.trigger}?`}
+                                                    confirmText="Delete"
                                                 >
-                                                    <Trash className="h-4 w-4 text-red-500" />
-                                                </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                    >
+                                                        <Trash className="h-4 w-4 text-red-500" />
+                                                    </Button>
+                                                </ConfirmDeleteDialog>
                                             </div>
                                         </TableCell>
                                     </TableRow>

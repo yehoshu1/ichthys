@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { ScrollArea } from "../../../../components/ui/scroll-area";
 import { Trophy, Trash } from "lucide-react";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
+import { ConfirmDeleteDialog } from "../../../../components/ConfirmDeleteDialog";
 import { useDiscordData } from "../../../../components/useDiscordData";
 import { toast } from "sonner";
 import { ExampleBox, HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
@@ -397,9 +398,16 @@ function LevelRewardsManager({ guildId }: { guildId: string }) {
                                 <span className="text-muted-foreground">→</span>
                                 <RoleBadge roleName={rolesById.get(reward.roleId)?.name || reward.roleId} />
                             </div>
-                            <Button variant="ghost" size="sm" onClick={() => deleteReward(reward.id)}>
-                                <Trash className="h-4 w-4 text-red-500" />
-                            </Button>
+                            <ConfirmDeleteDialog
+                                onConfirm={() => deleteReward(reward.id)}
+                                title="Delete Level Reward"
+                                description={`Are you sure you want to delete the reward for Level ${reward.level}?`}
+                                confirmText="Delete"
+                            >
+                                <Button variant="ghost" size="sm">
+                                    <Trash className="h-4 w-4 text-red-500" />
+                                </Button>
+                            </ConfirmDeleteDialog>
                         </div>
                     ))
                 )}

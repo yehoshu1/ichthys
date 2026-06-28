@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { ChannelSelect, RoleSelect } from "../../../../components/DiscordSelectors";
 import { Button } from "../../../../components/ui/button";
+import { ConfirmDeleteDialog } from "../../../../components/ConfirmDeleteDialog";
 import { Input } from "../../../../components/ui/input";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from "../../../../components/ui/card";
 import { Label } from "../../../../components/ui/label";
@@ -491,9 +492,16 @@ function MembersTab({ guildId }: { guildId: string }) {
                                 </TableCell>
                                 <TableCell>{entry.timezone}</TableCell>
                                 <TableCell>
-                                    <Button variant="ghost" size="sm" onClick={() => deleteEntry(entry.id)}>
-                                        <Trash className="h-4 w-4 text-red-500" />
-                                    </Button>
+                                    <ConfirmDeleteDialog
+                                        onConfirm={() => deleteEntry(entry.id)}
+                                        title="Delete Birthday Entry?"
+                                        description={`Are you sure you want to delete the birthday entry for ${entry.username}?`}
+                                        confirmText="Delete Entry"
+                                    >
+                                        <Button variant="ghost" size="sm">
+                                            <Trash className="h-4 w-4 text-red-500" />
+                                        </Button>
+                                    </ConfirmDeleteDialog>
                                 </TableCell>
                             </TableRow>
                         ))}

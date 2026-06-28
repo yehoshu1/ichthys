@@ -13,6 +13,7 @@ import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
 import { Switch } from "../../../../components/ui/switch";
 import { useDiscordData } from "../../../../components/useDiscordData";
 import { ExampleBox, HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
+import { ConfirmDeleteDialog } from "../../../../components/ConfirmDeleteDialog";
 import { ScrollArea } from "../../../../components/ui/scroll-area";
 
 interface RoleAction {
@@ -90,7 +91,6 @@ export default function RoleActionsPage() {
     }
 
     async function handleDelete(id: string) {
-        if (!confirm("Are you sure you want to delete this action?")) return;
         try {
             const res = await fetch(`/api/guilds/${guildId}/role-actions?id=${id}`, {
                 method: "DELETE",
@@ -207,9 +207,16 @@ export default function RoleActionsPage() {
                             }}>
                                 <Pencil className="mr-2 h-3 w-3" /> Edit
                             </Button>
-                            <Button variant="outline" size="sm" className="w-full text-destructive hover:text-destructive" onClick={() => handleDelete(action.id)}>
-                                <Trash2 className="mr-2 h-3 w-3" /> Delete
-                            </Button>
+                            <ConfirmDeleteDialog
+                                onConfirm={() => handleDelete(action.id)}
+                                title="Delete Role Action"
+                                description="Are you sure you want to delete this automated role action?"
+                                confirmText="Delete"
+                            >
+                                <Button variant="outline" size="sm" className="w-full text-destructive hover:text-destructive">
+                                    <Trash2 className="mr-2 h-3 w-3" /> Delete
+                                </Button>
+                            </ConfirmDeleteDialog>
                         </CardFooter>
                     </Card>
                 ))}

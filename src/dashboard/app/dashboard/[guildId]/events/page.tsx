@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Button } from "../../../../components/ui/button";
+import { ConfirmDeleteDialog } from "../../../../components/ConfirmDeleteDialog";
 import { Input } from "../../../../components/ui/input";
 import {
     Card,
@@ -76,6 +77,19 @@ import { RoleMultiSelect } from "../../../../components/DiscordSelectors";
 import { ScrollArea } from "../../../../components/ui/scroll-area";
 import EventCalendar from "../../../../components/EventCalendar";
 import { FadeInStagger, FadeInItem } from "../../../../components/MotionWrapper";
+
+function formatTimezone(tz: string): string {
+    try {
+        const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts();
+        const offset = parts.find(p => p.type === 'timeZoneName')?.value;
+        if (offset) {
+            return `${tz} (${offset.replace('GMT', 'UTC')})`;
+        }
+    } catch {
+        // ignore
+    }
+    return tz;
+}
 
 // Types
 interface Event {
@@ -1498,13 +1512,20 @@ function EventCard({
                                 <Copy className="h-4 w-4 mr-2" />
                                 Duplicate
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={onDelete}
-                                className="text-red-600"
+                            <ConfirmDeleteDialog
+                                onConfirm={onDelete}
+                                title="Delete Event?"
+                                description="Are you sure you want to delete this event? This action cannot be undone."
+                                confirmText="Delete Event"
                             >
-                                <Trash className="h-4 w-4 mr-2" />
-                                Delete
-                            </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onSelect={(e) => e.preventDefault()}
+                                    className="text-red-600"
+                                >
+                                    <Trash className="h-4 w-4 mr-2" />
+                                    Delete
+                                </DropdownMenuItem>
+                            </ConfirmDeleteDialog>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -1539,7 +1560,6 @@ function EventTemplatesTab({ guildId }: { guildId: string }) {
     }
 
     async function deleteTemplate(templateId: string) {
-        if (!confirm("Delete this template?")) return;
 
         try {
             const res = await fetch(`/api/guilds/${guildId}/events/templates/${templateId}`, {
@@ -1678,13 +1698,19 @@ function EventTemplatesTab({ guildId }: { guildId: string }) {
                                             >
                                                 <Edit className="h-4 w-4" />
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => deleteTemplate(template.id)}
+                                            <ConfirmDeleteDialog
+                                                onConfirm={() => deleteTemplate(template.id)}
+                                                title="Delete Template?"
+                                                description="Are you sure you want to delete this template?"
+                                                confirmText="Delete Template"
                                             >
-                                                <Trash className="h-4 w-4 text-red-500" />
-                                            </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                >
+                                                    <Trash className="h-4 w-4 text-red-500" />
+                                                </Button>
+                                            </ConfirmDeleteDialog>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -2054,7 +2080,7 @@ function EventSettingsTab({ guildId }: { guildId: string }) {
                             <SelectContent>
                                 {Intl.supportedValuesOf('timeZone').map((tz) => (
                                     <SelectItem key={tz} value={tz}>
-                                        {tz}
+                                        {formatTimezone(tz)}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

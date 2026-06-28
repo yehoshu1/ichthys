@@ -32,7 +32,6 @@ const reminderPresets = [
     { label: '1 hour before', minutes: 60 },
     { label: '2 hours before', minutes: 120 },
     { label: '1 day before', minutes: 1440 },
-    { label: '1 week before', minutes: 10080 },
 ];
 
 export async function execute(interaction: ChatInputCommandInteraction) {

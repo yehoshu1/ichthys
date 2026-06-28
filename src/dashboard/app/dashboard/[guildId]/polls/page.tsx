@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Button } from "../../../../components/ui/button";
+import { ConfirmDeleteDialog } from "../../../../components/ConfirmDeleteDialog";
 import { Input } from "../../../../components/ui/input";
 import {
     Card,
@@ -1845,10 +1846,17 @@ function PollCard({
                                     Close Poll
                                 </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onClick={onDelete} className="text-red-600">
-                                <Trash className="h-4 w-4 mr-2" />
-                                Delete
-                            </DropdownMenuItem>
+                            <ConfirmDeleteDialog
+                                onConfirm={onDelete}
+                                title="Delete Poll?"
+                                description="Are you sure you want to delete this poll? This action cannot be undone."
+                                confirmText="Delete Poll"
+                            >
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600">
+                                    <Trash className="h-4 w-4 mr-2" />
+                                    Delete
+                                </DropdownMenuItem>
+                            </ConfirmDeleteDialog>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -1970,7 +1978,6 @@ function PollTemplatesTab({ guildId }: { guildId: string }) {
     }
 
     async function deleteTemplate(templateId: string) {
-        if (!confirm("Delete this template?")) return;
 
         try {
             const res = await fetch(`/api/guilds/${guildId}/polls/templates/${templateId}`, {
@@ -2089,13 +2096,19 @@ function PollTemplatesTab({ guildId }: { guildId: string }) {
                                                 >
                                                     <Edit className="h-4 w-4" />
                                                 </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => deleteTemplate(template.id)}
+                                                <ConfirmDeleteDialog
+                                                    onConfirm={() => deleteTemplate(template.id)}
+                                                    title="Delete Template?"
+                                                    description="Are you sure you want to delete this template?"
+                                                    confirmText="Delete Template"
                                                 >
-                                                    <Trash className="h-4 w-4 text-red-500" />
-                                                </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                    >
+                                                        <Trash className="h-4 w-4 text-red-500" />
+                                                    </Button>
+                                                </ConfirmDeleteDialog>
                                             </div>
                                         </TableCell>
                                     </TableRow>

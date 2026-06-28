@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Loader2, Save, Settings2, Trash2, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../components/ui/card";
 import { Button } from "../../../../components/ui/button";
+import { ConfirmDeleteDialog } from "../../../../components/ConfirmDeleteDialog";
 import { Input } from "../../../../components/ui/input";
 import { Label } from "../../../../components/ui/label";
 import { Switch } from "../../../../components/ui/switch";
@@ -499,10 +500,17 @@ export default function CommandConfigPage() {
                                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                                 Save Configuration
                             </Button>
-                            <Button variant="destructive" onClick={resetCommandConfig} disabled={deleting}>
-                                {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                                Reset to Defaults
-                            </Button>
+                            <ConfirmDeleteDialog
+                                onConfirm={resetCommandConfig}
+                                title="Reset Configuration?"
+                                description="Are you sure you want to reset this command's configuration to defaults? This action cannot be undone."
+                                confirmText="Reset to Defaults"
+                            >
+                                <Button variant="destructive" disabled={deleting}>
+                                    {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                                    Reset to Defaults
+                                </Button>
+                            </ConfirmDeleteDialog>
                         </div>
                     </CardContent>
                     </Card>

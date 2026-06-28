@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Button } from "../../../../components/ui/button";
+import { ConfirmDeleteDialog } from "../../../../components/ConfirmDeleteDialog";
 import { Input } from "../../../../components/ui/input";
 import {
     Card,
@@ -524,10 +525,17 @@ function WebhookCard({
                                     <Edit className="h-4 w-4 mr-2" />
                                     Edit
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={onDelete} className="text-red-600">
-                                    <Trash className="h-4 w-4 mr-2" />
-                                    Delete
-                                </DropdownMenuItem>
+                                <ConfirmDeleteDialog
+                                    onConfirm={onDelete}
+                                    title="Delete Webhook?"
+                                    description="Are you sure you want to delete this webhook? This action cannot be undone."
+                                    confirmText="Delete Webhook"
+                                >
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600">
+                                        <Trash className="h-4 w-4 mr-2" />
+                                        Delete
+                                    </DropdownMenuItem>
+                                </ConfirmDeleteDialog>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -1073,9 +1081,16 @@ function ApiKeyCard({
 
                     <div className="flex items-center gap-2">
                         <Switch checked={apiKey.enabled} onCheckedChange={onToggle} />
-                        <Button variant="ghost" size="sm" onClick={onDelete}>
-                            <Trash className="h-4 w-4 text-red-500" />
-                        </Button>
+                        <ConfirmDeleteDialog
+                            onConfirm={onDelete}
+                            title="Delete API Key?"
+                            description="Are you sure you want to delete this API key? This action cannot be undone."
+                            confirmText="Delete API Key"
+                        >
+                            <Button variant="ghost" size="sm">
+                                <Trash className="h-4 w-4 text-red-500" />
+                            </Button>
+                        </ConfirmDeleteDialog>
                     </div>
                 </div>
             </div>

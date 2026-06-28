@@ -11,6 +11,7 @@ import {
 } from "../../../../components/ui/card";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
+import { ConfirmDeleteDialog } from "../../../../components/ConfirmDeleteDialog";
 import { Label } from "../../../../components/ui/label";
 import { Textarea } from "../../../../components/ui/textarea";
 import { Badge } from "../../../../components/ui/badge";
@@ -153,8 +154,7 @@ export default function WatchlistPage() {
     const [editSeverity, setEditSeverity] = useState<Severity>("LOW");
     const [editing, setEditing] = useState(false);
 
-    // Delete dialog
-    const [deleteEntry, setDeleteEntry] = useState<WatchlistEntry | null>(null);
+    // Delete dialog state no longer needed because of ConfirmDeleteDialog
     const [deleting, setDeleting] = useState(false);
 
     const fetchEntries = useCallback(async () => {
@@ -253,12 +253,11 @@ export default function WatchlistPage() {
         }
     }
 
-    async function handleDelete() {
-        if (!deleteEntry) return;
+    async function handleDelete(entry: WatchlistEntry) {
         setDeleting(true);
         try {
             const res = await fetch(
-                `/api/guilds/${guildId}/watchlist/${deleteEntry.userId}`,
+                `/api/guilds/${guildId}/watchlist/${entry.userId}`,
                 { method: "DELETE" }
             );
             if (!res.ok) {
@@ -266,7 +265,6 @@ export default function WatchlistPage() {
                 return;
             }
             toast.success("Member removed from watchlist");
-            setDeleteEntry(null);
             await fetchEntries();
         } finally {
             setDeleting(false);
@@ -463,19 +461,27 @@ export default function WatchlistPage() {
                                             <Pencil className="h-4 w-4" />
                                             <span className="sr-only">Edit</span>
                                         </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="text-destructive hover:text-destructive"
-                                            onClick={() =>
-                                                setDeleteEntry(entry)
-                                            }
+                                        <ConfirmDeleteDialog
+                                            onConfirm={() => handleDelete(entry)}
+                                            title="Remove from Watchlist"
+                                            description={`Are you sure you want to remove ${displayName(entry.user, entry.userId)} from the watchlist? This action cannot be undone.`}
+                                            confirmText="Remove"
                                         >
-                                            <Trash2 className="h-4 w-4" />
-                                            <span className="sr-only">
-                                                Remove
-                                            </span>
-                                        </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-destructive hover:text-destructive"
+                                            >
+                                                {deleting ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="h-4 w-4" />
+                                                )}
+                                                <span className="sr-only">
+                                                    Remove
+                                                </span>
+                                            </Button>
+                                        </ConfirmDeleteDialog>
                                     </div>
                                 </div>
                             ))}
@@ -675,48 +681,6 @@ export default function WatchlistPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Confirm */}
-            <Dialog
-                open={!!deleteEntry}
-                onOpenChange={(open) => !open && setDeleteEntry(null)}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Remove from Watchlist</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to remove{" "}
-                            <span className="font-medium text-foreground">
-                                {deleteEntry
-                                    ? displayName(
-                                          deleteEntry.user,
-                                          deleteEntry.userId
-                                      )
-                                    : ""}
-                            </span>{" "}
-                            from the watchlist? This action cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setDeleteEntry(null)}
-                            disabled={deleting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={handleDelete}
-                            disabled={deleting}
-                        >
-                            {deleting && (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            )}
-                            Remove
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }

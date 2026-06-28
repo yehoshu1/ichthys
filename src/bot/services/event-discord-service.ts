@@ -319,7 +319,7 @@ export class EventDiscordService {
     private getStatusPrefix(status?: EventDisplayData['status']): string {
         if (status === 'CANCELLED') return '[Cancelled] ';
         if (status === 'COMPLETED') return '[Completed] ';
-        if (status === 'ACTIVE') return '[Live] ';
+        if (status === 'ACTIVE') return '';
         return '';
     }
 

@@ -11,6 +11,7 @@ import { Switch } from "../../../../components/ui/switch";
 import { Trash2, Plus, ShieldCheck, UserX, UserCheck } from "lucide-react";
 import Image from "next/image";
 import { useDiscordData } from "../../../../components/useDiscordData";
+import { ConfirmDeleteDialog } from "../../../../components/ConfirmDeleteDialog";
 import { toast } from "sonner";
 import { HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
 
@@ -213,7 +214,6 @@ export default function VerificationPage() {
     }
 
     async function handleDeleteRule(ruleId: string) {
-        if (!confirm("Are you sure you want to delete this rule?")) return;
         try {
             const res = await fetch(`/api/guilds/${guildId}/verification/rules/${ruleId}`, {
                 method: "DELETE"
@@ -304,7 +304,6 @@ export default function VerificationPage() {
     }
 
     async function deleteRoleMessage(ruleId: string) {
-        if (!confirm("Delete this role message?")) return;
         try {
             const res = await fetch(`/api/guilds/${guildId}/verification/role-messages/${ruleId}`, {
                 method: "DELETE"
@@ -501,14 +500,20 @@ export default function VerificationPage() {
                                             >
                                                 Edit
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => deleteRoleMessage(rule.id)}
-                                                className="text-destructive hover:text-destructive"
+                                            <ConfirmDeleteDialog
+                                                onConfirm={() => deleteRoleMessage(rule.id)}
+                                                title="Delete Role Message"
+                                                description="Are you sure you want to delete this role-specific message?"
+                                                confirmText="Delete"
                                             >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-destructive hover:text-destructive"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </ConfirmDeleteDialog>
                                         </div>
                                     </div>
                                 ))}
@@ -600,14 +605,20 @@ export default function VerificationPage() {
                                             >
                                                 Edit
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleDeleteRule(rule.id)}
-                                                className="text-destructive hover:text-destructive"
+                                            <ConfirmDeleteDialog
+                                                onConfirm={() => handleDeleteRule(rule.id)}
+                                                title="Delete Verification Profile"
+                                                description="Are you sure you want to delete this verification profile?"
+                                                confirmText="Delete"
                                             >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-destructive hover:text-destructive"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </ConfirmDeleteDialog>
                                         </div>
                                     </div>
                                 ))}
