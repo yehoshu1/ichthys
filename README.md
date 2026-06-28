@@ -90,6 +90,7 @@ under `src/dashboard/content/docs/`.
     LOG_LEVEL=info
     PORT=4002
     DASHBOARD_URL=http://localhost:4002
+    DOMAIN=bot.example.com
     ```
 
 4.  **Initialize Database**
@@ -125,7 +126,9 @@ under `src/dashboard/content/docs/`.
 
 The project includes a production-ready Docker setup with PostgreSQL, automated backups, and PM2 process management.
 
-### Production Deployment
+### Production Deployment (Using Built-in CLI)
+
+We provide a robust Node CLI to manage deployments safely. It automatically handles database backups, code updates, and rollback on failure.
 
 1.  **Configure environment variables** in `.env`:
     ```bash
@@ -137,27 +140,24 @@ The project includes a production-ready Docker setup with PostgreSQL, automated 
     DATABASE_URL=postgresql://ixoye:change_me@postgres:5432/ixoye
     PG_SSL=false
     PORT=4002
+    DASHBOARD_URL=https://bot.example.com
+    DOMAIN=bot.example.com
     ```
 
-2.  **Build and start services**:
+2.  **Deploy for the first time**:
     ```bash
-    docker compose build
-    docker compose up -d
+    npm run cli -- deploy
+    ```
+    This builds the containers and runs migrations automatically.
+
+3.  **Update Safely** (Pulls code, backs up DB, rebuilds, and auto-rolls back on failure):
+    ```bash
+    npm run cli -- update
     ```
 
-3.  **Run database migrations manually** (inside container):
+4.  **Check logs**:
     ```bash
-    docker exec ixoye-app node /app/scripts/run-migrations.js
-    ```
-
-4.  **Deploy slash commands manually** (inside container):
-    ```bash
-    docker exec ixoye-app node /app/scripts/deployCommands.js
-    ```
-
-5.  **Check logs**:
-    ```bash
-    docker logs ixoye-app -f
+    npm run cli -- logs
     ```
 
 ### Services Included
@@ -173,18 +173,14 @@ If behind Cloudflare or nginx, the bot automatically detects `X-Forwarded-*` hea
 
 ### Backups
 
+### Backups
+
 ```bash
 # Create manual backup (timestamped)
-npm run db:backup
+npm run cli -- backup
 
-# List available backups
-npm run db:backup:list
-
-# Restore from most recent backup
-npm run db:restore
-
-# Restore specific backup
-npm run db:restore ixoye-2026-02-17T10-30-00.db
+# Restore from backup
+npm run cli -- restore
 ```
 
 **Docker:** Automated daily backups via `ixoye-pg-backup` container with configurable retention (default: 10 most recent).
@@ -204,8 +200,8 @@ npm run db:studio
 
 ### Safe Deployment
 ```bash
-# Backup + migrate + build in one command
-npm run deploy:safe
+# Safely deploy updates with automatic backup and rollback
+npm run cli -- update
 ```
 
 ## 🔧 Available Scripts
@@ -272,7 +268,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the GPL-3.0 License - see the LICENSE file for details.
 
 ## 🙏 Acknowledgments
 
@@ -283,12 +279,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ---
 
 **Made with ❤️ for Discord communities**
-
-## CLI Management
-We provide a built-in Node CLI to easily manage the app lifecycle. You can run commands using `npm run cli -- <command>`.
-
-- `npm run cli -- deploy`: Build and deploy the app.
-- `npm run cli -- update`: Safe update with automatic backups.
-- `npm run cli -- backup`: Trigger a database backup.
-- `npm run cli -- restore`: Restore from a backup.
-- `npm run cli -- logs`: View logs.

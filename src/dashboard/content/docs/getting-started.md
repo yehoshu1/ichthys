@@ -78,6 +78,7 @@ openssl rand -base64 32
 | `ANONYMIZE_SECRET` | Yes (anonymous polls) | Secret for anonymizing user IDs in anonymous polls (minimum 16 characters). |
 | `METRICS_TOKEN` | Optional (recommended in prod) | Bearer token required to access `GET /api/metrics` in production. |
 | `REDIS_URL` | Optional (recommended in prod) | Enables distributed dashboard rate limiting/cache across multiple app instances. Requires `ioredis` package installed. |
+| `DOMAIN` | Yes (for Docker/Traefik) | Base domain used by Traefik router to proxy web traffic in production deployments. |
 
 ### Common Local Values
 
@@ -95,6 +96,7 @@ WEBHOOK_SECRET_ENCRYPTION_KEY=replace_with_random_16plus_chars
 ANONYMIZE_SECRET=replace_with_different_random_16plus_chars
 METRICS_TOKEN=replace_with_random_metrics_token
 REDIS_URL=redis://localhost:6379
+DOMAIN=bot.example.com
 ```
 
 When `REDIS_URL` is set, dashboard rate limiting attempts to use Redis (multi-instance safe). If Redis client support is unavailable or `REDIS_URL` is unset, it falls back to in-memory per-instance limits.
@@ -228,18 +230,24 @@ Run dashboard:
 npm run dashboard:start
 ```
 
-## 8. Production Docker
+## 8. Production Docker (Using Built-in CLI)
 
-Build and run:
+Build and deploy the application safely:
 
 ```bash
-docker compose up -d --build
+npm run cli -- deploy
+```
+
+Safely update the application (automatic backup, pull, build, rollback on failure):
+
+```bash
+npm run cli -- update
 ```
 
 Read logs:
 
 ```bash
-docker compose logs -f
+npm run cli -- logs
 ```
 
 The production image uses PM2 runtime (`ecosystem.config.js`).
@@ -262,31 +270,19 @@ Recommended before deploy:
 Create backup:
 
 ```bash
-npm run db:backup
+npm run cli -- backup
 ```
 
-List backups:
+Restore (interactive):
 
 ```bash
-npm run db:backup:list
+npm run cli -- restore
 ```
 
-Restore:
+Safe deployment wrapper (updates and backs up):
 
 ```bash
-npm run db:restore
-```
-
-List restore targets:
-
-```bash
-npm run db:restore:list
-```
-
-Safe deployment wrapper:
-
-```bash
-npm run deploy:safe
+npm run cli -- update
 ```
 
 ## 11. Troubleshooting
@@ -331,10 +327,12 @@ docker compose -f docker-compose.dev.yml up -d --build
 
 ## Documentation Map
 
-- Setup: `docs/SETUP.md`
-- Commands: `docs/COMMANDS.md`
-- Dashboard overview: `docs/DASHBOARD.md`
-- Module deep-dives: `docs/MODULES.md`
+The documentation files are built directly into the dashboard and can be accessed under `/docs`. The markdown source files are located in `src/dashboard/content/docs/`:
+
+- Setup: `getting-started.md`
+- Commands: `commands.md`
+- Dashboard overview: `dashboard.md`
+- Module deep-dives: `modules/`
 
 ## Dashboard Access
 

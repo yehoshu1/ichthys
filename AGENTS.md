@@ -175,6 +175,7 @@ NODE_ENV=development              # development, production
 PORT=3000                         # Dashboard port
 GUILD_ID=your_test_guild_id       # For testing slash commands
 DASHBOARD_URL=https://yourdomain.com  # For /dashboard command
+DOMAIN=yourdomain.com             # Domain for Traefik routing
 ```
 
 ## Security Considerations
@@ -386,20 +387,17 @@ const signature = crypto
 
 **Create a backup:**
 ```bash
-npm run db:backup           # Creates timestamped backup
-npm run db:backup:list      # List all available backups
+npm run cli -- backup
 ```
 
 **Restore from backup:**
 ```bash
-npm run db:restore          # Restore from most recent backup
-npm run db:restore:list     # List backups to choose from
-npm run db:restore ixoye-2026-02-08T10-30-00.db  # Restore specific backup
+npm run cli -- restore          # Interactive restore process
 ```
 
-**Safe deployment (with automatic backup):**
+**Safe deployment (with automatic backup and rollback):**
 ```bash
-npm run deploy:safe         # Backs up, migrates, and builds
+npm run cli -- update         # Backs up, pulls code, migrates, and builds
 ```
 
 Backups are stored in `./backups/` with a retention policy of 10 most recent backups.
@@ -413,9 +411,13 @@ Backups are stored in `./backups/` with a retention policy of 10 most recent bac
 ## Deployment
 
 ### Docker (Recommended for Production)
+We use a robust CLI to handle deployments, which manages docker-compose under the hood.
 ```bash
-# Build and run with docker-compose
-docker-compose up -d
+# First-time build and deploy
+npm run cli -- deploy
+
+# Update safely (backup + git pull + rebuild + auto-rollback on failure)
+npm run cli -- update
 ```
 
 The Dockerfile uses multi-stage builds:
