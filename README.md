@@ -283,3 +283,12 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ---
 
 **Made with ❤️ for Discord communities**
+
+## CLI Management
+We provide a built-in Node CLI to easily manage the app lifecycle. You can run commands using `npm run cli -- <command>`.
+
+- `npm run cli -- deploy`: Build and deploy the app.
+- `npm run cli -- update`: Safe update with automatic backups.
+- `npm run cli -- backup`: Trigger a database backup.
+- `npm run cli -- restore`: Restore from a backup.
+- `npm run cli -- logs`: View logs.
