@@ -43,6 +43,16 @@ const envRows = [
         required: "Optional",
         description: "Runtime logging verbosity.",
     },
+    {
+        key: "DOMAIN",
+        required: "Optional",
+        description: "Domain for Traefik routing and cookie scope.",
+    },
+    {
+        key: "DASHBOARD_URL",
+        required: "Optional",
+        description: "Public URL for the dashboard, used by the /dashboard command.",
+    },
 ];
 
 export default function DocsDevSetupPage() {

@@ -53,6 +53,7 @@ import { DASHBOARD_NAV_ITEMS, DashboardNavId } from "../../../lib/search/dashboa
 import type { SearchOpenMethod } from "../../../lib/search/telemetry";
 import { RbacAccessProvider } from "../../../components/RbacAccessContext";
 import { ScrollArea } from "../../../components/ui/scroll-area";
+import { PageTransition } from "../../../components/PageTransition";
 
 interface ModuleStateResponse {
     modules: Array<{
@@ -644,7 +645,9 @@ export default function DashboardLayout({
                                 isBypassUser={accessData?.isBypassUser ?? true}
                                 modules={accessData?.modules ?? {}}
                             >
-                                {children}
+                                <PageTransition>
+                                    {children}
+                                </PageTransition>
                             </RbacAccessProvider>
                         </div>
                     </main>

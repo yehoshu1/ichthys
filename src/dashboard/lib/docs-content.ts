@@ -1362,8 +1362,31 @@ export const setupSections = [
             "npm run db:backup",
             "npm run db:backup:list",
             "npm run db:restore",
-            "npm run db:restore:list",
             "npm run deploy:safe",
         ],
     },
+    {
+        title: "Docker Setup",
+        commands: [
+            "npm run cli -- deploy",
+            "npm run cli -- update",
+        ],
+        bullets: [
+            "We use a robust CLI to handle deployments, which manages docker-compose under the hood.",
+            "The Dockerfile uses multi-stage builds: builder for compiling Next.js and runner for PM2.",
+        ],
+    },
+    {
+        title: "CLI Operations",
+        commands: [
+            "npm run cli -- deploy",
+            "npm run cli -- update",
+            "npm run cli -- backup",
+            "npm run cli -- restore",
+        ],
+        bullets: [
+            "The CLI wrapper manages docker builds, safe deployments, and automatic rollback.",
+            "Use 'npm run cli -- update' for safe updates with automatic backup and rollback on failure.",
+        ],
+    }
 ];

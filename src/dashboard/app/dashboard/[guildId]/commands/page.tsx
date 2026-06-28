@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { useDiscordData } from "../../../../components/useDiscordData";
 import { ExampleBox, HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
+import { FadeInStagger, FadeInItem } from "../../../../components/MotionWrapper";
 
 interface CommandConfigPayload {
     commandId: string;
@@ -306,47 +307,52 @@ export default function CommandConfigPage() {
     }
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Command Configuration</h1>
-                <p className="text-muted-foreground">
-                    Configure per-command access rules, limits, and auto-delete behavior for this server.
-                </p>
-                <ExampleBox>
-                    Restrict the /kick command to only Moderators and Admins by adding those roles to Enabled Roles.
-                    Or block the /warn command in #general by adding it to Disabled Channels.
-                </ExampleBox>
-            </div>
+        <FadeInStagger className="space-y-6">
+            <FadeInItem>
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Command Configuration</h1>
+                    <p className="text-muted-foreground">
+                        Configure per-command access rules, limits, and auto-delete behavior for this server.
+                    </p>
+                    <ExampleBox>
+                        Restrict the /kick command to only Moderators and Admins by adding those roles to Enabled Roles.
+                        Or block the /warn command in #general by adding it to Disabled Channels.
+                    </ExampleBox>
+                </div>
+            </FadeInItem>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Settings2 className="h-5 w-5" />
-                        Select Command
-                    </CardTitle>
-                    <CardDescription>Each command can be configured independently.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="max-w-sm space-y-2">
-                        <Label>Command</Label>
-                        <Select value={selectedCommandId} onValueChange={setSelectedCommandId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select command" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {commands.map((commandId) => (
-                                    <SelectItem key={commandId} value={commandId}>
-                                        /{commandId}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </CardContent>
-            </Card>
+            <FadeInItem>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Settings2 className="h-5 w-5" />
+                            Select Command
+                        </CardTitle>
+                        <CardDescription>Each command can be configured independently.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="max-w-sm space-y-2">
+                            <Label>Command</Label>
+                            <Select value={selectedCommandId} onValueChange={setSelectedCommandId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select command" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {commands.map((commandId) => (
+                                        <SelectItem key={commandId} value={commandId}>
+                                            /{commandId}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </CardContent>
+                </Card>
+            </FadeInItem>
 
             {selectedCommandId && (
-                <Card>
+                <FadeInItem>
+                    <Card>
                     <CardHeader>
                         <CardTitle>/{selectedCommandId} Settings</CardTitle>
                         <CardDescription>
@@ -499,8 +505,9 @@ export default function CommandConfigPage() {
                             </Button>
                         </div>
                     </CardContent>
-                </Card>
+                    </Card>
+                </FadeInItem>
             )}
-        </div>
+        </FadeInStagger>
     );
 }

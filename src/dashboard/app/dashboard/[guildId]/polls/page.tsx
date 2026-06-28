@@ -70,6 +70,7 @@ import { ScrollArea } from "../../../../components/ui/scroll-area";
 
 import { DateTimePicker, DatePicker, TimePicker } from "../../../../components/ui/datetime-picker";
 import { RoleMultiSelect } from "../../../../components/DiscordSelectors";
+import { FadeInStagger, FadeInItem } from "../../../../components/MotionWrapper";
 
 // Types
 interface Poll {
@@ -1647,18 +1648,19 @@ function PollsList({ guildId, status }: { guildId: string; status: "active" | "e
                             </p>
                         </div>
                     ) : (
-                        <div className="space-y-4">
+                        <FadeInStagger className="space-y-4">
                             {filteredPolls.map((poll) => (
-                                <PollCard
-                                    key={poll.id}
-                                    poll={poll}
-                                    onEdit={() => setEditingPoll(poll)}
-                                    onDelete={() => deletePoll(poll.id)}
-                                    onClose={() => closePoll(poll.id)}
-                                    onView={() => setViewingPoll(poll)}
-                                />
+                                <FadeInItem key={poll.id}>
+                                    <PollCard
+                                        poll={poll}
+                                        onEdit={() => setEditingPoll(poll)}
+                                        onDelete={() => deletePoll(poll.id)}
+                                        onClose={() => closePoll(poll.id)}
+                                        onView={() => setViewingPoll(poll)}
+                                    />
+                                </FadeInItem>
                             ))}
-                        </div>
+                        </FadeInStagger>
                     )}
                 </CardContent>
             </Card>

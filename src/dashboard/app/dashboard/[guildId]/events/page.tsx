@@ -74,6 +74,7 @@ import { DateTimePicker, DatePicker } from "../../../../components/ui/datetime-p
 import { RoleMultiSelect } from "../../../../components/DiscordSelectors";
 import { ScrollArea } from "../../../../components/ui/scroll-area";
 import EventCalendar from "../../../../components/EventCalendar";
+import { FadeInStagger, FadeInItem } from "../../../../components/MotionWrapper";
 
 // Types
 interface Event {
@@ -1181,17 +1182,18 @@ function EventsList({
                             </p>
                         </div>
                     ) : (
-                        <div className="space-y-4">
+                        <FadeInStagger className="space-y-4">
                             {filteredEvents.map((event) => (
-                                <EventCard
-                                    key={event.id}
-                                    event={event}
-                                    onEdit={() => setEditingEvent(event)}
-                                    onDelete={() => deleteEvent(event.id)}
-                                    onDuplicate={() => duplicateEvent(event)}
-                                />
+                                <FadeInItem key={event.id}>
+                                    <EventCard
+                                        event={event}
+                                        onEdit={() => setEditingEvent(event)}
+                                        onDelete={() => deleteEvent(event.id)}
+                                        onDuplicate={() => duplicateEvent(event)}
+                                    />
+                                </FadeInItem>
                             ))}
-                        </div>
+                        </FadeInStagger>
                     )}
                 </CardContent>
             </Card>

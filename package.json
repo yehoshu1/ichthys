@@ -81,6 +81,7 @@
     "discord.js": "^14.25.1",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
+    "framer-motion": "^12.42.0",
     "fumadocs-core": "^16.9.0",
     "fumadocs-mdx": "^15.0.7",
     "fumadocs-ui": "^16.9.0",

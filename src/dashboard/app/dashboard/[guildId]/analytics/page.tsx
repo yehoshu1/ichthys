@@ -10,6 +10,7 @@ import { HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip
 import GrowthChart from "../../../../components/charts/GrowthChart";
 import ModerationPieChart from "../../../../components/charts/ModerationPieChart";
 import VerificationFunnel from "../../../../components/charts/VerificationFunnel";
+import { FadeInStagger, FadeInItem, InteractiveCard } from "../../../../components/MotionWrapper";
 
 interface Stats {
     members: number;
@@ -123,7 +124,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            <FadeInStagger className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                 <StatCard title="Total Members" value={stats.members.toLocaleString()} icon={Users} tooltip="Current server member count" />
                 <StatCard title="Verified" value={stats.verified.toLocaleString()} icon={ShieldCheck} tooltip="Members who have the verification role" />
                 <StatCard title="Voice Hours" value={`${stats.voiceHours}h`} icon={Mic} tooltip="Total hours spent in voice channels by all members" />
@@ -136,46 +137,60 @@ export default function AnalyticsPage() {
                 <StatCard title="Birthdays (This Month)" value={stats.birthdaysThisMonth.toLocaleString()} icon={Cake} tooltip="Birthdays happening this month" />
                 <StatCard title="Action Reliability" value={`${stats.actionSuccessRate}%`} icon={Activity} tooltip="Success rate of automated background actions" />
                 <StatCard title="Avg Verify Time" value={`${stats.avgVerifyHours}h`} icon={Timer} tooltip="Average time from join to verification" />
-            </div>
+            </FadeInStagger>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <FadeInStagger className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {/* Growth Chart */}
-                <Card className="col-span-1 lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Member Growth</CardTitle>
-                        <CardDescription>Server population over the last 30 days</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? <Loading /> : <GrowthChart data={growthData} />}
-                    </CardContent>
-                </Card>
+                <FadeInItem className="col-span-1 lg:col-span-2">
+                    <InteractiveCard className="h-full">
+                        <Card className="h-full">
+                            <CardHeader>
+                                <CardTitle>Member Growth</CardTitle>
+                                <CardDescription>Server population over the last 30 days</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {loading ? <Loading /> : <GrowthChart data={growthData} />}
+                            </CardContent>
+                        </Card>
+                    </InteractiveCard>
+                </FadeInItem>
 
                 {/* Verification Funnel */}
-                <Card className="col-span-1">
-                    <CardHeader>
-                        <CardTitle>Verification Funnel</CardTitle>
-                        <CardDescription>Users joined vs verified (30d)</CardDescription>
-                        <HelperText>Shows how many of the users who joined recently actually completed the verification process.</HelperText>
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? <Loading /> : <VerificationFunnel data={verificationStats} />}
-                    </CardContent>
-                </Card>
-            </div>
+                <FadeInItem className="col-span-1">
+                    <InteractiveCard className="h-full">
+                        <Card className="h-full">
+                            <CardHeader>
+                                <CardTitle>Verification Funnel</CardTitle>
+                                <CardDescription>Users joined vs verified (30d)</CardDescription>
+                                <HelperText>Shows how many of the users who joined recently actually completed the verification process.</HelperText>
+                            </CardHeader>
+                            <CardContent>
+                                {loading ? <Loading /> : <VerificationFunnel data={verificationStats} />}
+                            </CardContent>
+                        </Card>
+                    </InteractiveCard>
+                </FadeInItem>
+            </FadeInStagger>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <FadeInStagger className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {/* Moderation Chart */}
-                <Card className="col-span-1">
-                    <CardHeader>
-                        <CardTitle>Moderation Overview</CardTitle>
-                        <CardDescription>Actions taken (30d)</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? <Loading /> : <ModerationPieChart data={moderationStats} />}
-                    </CardContent>
-                </Card>
+                <FadeInItem className="col-span-1">
+                    <InteractiveCard className="h-full">
+                        <Card className="h-full">
+                            <CardHeader>
+                                <CardTitle>Moderation Overview</CardTitle>
+                                <CardDescription>Actions taken (30d)</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {loading ? <Loading /> : <ModerationPieChart data={moderationStats} />}
+                            </CardContent>
+                        </Card>
+                    </InteractiveCard>
+                </FadeInItem>
                 {/* Activity Heatmap (Day x Hour Grid) */}
-                <Card className="col-span-1 lg:col-span-2">
+                <FadeInItem className="col-span-1 lg:col-span-2">
+                    <InteractiveCard className="h-full">
+                        <Card className="h-full">
                     <CardHeader>
                         <CardTitle>Activity Heatmap</CardTitle>
                         <CardDescription>Busiest times of the week (UTC)</CardDescription>
@@ -206,10 +221,14 @@ export default function AnalyticsPage() {
                             </div>
                         )}
                     </CardContent>
-                </Card>
+                        </Card>
+                    </InteractiveCard>
+                </FadeInItem>
 
                 {/* Leaderboard */}
-                <Card className="col-span-1">
+                <FadeInItem className="col-span-1">
+                    <InteractiveCard className="h-full">
+                        <Card className="h-full">
                     <CardHeader>
                         <CardTitle>Top Active Members</CardTitle>
                         <CardDescription>Most XP earned</CardDescription>
@@ -225,8 +244,10 @@ export default function AnalyticsPage() {
                             </div>
                         )}
                     </CardContent>
-                </Card>
-            </div>
+                        </Card>
+                    </InteractiveCard>
+                </FadeInItem>
+            </FadeInStagger>
         </div>
     );
 }
@@ -310,17 +331,21 @@ function StatCard({ title, value, icon: Icon, tooltip }: {
     tooltip?: string;
 }) {
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                    <LabelWithTooltip label={title} tooltip={tooltip} />
-                </CardTitle>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">{value}</div>
-            </CardContent>
-        </Card>
+        <FadeInItem className="h-full">
+            <InteractiveCard className="h-full">
+                <Card className="h-full">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                            <LabelWithTooltip label={title} tooltip={tooltip} />
+                        </CardTitle>
+                        <Icon className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{value}</div>
+                    </CardContent>
+                </Card>
+            </InteractiveCard>
+        </FadeInItem>
     );
 }
 
