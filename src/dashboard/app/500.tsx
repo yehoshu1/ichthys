@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '../components/ui/button';
+import { Button } from '../components/ui/button';
+import { ScrollArea } from '../components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../components/ui/card';
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react';
 
@@ -32,9 +34,11 @@ export default function InternalError({
                         Something went wrong on our end. Please try again later.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="text-sm text-muted-foreground bg-muted/50 p-4 m-4 rounded-md overflow-auto max-h-32 font-mono">
-                    {error?.message || "An internal server error occurred"}
-                    {error?.digest && <div className="mt-2 text-xs opacity-70">Error ID: {error.digest}</div>}
+                <CardContent className="p-0 m-4">
+                    <ScrollArea className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-md max-h-32 font-mono">
+                        {error?.message || "An internal server error occurred"}
+                        {error?.digest && <div className="mt-2 text-xs opacity-70">Error ID: {error.digest}</div>}
+                    </ScrollArea>
                 </CardContent>
                 <CardFooter className="flex flex-col gap-2">
                     <Button onClick={() => reset?.()} className="gap-2 w-full">

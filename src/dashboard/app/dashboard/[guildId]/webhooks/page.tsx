@@ -66,6 +66,7 @@ import { Badge } from "../../../../components/ui/badge";
 import { format, formatDistanceToNow } from "date-fns";
 import { HelperText } from "../../../../components/HelpTooltip";
 import { Checkbox } from "../../../../components/ui/checkbox";
+import { ScrollArea } from "../../../../components/ui/scroll-area";
 
 // Types
 interface WebhookEndpoint {
@@ -335,7 +336,9 @@ function WebhooksTab({ guildId }: { guildId: string }) {
 
             {/* Create Dialog */}
             <Dialog open={showCreate} onOpenChange={setShowCreate}>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-2xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
+                    <ScrollArea className="flex-1">
+                        <div className="p-6">
                     <DialogHeader>
                         <DialogTitle>Create Webhook</DialogTitle>
                         <DialogDescription>
@@ -349,6 +352,8 @@ function WebhooksTab({ guildId }: { guildId: string }) {
                             fetchWebhooks();
                         }}
                     />
+                        </div>
+                    </ScrollArea>
                 </DialogContent>
             </Dialog>
 
@@ -357,7 +362,9 @@ function WebhooksTab({ guildId }: { guildId: string }) {
                 open={!!editingWebhook}
                 onOpenChange={(open) => !open && setEditingWebhook(null)}
             >
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-2xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
+                    <ScrollArea className="flex-1">
+                        <div className="p-6">
                     <DialogHeader>
                         <DialogTitle>Edit Webhook</DialogTitle>
                     </DialogHeader>
@@ -371,6 +378,8 @@ function WebhooksTab({ guildId }: { guildId: string }) {
                             }}
                         />
                     )}
+                        </div>
+                    </ScrollArea>
                 </DialogContent>
             </Dialog>
 
@@ -763,7 +772,7 @@ function WebhookLogs({ webhookId, guildId }: { webhookId: string; guildId: strin
     }
 
     return (
-        <div className="max-h-[60vh] overflow-auto">
+        <ScrollArea className="max-h-[60vh]">
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -816,7 +825,7 @@ function WebhookLogs({ webhookId, guildId }: { webhookId: string; guildId: strin
                     )}
                 </TableBody>
             </Table>
-        </div>
+        </ScrollArea>
     );
 }
 
@@ -977,7 +986,9 @@ function ApiKeysTab({ guildId }: { guildId: string }) {
 
             {/* Create Dialog */}
             <Dialog open={showCreate} onOpenChange={setShowCreate}>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-2xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
+                    <ScrollArea className="flex-1">
+                        <div className="p-6">
                     <DialogHeader>
                         <DialogTitle>Create API Key</DialogTitle>
                         <DialogDescription>
@@ -992,6 +1003,8 @@ function ApiKeysTab({ guildId }: { guildId: string }) {
                             fetchApiKeys();
                         }}
                     />
+                        </div>
+                    </ScrollArea>
                 </DialogContent>
             </Dialog>
         </>

@@ -6,6 +6,7 @@ import { AlertCircle, Loader2, Search } from "lucide-react";
 import { Input } from "./ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Badge } from "./ui/badge";
+import { ScrollArea } from "./ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
     hashSearchQuery,
@@ -241,7 +242,8 @@ export default function GlobalSearchModal({
                         </div>
                     )}
 
-                    <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-2">
+                    <ScrollArea className="max-h-[60vh] pr-2">
+                        <div className="space-y-4">
                         {loading && (
                             <div className="flex items-center gap-2 rounded-md border px-3 py-3 text-sm text-muted-foreground">
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -308,7 +310,8 @@ export default function GlobalSearchModal({
                                 </div>
                             </section>
                         ))}
-                    </div>
+                        </div>
+                    </ScrollArea>
                 </div>
             </DialogContent>
         </Dialog>

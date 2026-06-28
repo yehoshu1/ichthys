@@ -5,8 +5,11 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 
 import { Button } from "../../../../components/ui/button";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "../../../../components/ui/card";
-import { Users, ShieldCheck, Rocket, Zap, Mic, Clock, Trophy } from "lucide-react";
+import { Users, ShieldCheck, Rocket, Zap, Mic, Clock, Trophy, CalendarDays, CheckSquare, Cake, Activity, Timer } from "lucide-react";
 import { HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
+import GrowthChart from "../../../../components/charts/GrowthChart";
+import ModerationPieChart from "../../../../components/charts/ModerationPieChart";
+import VerificationFunnel from "../../../../components/charts/VerificationFunnel";
 
 interface Stats {
     members: number;
@@ -15,6 +18,11 @@ interface Stats {
     actionsToday: number;
     voiceHours: number;
     retentionRate: number;
+    eventsThisMonth: number;
+    pollsThisMonth: number;
+    birthdaysThisMonth: number;
+    actionSuccessRate: number;
+    avgVerifyHours: number;
 }
 
 interface LeaderboardUser {
@@ -41,10 +49,18 @@ export default function AnalyticsPage() {
         boosts: 0,
         actionsToday: 0,
         voiceHours: 0,
-        retentionRate: 0
+        retentionRate: 0,
+        eventsThisMonth: 0,
+        pollsThisMonth: 0,
+        birthdaysThisMonth: 0,
+        actionSuccessRate: 100,
+        avgVerifyHours: 0,
     });
     const [heatmapData, setHeatmapData] = useState<HeatmapEntry[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
+    const [moderationStats, setModerationStats] = useState<{ action: string; count: number }[]>([]);
+    const [verificationStats, setVerificationStats] = useState<{ joinedLast30Days: number; verifiedLast30Days: number }>({ joinedLast30Days: 0, verifiedLast30Days: 0 });
+    const [growthData, setGrowthData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     // 🎯 PERFORMANCE FIX: Memoize fetch function to prevent unnecessary re-renders
@@ -57,6 +73,9 @@ export default function AnalyticsPage() {
                 if (data.stats) setStats(data.stats);
                 if (data.heatmap) setHeatmapData(data.heatmap);
                 if (data.leaderboard) setLeaderboard(data.leaderboard);
+                if (data.moderationStats) setModerationStats(data.moderationStats);
+                if (data.verificationStats) setVerificationStats(data.verificationStats);
+                if (data.growth) setGrowthData(data.growth);
             }
         } catch (error) {
             console.error("Failed to fetch analytics:", error);
@@ -104,18 +123,59 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                 <StatCard title="Total Members" value={stats.members.toLocaleString()} icon={Users} tooltip="Current server member count" />
                 <StatCard title="Verified" value={stats.verified.toLocaleString()} icon={ShieldCheck} tooltip="Members who have the verification role" />
                 <StatCard title="Voice Hours" value={`${stats.voiceHours}h`} icon={Mic} tooltip="Total hours spent in voice channels by all members" />
                 <StatCard title="Retention" value={`${stats.retentionRate}%`} icon={Clock} tooltip="Percentage of members who stay vs leave over time" />
                 <StatCard title="Boosts" value={stats.boosts.toLocaleString()} icon={Rocket} tooltip="Current number of server boosts" />
                 <StatCard title="Actions (24h)" value={stats.actionsToday.toLocaleString()} icon={Zap} tooltip="Automated actions executed in the last 24 hours" />
+                
+                <StatCard title="Events (30d)" value={stats.eventsThisMonth.toLocaleString()} icon={CalendarDays} tooltip="Events scheduled in the last 30 days" />
+                <StatCard title="Polls (30d)" value={stats.pollsThisMonth.toLocaleString()} icon={CheckSquare} tooltip="Polls created in the last 30 days" />
+                <StatCard title="Birthdays (This Month)" value={stats.birthdaysThisMonth.toLocaleString()} icon={Cake} tooltip="Birthdays happening this month" />
+                <StatCard title="Action Reliability" value={`${stats.actionSuccessRate}%`} icon={Activity} tooltip="Success rate of automated background actions" />
+                <StatCard title="Avg Verify Time" value={`${stats.avgVerifyHours}h`} icon={Timer} tooltip="Average time from join to verification" />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-                {/* Activity Heatmap (Day x Hour Grid) */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* Growth Chart */}
+                <Card className="col-span-1 lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle>Member Growth</CardTitle>
+                        <CardDescription>Server population over the last 30 days</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {loading ? <Loading /> : <GrowthChart data={growthData} />}
+                    </CardContent>
+                </Card>
+
+                {/* Verification Funnel */}
                 <Card className="col-span-1">
+                    <CardHeader>
+                        <CardTitle>Verification Funnel</CardTitle>
+                        <CardDescription>Users joined vs verified (30d)</CardDescription>
+                        <HelperText>Shows how many of the users who joined recently actually completed the verification process.</HelperText>
+                    </CardHeader>
+                    <CardContent>
+                        {loading ? <Loading /> : <VerificationFunnel data={verificationStats} />}
+                    </CardContent>
+                </Card>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* Moderation Chart */}
+                <Card className="col-span-1">
+                    <CardHeader>
+                        <CardTitle>Moderation Overview</CardTitle>
+                        <CardDescription>Actions taken (30d)</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {loading ? <Loading /> : <ModerationPieChart data={moderationStats} />}
+                    </CardContent>
+                </Card>
+                {/* Activity Heatmap (Day x Hour Grid) */}
+                <Card className="col-span-1 lg:col-span-2">
                     <CardHeader>
                         <CardTitle>Activity Heatmap</CardTitle>
                         <CardDescription>Busiest times of the week (UTC)</CardDescription>
@@ -126,7 +186,7 @@ export default function AnalyticsPage() {
                             <div className="flex flex-col gap-2 overflow-x-auto pb-2">
                                 <div className="flex">
                                     <div className="w-10"></div>
-                                    <div className="flex-1 grid grid-cols-24 gap-0.5 min-w-[500px]">
+                                    <div className="flex-1 grid gap-0.5 min-w-[500px]" style={{ gridTemplateColumns: 'repeat(24, minmax(0, 1fr))' }}>
                                         {Array.from({ length: 24 }).map((_, h) => (
                                             <div key={h} className="text-[10px] text-muted-foreground text-center">
                                                 {h % 4 === 0 ? h : ''}
@@ -183,7 +243,7 @@ function HeatmapRow({ dayData, dayIndex, max, days }: {
             <div className="w-10 text-xs text-muted-foreground font-medium">
                 {days[dayIndex]}
             </div>
-            <div className="flex-1 grid grid-cols-24 gap-0.5 min-w-[500px]">
+            <div className="flex-1 grid gap-0.5 min-w-[500px]" style={{ gridTemplateColumns: 'repeat(24, minmax(0, 1fr))' }}>
                 {dayData.map((count, hourIndex) => (
                     <HeatmapCell
                         key={hourIndex}

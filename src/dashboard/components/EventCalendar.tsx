@@ -12,6 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "./ui/select";
+import { ScrollArea } from "./ui/scroll-area";
 
 interface MinimalEvent {
     id: string;
@@ -265,7 +266,7 @@ export default function EventCalendar<T extends MinimalEvent = MinimalEvent>({
                 </div>
 
                 {/* Time slots */}
-                <div className="overflow-y-auto max-h-[600px]">
+                <ScrollArea className="max-h-[600px]">
                     {hours.map((hour) => {
                         const hourEvents = dayEvents.filter((event) => {
                             const eventHour = parseISO(event.startTime).getHours();
@@ -299,7 +300,7 @@ export default function EventCalendar<T extends MinimalEvent = MinimalEvent>({
                             </div>
                         );
                     })}
-                </div>
+                </ScrollArea>
             </div>
         );
     };

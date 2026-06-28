@@ -11,6 +11,7 @@ import { Label } from "../../../../components/ui/label";
 import { Switch } from "../../../../components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../components/ui/table";
+import { ScrollArea } from "../../../../components/ui/scroll-area";
 import { Trophy, Trash } from "lucide-react";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
 import { useDiscordData } from "../../../../components/useDiscordData";
@@ -382,7 +383,8 @@ function LevelRewardsManager({ guildId }: { guildId: string }) {
                 <Button onClick={addReward} disabled={!newRoleId}>Add Reward</Button>
             </div>
 
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+            <ScrollArea className="max-h-[300px]">
+                <div className="space-y-2">
                 {loading ? (
                     <div className="text-center text-sm text-muted-foreground">Loading...</div>
                 ) : rewards.length === 0 ? (
@@ -401,7 +403,8 @@ function LevelRewardsManager({ guildId }: { guildId: string }) {
                         </div>
                     ))
                 )}
-            </div>
+                </div>
+            </ScrollArea>
         </div>
     );
 }

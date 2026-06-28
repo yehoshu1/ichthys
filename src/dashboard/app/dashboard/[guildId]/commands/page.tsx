@@ -11,6 +11,7 @@ import { Label } from "../../../../components/ui/label";
 import { Switch } from "../../../../components/ui/switch";
 import { Badge } from "../../../../components/ui/badge";
 import { Checkbox } from "../../../../components/ui/checkbox";
+import { ScrollArea } from "../../../../components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { useDiscordData } from "../../../../components/useDiscordData";
@@ -108,7 +109,8 @@ function MultiSelectChecklist({
                 </div>
             )}
 
-            <div className="max-h-56 space-y-2 overflow-y-auto rounded border p-2">
+            <ScrollArea className="max-h-56 rounded border p-2">
+                <div className="space-y-2">
                 {items.map((item) => (
                     <label key={item.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-muted/60">
                         <Checkbox
@@ -118,7 +120,8 @@ function MultiSelectChecklist({
                         <span className="text-sm">{item.label}</span>
                     </label>
                 ))}
-            </div>
+                </div>
+            </ScrollArea>
         </div>
     );
 }

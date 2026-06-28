@@ -66,6 +66,7 @@ import { Badge } from "../../../../components/ui/badge";
 import { Textarea } from "../../../../components/ui/textarea";
 import { format, addDays, addMinutes, setHours, setMinutes, startOfDay } from "date-fns";
 import { LabelWithTooltip, HelperText } from "../../../../components/HelpTooltip";
+import { ScrollArea } from "../../../../components/ui/scroll-area";
 
 import { DateTimePicker, DatePicker, TimePicker } from "../../../../components/ui/datetime-picker";
 import { RoleMultiSelect } from "../../../../components/DiscordSelectors";
@@ -354,7 +355,9 @@ function CreatePollButton({ guildId }: { guildId: string }) {
                     Create Poll
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-3xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
+                <ScrollArea className="flex-1">
+                    <div className="p-6">
                 <DialogHeader>
                     <DialogTitle>Create New Poll</DialogTitle>
                     <DialogDescription>
@@ -391,6 +394,8 @@ function CreatePollButton({ guildId }: { guildId: string }) {
                 ) : (
                     <StandardPollForm guildId={guildId} pollType={pollType} onSuccess={() => setOpen(false)} />
                 )}
+                    </div>
+                </ScrollArea>
             </DialogContent>
         </Dialog>
     );
@@ -1663,7 +1668,9 @@ function PollsList({ guildId, status }: { guildId: string; status: "active" | "e
                 open={!!editingPoll}
                 onOpenChange={(open) => !open && setEditingPoll(null)}
             >
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-2xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
+                    <ScrollArea className="flex-1">
+                        <div className="p-6">
                     <DialogHeader>
                         <DialogTitle>Edit Poll</DialogTitle>
                     </DialogHeader>
@@ -1689,6 +1696,8 @@ function PollsList({ guildId, status }: { guildId: string; status: "active" | "e
                             />
                         )
                     )}
+                        </div>
+                    </ScrollArea>
                 </DialogContent>
             </Dialog>
 
@@ -1697,12 +1706,16 @@ function PollsList({ guildId, status }: { guildId: string; status: "active" | "e
                 open={!!viewingPoll}
                 onOpenChange={(open) => !open && setViewingPoll(null)}
             >
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-2xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
+                    <ScrollArea className="flex-1">
+                        <div className="p-6">
                     <DialogHeader>
                         <DialogTitle>Poll Results</DialogTitle>
                         <DialogDescription>{viewingPoll?.question}</DialogDescription>
                     </DialogHeader>
                     {viewingPoll && <PollResults poll={viewingPoll} />}
+                        </div>
+                    </ScrollArea>
                 </DialogContent>
             </Dialog>
         </>

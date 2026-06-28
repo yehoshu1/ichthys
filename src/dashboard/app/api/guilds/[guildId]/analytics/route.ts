@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shared/database/client";
-import { guildConfig, userJoin, actionLog, levelProfile, messageActivity, guildGrowth } from "@shared/database/schema";
-import { sql, eq, and, gt, lt, desc, gte, asc } from "drizzle-orm";
+import { guildConfig, userJoin, actionLog, levelProfile, messageActivity, guildGrowth, moderationCase, event, poll, birthdayEntry } from "@shared/database/schema";
+import { sql, eq, and, gt, lt, desc, gte, asc, isNotNull } from "drizzle-orm";
 import { requireGuildManageAccess } from "@/lib/guild-auth";
 import { getDiscordUsers } from "@/lib/discord-user-cache";
 import logger from "@/lib/logger";
@@ -141,6 +141,80 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             .where(and(eq(guildGrowth.guildId, guildId), gte(guildGrowth.date, thirtyDaysAgo)))
             .orderBy(asc(guildGrowth.date));
 
+        // --- NEW METRICS ---
+
+        // 1. Moderation Cases
+        const moderationCasesStats = await db
+            .select({
+                action: moderationCase.action,
+                count: sql<number>`count(*)::int`,
+            })
+            .from(moderationCase)
+            .where(and(eq(moderationCase.guildId, guildId), gte(moderationCase.createdAt, thirtyDaysAgo)))
+            .groupBy(moderationCase.action);
+
+        // 2. Verification Funnel
+        const recentJoinsResult = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(userJoin)
+            .where(and(eq(userJoin.guildId, guildId), gte(userJoin.joinedAt, thirtyDaysAgo), eq(userJoin.isBot, false)));
+        const joinedLast30Days = recentJoinsResult[0]?.count || 0;
+
+        const recentVerifiedResult = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(userJoin)
+            .where(and(
+                eq(userJoin.guildId, guildId),
+                gte(userJoin.joinedAt, thirtyDaysAgo),
+                eq(userJoin.isVerified, true),
+                eq(userJoin.isBot, false)
+            ));
+        const verifiedLast30Days = recentVerifiedResult[0]?.count || 0;
+
+        const avgVerifyTimeResult = await db
+            .select({ avgHours: sql<number>`extract(epoch from avg(${userJoin.verifiedAt} - ${userJoin.joinedAt})) / 3600` })
+            .from(userJoin)
+            .where(and(
+                eq(userJoin.guildId, guildId),
+                eq(userJoin.isVerified, true),
+                isNotNull(userJoin.verifiedAt)
+            ));
+        const avgVerifyHours = Math.round((avgVerifyTimeResult[0]?.avgHours || 0) * 10) / 10;
+
+        // 3. Events and Polls
+        const eventsResult = await db.select({ count: sql<number>`count(*)::int` })
+            .from(event).where(and(eq(event.guildId, guildId), gte(event.startTime, thirtyDaysAgo)));
+        const eventsThisMonth = eventsResult[0]?.count || 0;
+
+        const pollsResult = await db.select({ count: sql<number>`count(*)::int` })
+            .from(poll).where(and(eq(poll.guildId, guildId), gte(poll.createdAt, thirtyDaysAgo)));
+        const pollsThisMonth = pollsResult[0]?.count || 0;
+
+        // 4. Birthdays
+        const currentMonth = now.getMonth() + 1; // 1-12
+        const birthdaysResult = await db.select({ count: sql<number>`count(*)::int` })
+            .from(birthdayEntry).where(and(eq(birthdayEntry.guildId, guildId), eq(birthdayEntry.month, currentMonth)));
+        const birthdaysThisMonth = birthdaysResult[0]?.count || 0;
+
+        // 5. Action Reliability
+        const actionLogStats = await db.select({
+            success: actionLog.success,
+            count: sql<number>`count(*)::int`
+        })
+        .from(actionLog)
+        .where(and(eq(actionLog.guildId, guildId), gte(actionLog.executedAt, sevenDaysAgo)))
+        .groupBy(actionLog.success);
+
+        let successfulActions = 0;
+        let failedActions = 0;
+        actionLogStats.forEach(stat => {
+            if (stat.success) successfulActions += stat.count;
+            else failedActions += stat.count;
+        });
+        const actionSuccessRate = (successfulActions + failedActions) > 0 
+            ? Math.round((successfulActions / (successfulActions + failedActions)) * 100) 
+            : 100;
+
         const payload = {
             stats: {
                 members: memberCount,
@@ -150,10 +224,20 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
                 levelingEnabled,
                 voiceHours: totalVoiceHours,
                 retentionRate,
+                eventsThisMonth,
+                pollsThisMonth,
+                birthdaysThisMonth,
+                actionSuccessRate,
+                avgVerifyHours,
             },
             heatmap: heatmapData,
             leaderboard,
             growth: growthData,
+            moderationStats: moderationCasesStats,
+            verificationStats: {
+                joinedLast30Days,
+                verifiedLast30Days
+            }
         };
 
         analyticsCache.set(guildId, {

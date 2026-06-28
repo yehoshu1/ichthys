@@ -52,6 +52,7 @@ import GlobalSearchModal from "../../../components/GlobalSearchModal";
 import { DASHBOARD_NAV_ITEMS, DashboardNavId } from "../../../lib/search/dashboard-nav";
 import type { SearchOpenMethod } from "../../../lib/search/telemetry";
 import { RbacAccessProvider } from "../../../components/RbacAccessContext";
+import { ScrollArea } from "../../../components/ui/scroll-area";
 
 interface ModuleStateResponse {
     modules: Array<{
@@ -402,40 +403,42 @@ export default function DashboardLayout({
                     </Link>
                 </div>
 
-                <nav className="flex-1 space-y-1 px-4 py-6 overflow-y-auto">
-                    <div className="px-3 mb-2 text-xs font-semibold uppercase text-muted-foreground">
-                        Menu
-                    </div>
-                    {navItems.map((item) => {
-                        const ItemIcon = navIconById[item.id];
-                        const enabled = isNavItemEnabled(item, moduleEnabledById);
-                        const href = getNavHref(guildId, item, moduleEnabledById);
-                        const targetHref = `/dashboard/${guildId}${item.href}`;
-                        const isActive = item.href === ""
-                            ? pathname === targetHref
-                            : pathname.startsWith(targetHref);
+                <ScrollArea className="flex-1">
+                    <nav className="space-y-1 px-4 py-6">
+                        <div className="px-3 mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                            Menu
+                        </div>
+                        {navItems.map((item) => {
+                            const ItemIcon = navIconById[item.id];
+                            const enabled = isNavItemEnabled(item, moduleEnabledById);
+                            const href = getNavHref(guildId, item, moduleEnabledById);
+                            const targetHref = `/dashboard/${guildId}${item.href}`;
+                            const isActive = item.href === ""
+                                ? pathname === targetHref
+                                : pathname.startsWith(targetHref);
 
-                        return (
-                            <Link
-                                key={item.name}
-                                href={href}
-                                className={cn(
-                                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
-                                    isActive ? "bg-secondary text-foreground" : "text-muted-foreground",
-                                    !enabled && "opacity-70"
-                                )}
-                            >
-                                <ItemIcon className="h-4 w-4" />
-                                <span className="flex-1">{item.name}</span>
-                                {!enabled && (
-                                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                                        Off
-                                    </span>
-                                )}
-                            </Link>
-                        );
-                    })}
-                </nav>
+                            return (
+                                <Link
+                                    key={item.name}
+                                    href={href}
+                                    className={cn(
+                                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
+                                        isActive ? "bg-secondary text-foreground" : "text-muted-foreground",
+                                        !enabled && "opacity-70"
+                                    )}
+                                >
+                                    <ItemIcon className="h-4 w-4" />
+                                    <span className="flex-1">{item.name}</span>
+                                    {!enabled && (
+                                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                            Off
+                                        </span>
+                                    )}
+                                </Link>
+                            );
+                        })}
+                    </nav>
+                </ScrollArea>
 
                 <div className="border-t p-4">
                     <Button
@@ -503,38 +506,40 @@ export default function DashboardLayout({
                                         <span className="text-primary">Ixoye</span> Dashboard
                                     </h1>
                                 </div>
-                                <nav className="flex-1 overflow-y-auto space-y-1 px-4 py-6">
-                                    {navItems.map((item) => {
-                                        const ItemIcon = navIconById[item.id];
-                                        const enabled = isNavItemEnabled(item, moduleEnabledById);
-                                        const href = getNavHref(guildId, item, moduleEnabledById);
-                                        const targetHref = `/dashboard/${guildId}${item.href}`;
-                                        const isActive = item.href === ""
-                                            ? pathname === targetHref
-                                            : pathname.startsWith(targetHref);
+                                <ScrollArea className="flex-1">
+                                    <nav className="space-y-1 px-4 py-6">
+                                        {navItems.map((item) => {
+                                            const ItemIcon = navIconById[item.id];
+                                            const enabled = isNavItemEnabled(item, moduleEnabledById);
+                                            const href = getNavHref(guildId, item, moduleEnabledById);
+                                            const targetHref = `/dashboard/${guildId}${item.href}`;
+                                            const isActive = item.href === ""
+                                                ? pathname === targetHref
+                                                : pathname.startsWith(targetHref);
 
-                                        return (
-                                            <SheetClose asChild key={item.name}>
-                                                <Link
-                                                    href={href}
-                                                    className={cn(
-                                                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
-                                                        isActive ? "bg-secondary text-foreground" : "text-muted-foreground",
-                                                        !enabled && "opacity-70"
-                                                    )}
-                                                >
-                                                    <ItemIcon className="h-4 w-4" />
-                                                    <span className="flex-1">{item.name}</span>
-                                                    {!enabled && (
-                                                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                                                            Off
-                                                        </span>
-                                                    )}
-                                                </Link>
-                                            </SheetClose>
-                                        );
-                                    })}
-                                </nav>
+                                            return (
+                                                <SheetClose asChild key={item.name}>
+                                                    <Link
+                                                        href={href}
+                                                        className={cn(
+                                                            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
+                                                            isActive ? "bg-secondary text-foreground" : "text-muted-foreground",
+                                                            !enabled && "opacity-70"
+                                                        )}
+                                                    >
+                                                        <ItemIcon className="h-4 w-4" />
+                                                        <span className="flex-1">{item.name}</span>
+                                                        {!enabled && (
+                                                            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                                                Off
+                                                            </span>
+                                                        )}
+                                                    </Link>
+                                                </SheetClose>
+                                            );
+                                        })}
+                                    </nav>
+                                </ScrollArea>
                                 <div className="border-t p-4 shrink-0">
                                     <Button
                                         variant="ghost"
@@ -632,17 +637,18 @@ export default function DashboardLayout({
                     </div>
                 </header>
 
-                {/* Page Content */}
-                <main className="flex-1 overflow-y-auto p-4 md:p-8">
-                    <div className="mx-auto max-w-6xl">
-                        <RbacAccessProvider
-                            isBypassUser={accessData?.isBypassUser ?? true}
-                            modules={accessData?.modules ?? {}}
-                        >
-                            {children}
-                        </RbacAccessProvider>
-                    </div>
-                </main>
+                <ScrollArea className="flex-1">
+                    <main className="p-4 md:p-8">
+                        <div className="mx-auto max-w-6xl">
+                            <RbacAccessProvider
+                                isBypassUser={accessData?.isBypassUser ?? true}
+                                modules={accessData?.modules ?? {}}
+                            >
+                                {children}
+                            </RbacAccessProvider>
+                        </div>
+                    </main>
+                </ScrollArea>
             </div>
 
             <GlobalSearchModal

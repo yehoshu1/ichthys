@@ -3,6 +3,8 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { ScrollArea } from "./ui/scroll-area";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 interface Props {
@@ -70,7 +72,8 @@ export class ErrorBoundary extends Component<Props, State> {
                             </p>
 
                             {process.env.NODE_ENV === "development" && this.state.error && (
-                                <div className="bg-muted p-4 rounded-lg overflow-auto max-h-48">
+                                <ScrollArea className="max-h-48">
+                                    <div className="bg-muted p-4 rounded-lg">
                                     <p className="font-mono text-sm text-red-600 dark:text-red-400">
                                         {this.state.error.toString()}
                                     </p>
@@ -79,7 +82,8 @@ export class ErrorBoundary extends Component<Props, State> {
                                             {this.state.errorInfo.componentStack}
                                         </pre>
                                     )}
-                                </div>
+                                    </div>
+                                </ScrollArea>
                             )}
 
                             <div className="flex gap-2 justify-center">

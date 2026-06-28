@@ -13,6 +13,7 @@ import { MessageSquare, Plus, Trash, Edit, Eye, EyeOff, Clock, Hash, User, Messa
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { Badge } from "../../../../components/ui/badge";
+import { ScrollArea } from "../../../../components/ui/scroll-area";
 import { Textarea } from "../../../../components/ui/textarea";
 import { ChannelMultiSelect, RoleMultiSelect } from "../../../../components/DiscordSelectors";
 import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
@@ -333,7 +334,9 @@ export default function AliasesPage() {
                                 Add Alias
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <DialogContent className="max-w-2xl p-0 max-h-[90vh] flex flex-col gap-0 overflow-hidden">
+                            <ScrollArea className="flex-1">
+                                <div className="p-6">
                             <DialogHeader>
                                 <DialogTitle>{editingAlias ? "Edit Alias" : "Create New Alias"}</DialogTitle>
                                 <DialogDescription>
@@ -548,6 +551,8 @@ export default function AliasesPage() {
                                     </Button>
                                 </DialogFooter>
                             </form>
+                                </div>
+                            </ScrollArea>
                         </DialogContent>
                     </Dialog>
                 </CardHeader>

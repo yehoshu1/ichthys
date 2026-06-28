@@ -14,6 +14,7 @@ const event: Event<Events.GuildMemberRemove> = {
             // 1. Update database to track leave
             await db.update(userJoin)
                 .set({
+                    isVerified: false,
                     kickedAt: new Date(), // Using kickedAt to track leave time
                     updatedAt: new Date()
                 })

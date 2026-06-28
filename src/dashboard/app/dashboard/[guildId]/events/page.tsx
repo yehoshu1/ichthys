@@ -72,6 +72,7 @@ import { format } from "date-fns";
 import { LabelWithTooltip, HelperText } from "../../../../components/HelpTooltip";
 import { DateTimePicker, DatePicker } from "../../../../components/ui/datetime-picker";
 import { RoleMultiSelect } from "../../../../components/DiscordSelectors";
+import { ScrollArea } from "../../../../components/ui/scroll-area";
 import EventCalendar from "../../../../components/EventCalendar";
 
 // Types
@@ -280,9 +281,11 @@ function EventDialogShell({
                 <DialogTitle>{title}</DialogTitle>
                 <DialogDescription>{description}</DialogDescription>
             </DialogHeader>
-            <div className="min-h-0 overflow-y-auto px-6 pb-6 pr-4 pt-5">
+            <ScrollArea className="flex-1">
+                <div className="px-6 pb-6 pr-4 pt-5">
                 {children}
-            </div>
+                </div>
+            </ScrollArea>
         </DialogContent>
     );
 }

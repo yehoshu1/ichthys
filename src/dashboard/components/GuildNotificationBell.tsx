@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 interface NotificationItem {
@@ -157,7 +158,8 @@ export default function GuildNotificationBell({ guildId }: { guildId: string }) 
                     </div>
                 </div>
 
-                <div className="max-h-[420px] overflow-y-auto p-2">
+                <ScrollArea className="max-h-[420px] p-2">
+                    <div className="flex flex-col gap-2">
                     {loading && (
                         <div className="flex items-center justify-center py-8 text-muted-foreground">
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -220,7 +222,8 @@ export default function GuildNotificationBell({ guildId }: { guildId: string }) 
                             })}
                         </div>
                     )}
-                </div>
+                    </div>
+                </ScrollArea>
             </PopoverContent>
         </Popover>
     );
