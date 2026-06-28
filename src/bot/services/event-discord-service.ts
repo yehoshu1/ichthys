@@ -150,40 +150,47 @@ export class EventDiscordService {
         return embed;
     }
 
-    buildEventButtons(eventId: string, disabled = false): ActionRowBuilder<ButtonBuilder>[] {
-        const row1 = new ActionRowBuilder<ButtonBuilder>();
+    buildEventButtons(eventId: string, status?: EventDisplayData['status'], startTime?: Date): ActionRowBuilder<ButtonBuilder>[] {
+        const isPastOrActive = status === 'ACTIVE' || status === 'COMPLETED' || status === 'CANCELLED' || (startTime && startTime < new Date());
+        
+        const detailsButton = new ButtonBuilder()
+            .setCustomId(`event:details:${eventId}`)
+            .setLabel('📋 Details')
+            .setStyle(ButtonStyle.Secondary);
 
-        const yesButton = new ButtonBuilder()
-            .setCustomId(`event:rsvp:${eventId}:YES`)
-            .setLabel('✅ Yes')
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(disabled);
+        const settingsButton = new ButtonBuilder()
+            .setCustomId(`event:settings:${eventId}`)
+            .setLabel('⚙️ Settings')
+            .setStyle(ButtonStyle.Secondary);
 
-        const maybeButton = new ButtonBuilder()
-            .setCustomId(`event:rsvp:${eventId}:MAYBE`)
-            .setLabel('🤔 Maybe')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(disabled);
+        if (isPastOrActive) {
+            // Event has started or ended; remove RSVP options and only keep Details/Settings
+            return [new ActionRowBuilder<ButtonBuilder>().addComponents(detailsButton, settingsButton)];
+        }
 
-        const noButton = new ButtonBuilder()
-            .setCustomId(`event:rsvp:${eventId}:NO`)
-            .setLabel('❌ No')
-            .setStyle(ButtonStyle.Danger)
-            .setDisabled(disabled);
-
-        row1.addComponents(yesButton, maybeButton, noButton);
+        // Event is scheduled and in the future; show all options
+        const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`event:rsvp:${eventId}:YES`)
+                .setLabel('✅ Yes')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId(`event:rsvp:${eventId}:MAYBE`)
+                .setLabel('🤔 Maybe')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`event:rsvp:${eventId}:NO`)
+                .setLabel('❌ No')
+                .setStyle(ButtonStyle.Danger)
+        );
         
         const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder()
                 .setCustomId(`event:reminder:${eventId}`)
                 .setLabel('⏰ Set Reminder')
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(disabled),
-            new ButtonBuilder()
-                .setCustomId(`event:details:${eventId}`)
-                .setLabel('📋 Details')
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(disabled)
+                .setStyle(ButtonStyle.Secondary),
+            detailsButton,
+            settingsButton
         );
 
         return [row1, row2];
@@ -198,7 +205,7 @@ export class EventDiscordService {
         if (!channel) return null;
 
         const embed = await this.buildEventEmbed(event, guild);
-        const buttons = this.buildEventButtons(event.id, !this.isEventInteractable(event.status));
+        const buttons = this.buildEventButtons(event.id, event.status, event.startTime);
 
         // Build mention string — only the create role (first entry in the array)
         let mentionContent = '';
@@ -229,7 +236,7 @@ export class EventDiscordService {
             if (!message) return null;
 
             const embed = await this.buildEventEmbed(event, guild);
-            const buttons = this.buildEventButtons(event.id, !this.isEventInteractable(event.status));
+            const buttons = this.buildEventButtons(event.id, event.status, event.startTime);
 
             await message.edit({
                 embeds: [embed],

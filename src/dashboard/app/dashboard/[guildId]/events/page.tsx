@@ -2005,7 +2005,7 @@ function EventSettingsTab({ guildId }: { guildId: string }) {
                         <div className="space-y-0.5">
                             <Label>Default Mention on Create</Label>
                             <HelperText>
-                                Automatically mention roles when new events are created
+                                Pre-checks the 'Mention Roles on Create' option in the dashboard form by default.
                             </HelperText>
                         </div>
                         <Switch
@@ -2023,7 +2023,7 @@ function EventSettingsTab({ guildId }: { guildId: string }) {
                         <div className="space-y-0.5">
                             <Label>Default Mention on Start</Label>
                             <HelperText>
-                                Automatically mention roles when events start
+                                Pre-checks the 'Mention Roles on Start' option in the dashboard form by default.
                             </HelperText>
                         </div>
                         <Switch

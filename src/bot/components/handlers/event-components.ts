@@ -340,10 +340,183 @@ async function handleDmReminder(interaction: ButtonInteraction): Promise<void> {
     });
 }
 
+async function handleEventSettings(interaction: ButtonInteraction): Promise<void> {
+    const eventId = interaction.customId.split(':')[2];
+    const evt = await eventService.getEventById(eventId);
+    if (!evt) {
+        await interaction.reply({ content: 'This event no longer exists.', ephemeral: true });
+        return;
+    }
+
+    const userRsvp = await eventService.getRsvp(eventId, interaction.user.id);
+    const rsvpStatus = userRsvp ? userRsvp.status : 'None';
+
+    const embed = new EmbedBuilder()
+        .setTitle('⚙️ Event Settings')
+        .setDescription(`What would you like to do with event **${evt.title}**?\n\n**Current RSVP:** ${rsvpStatus}`)
+        .setColor('#5865F2');
+
+    const isAdminOrCreator = interaction.memberPermissions?.has('Administrator') || interaction.user.id === evt.creatorId;
+
+    const row = new ActionRowBuilder<ButtonBuilder>();
+
+    if (isAdminOrCreator) {
+        row.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`event_action:edit:${eventId}`)
+                .setLabel('✏️ Edit')
+                .setStyle(ButtonStyle.Primary)
+        );
+    }
+
+    row.addComponents(
+        new ButtonBuilder()
+            .setCustomId(`event_action:rsvpers:${eventId}`)
+            .setLabel('👥 View RSVPers')
+            .setStyle(ButtonStyle.Secondary)
+    );
+
+    if (userRsvp) {
+        row.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`event_action:unrsvp:${eventId}`)
+                .setLabel('🗑️ UnRSVP')
+                .setStyle(ButtonStyle.Secondary)
+        );
+    }
+
+    if (isAdminOrCreator) {
+        row.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`event_action:delete:${eventId}`)
+                .setLabel('🧨 Delete')
+                .setStyle(ButtonStyle.Danger)
+        );
+    }
+
+    await interaction.reply({
+        embeds: [embed],
+        components: [row],
+        ephemeral: true,
+    });
+}
+
+async function handleEventEdit(interaction: ButtonInteraction): Promise<void> {
+    const eventId = interaction.customId.split(':')[2];
+    const guildId = interaction.guildId;
+    
+    const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3000';
+    
+    await interaction.reply({ 
+        content: `To edit this event, please visit the dashboard:\n${dashboardUrl}/dashboard/${guildId}/events?event=${eventId}`, 
+        ephemeral: true 
+    });
+}
+
+async function handleEventRsvpers(interaction: ButtonInteraction): Promise<void> {
+    const eventId = interaction.customId.split(':')[2];
+    const evt = await eventService.getEventById(eventId);
+    if (!evt) {
+        await interaction.reply({ content: 'This event no longer exists.', ephemeral: true });
+        return;
+    }
+
+    const rsvps = await eventService.getRsvpsByEvent(eventId);
+    const yes = rsvps.filter(r => r.status === 'YES');
+    const maybe = rsvps.filter(r => r.status === 'MAYBE');
+    const waitlist = rsvps.filter(r => r.status === 'WAITLIST');
+
+    const formatUsers = (users: typeof rsvps) => {
+        if (users.length === 0) return 'None';
+        return users.map(r => `<@${r.userId}>`).join(', ');
+    };
+
+    const embed = new EmbedBuilder()
+        .setTitle(`👥 RSVPers for ${evt.title}`)
+        .setColor('#5865F2')
+        .addFields(
+            { name: `✅ Going (${yes.length})`, value: formatUsers(yes), inline: false },
+            { name: `🤔 Maybe (${maybe.length})`, value: formatUsers(maybe), inline: false },
+            { name: `⏳ Waitlist (${waitlist.length})`, value: formatUsers(waitlist), inline: false }
+        );
+
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
+async function handleEventUnrsvp(interaction: ButtonInteraction): Promise<void> {
+    const eventId = interaction.customId.split(':')[2];
+    
+    const evt = await eventService.getEventById(eventId);
+    if (!evt) {
+        await interaction.reply({ content: 'This event no longer exists.', ephemeral: true });
+        return;
+    }
+
+    const removed = await eventService.removeRsvp(eventId, interaction.user.id);
+    
+    if (removed) {
+        const member = interaction.member as GuildMember;
+        if (evt.attendeeRoleId && member) {
+            await member.roles.remove(evt.attendeeRoleId).catch((error) => {
+                logger.warn(`Could not remove attendee role from ${interaction.user.id}:`, error);
+            });
+        }
+
+        if (interaction.guild) {
+            try {
+                const { eventDiscordService } = await import('../../services/event-discord-service');
+                if (eventDiscordService) {
+                    await eventDiscordService.updateEventMessage(evt, interaction.guild);
+                }
+            } catch (error) {
+                logger.warn('Could not update event Discord message:', error);
+            }
+        }
+        
+        await interaction.reply({ content: '✅ You have successfully un-RSVP\'d from this event.', ephemeral: true });
+    } else {
+        await interaction.reply({ content: 'You were not RSVP\'d to this event.', ephemeral: true });
+    }
+}
+
+async function handleEventDelete(interaction: ButtonInteraction): Promise<void> {
+    const eventId = interaction.customId.split(':')[2];
+    
+    const evt = await eventService.getEventById(eventId);
+    if (!evt) {
+        await interaction.reply({ content: 'This event no longer exists.', ephemeral: true });
+        return;
+    }
+
+    const isAdminOrCreator = interaction.memberPermissions?.has('Administrator') || interaction.user.id === evt.creatorId;
+    if (!isAdminOrCreator) {
+        await interaction.reply({ content: 'You do not have permission to delete this event.', ephemeral: true });
+        return;
+    }
+
+    try {
+        const success = await eventService.deleteEvent(eventId);
+        
+        if (success) {
+            await interaction.reply({ content: '✅ Event has been deleted.', ephemeral: true });
+        } else {
+            await interaction.reply({ content: '❌ Failed to delete event.', ephemeral: true });
+        }
+    } catch (error) {
+        logger.error('Error deleting event from interaction:', error);
+        await interaction.reply({ content: '❌ An error occurred while deleting the event.', ephemeral: true });
+    }
+}
+
 export function registerEventComponentHandlers(router: ComponentRouter): void {
     router.register('button', 'event:rsvp:', handleEventRsvp, { moduleId: 'events' });
     router.register('button', 'event:reminder:', handleEventReminder, { moduleId: 'events' });
     router.register('button', 'event:details:', handleEventDetails, { moduleId: 'events' });
+    router.register('button', 'event:settings:', handleEventSettings, { moduleId: 'events' });
+    router.register('button', 'event_action:edit:', handleEventEdit, { moduleId: 'events' });
+    router.register('button', 'event_action:rsvpers:', handleEventRsvpers, { moduleId: 'events' });
+    router.register('button', 'event_action:unrsvp:', handleEventUnrsvp, { moduleId: 'events' });
+    router.register('button', 'event_action:delete:', handleEventDelete, { moduleId: 'events' });
     router.register('button', 'reminder:preset:', handleReminderPreset, { moduleId: 'events' });
     router.register('button', 'reminder:custom:', handleCustomReminder, { moduleId: 'events' });
     router.register('button', 'dm_reminder:', handleDmReminder, { moduleId: 'events' });
