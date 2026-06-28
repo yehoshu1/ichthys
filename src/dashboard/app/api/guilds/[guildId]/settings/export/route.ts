@@ -13,6 +13,12 @@ import {
     birthdayEntry,
     messageAlias,
     commandConfig,
+    moduleState,
+    eventTemplate,
+    pollTemplate,
+    eventPollSettings,
+    dashboardRbacConfig,
+    dashboardRbacRules,
 } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { requireGuildManageAccess } from "@/lib/guild-auth";
@@ -40,6 +46,12 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             birthdayEntries,
             aliases,
             commandConfigs,
+            moduleStates,
+            eventTemplates,
+            pollTemplates,
+            eventPollSettingsConfig,
+            rbacConfig,
+            rbacRules,
         ] = await Promise.all([
             db.query.guildConfig.findFirst({ where: eq(guildConfig.guildId, guildId) }),
             db.query.welcomeTrigger.findMany({ where: eq(welcomeTrigger.guildId, guildId) }),
@@ -53,6 +65,12 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             db.query.birthdayEntry.findMany({ where: eq(birthdayEntry.guildId, guildId) }),
             db.query.messageAlias.findMany({ where: eq(messageAlias.guildId, guildId) }),
             db.query.commandConfig.findMany({ where: eq(commandConfig.guildId, guildId) }),
+            db.query.moduleState.findMany({ where: eq(moduleState.guildId, guildId) }),
+            db.query.eventTemplate.findMany({ where: eq(eventTemplate.guildId, guildId) }),
+            db.query.pollTemplate.findMany({ where: eq(pollTemplate.guildId, guildId) }),
+            db.query.eventPollSettings.findFirst({ where: eq(eventPollSettings.guildId, guildId) }),
+            db.query.dashboardRbacConfig.findFirst({ where: eq(dashboardRbacConfig.guildId, guildId) }),
+            db.query.dashboardRbacRules.findMany({ where: eq(dashboardRbacRules.guildId, guildId) }),
         ]);
 
         const exportData = {
@@ -71,6 +89,12 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
             birthdayEntries,
             messageAliases: aliases,
             commandConfigs,
+            moduleStates,
+            eventTemplates,
+            pollTemplates,
+            eventPollSettings: eventPollSettingsConfig,
+            dashboardRbacConfig: rbacConfig,
+            dashboardRbacRules: rbacRules,
         };
 
         await emitGuildNotification({

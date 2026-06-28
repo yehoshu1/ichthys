@@ -108,8 +108,11 @@ export default function Home() {
                                 Login with Discord
                                 <ArrowRight className="h-4 w-4" />
                             </Button>
-                            <Link href="/docs">
+                            <a href="/docs">
                                 <Button variant="outline" size="lg">Docs</Button>
+                            </a>
+                            <Link href="/timestamp">
+                                <Button variant="outline" size="lg">Timestamp Tool</Button>
                             </Link>
                         </div>
                     ) : (
@@ -120,8 +123,11 @@ export default function Home() {
                                     <ArrowRight className="h-4 w-4" />
                                 </Button>
                             </Link>
-                            <Link href="/docs">
+                            <a href="/docs">
                                 <Button variant="outline" size="lg">Docs</Button>
+                            </a>
+                            <Link href="/timestamp">
+                                <Button variant="outline" size="lg">Timestamp Tool</Button>
                             </Link>
                             <Button variant="outline" size="lg" onClick={() => signOut()}>
                                 Logout

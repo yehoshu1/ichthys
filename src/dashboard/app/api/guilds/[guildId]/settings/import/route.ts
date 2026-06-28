@@ -14,6 +14,12 @@ import {
     birthdayEntry,
     messageAlias,
     commandConfig,
+    moduleState,
+    eventTemplate,
+    pollTemplate,
+    eventPollSettings,
+    dashboardRbacConfig,
+    dashboardRbacRules,
 } from "@/lib/db";
 import { requireGuildManageRolesAccess } from "@/lib/guild-auth";
 import { eq } from "drizzle-orm";
@@ -34,6 +40,10 @@ const MAX_VERIFICATION_ROLE_MESSAGES = 400;
 const MAX_BIRTHDAY_ENTRIES = 2_500;
 const MAX_ALIASES = 500;
 const MAX_COMMAND_CONFIGS = 500;
+const MAX_MODULE_STATES = 100;
+const MAX_EVENT_TEMPLATES = 100;
+const MAX_POLL_TEMPLATES = 100;
+const MAX_RBAC_RULES = 200;
 
 const importPayloadSchema = z.object({
     version: z.number().int().min(1),
@@ -53,6 +63,12 @@ const importPayloadSchema = z.object({
     birthdayEntries: z.array(z.record(z.string(), z.unknown())).max(MAX_BIRTHDAY_ENTRIES).default([]),
     messageAliases: z.array(z.record(z.string(), z.unknown())).max(MAX_ALIASES).default([]),
     commandConfigs: z.array(z.record(z.string(), z.unknown())).max(MAX_COMMAND_CONFIGS).default([]),
+    moduleStates: z.array(z.record(z.string(), z.unknown())).max(MAX_MODULE_STATES).default([]),
+    eventTemplates: z.array(z.record(z.string(), z.unknown())).max(MAX_EVENT_TEMPLATES).default([]),
+    pollTemplates: z.array(z.record(z.string(), z.unknown())).max(MAX_POLL_TEMPLATES).default([]),
+    eventPollSettings: z.record(z.string(), z.unknown()).nullable().optional(),
+    dashboardRbacConfig: z.record(z.string(), z.unknown()).nullable().optional(),
+    dashboardRbacRules: z.array(z.record(z.string(), z.unknown())).max(MAX_RBAC_RULES).default([]),
 }).strict();
 
 const ALLOWED_CONFIG_KEYS = new Set([
@@ -468,6 +484,107 @@ function sanitizeCommandConfigs(items: Record<string, unknown>[], warnings: Impo
     return sanitized;
 }
 
+function sanitizeModuleStates(items: Record<string, unknown>[], fallbackUserId: string): Array<Record<string, unknown>> {
+    const sanitized: Array<Record<string, unknown>> = [];
+    for (const item of items) {
+        if (typeof item.moduleId !== "string") continue;
+        sanitized.push({
+            id: typeof item.id === "string" ? item.id : undefined,
+            guildId: undefined,
+            moduleId: item.moduleId,
+            enabled: toBoolean(item.enabled, true),
+            updatedBy: typeof item.updatedBy === "string" ? item.updatedBy : fallbackUserId,
+        });
+    }
+    return sanitized;
+}
+
+function sanitizeEventTemplates(items: Record<string, unknown>[], fallbackUserId: string, warnings: ImportWarnings): Array<Record<string, unknown>> {
+    const sanitized: Array<Record<string, unknown>> = [];
+    for (const item of items) {
+        if (typeof item.name !== "string") continue;
+        sanitized.push({
+            id: typeof item.id === "string" ? item.id : undefined,
+            guildId: undefined,
+            creatorId: typeof item.creatorId === "string" ? item.creatorId : fallbackUserId,
+            name: item.name,
+            description: toStringOrNull(item.description),
+            imageBanner: toStringOrNull(item.imageBanner),
+            locationType: item.locationType === "VOICE" || item.locationType === "EXTERNAL" ? item.locationType : "TEXT",
+            locationUrl: toStringOrNull(item.locationUrl),
+            locationChannelId: normalizeNullableDiscordId(item.locationChannelId, warnings, "eventTemplates.locationChannelId.invalid"),
+            durationMinutes: toInteger(item.durationMinutes, 60),
+            allowRsvp: toBoolean(item.allowRsvp, true),
+            allowWaitlist: toBoolean(item.allowWaitlist, false),
+            requireApproval: toBoolean(item.requireApproval, false),
+            maxAttendees: Number.isFinite(Number(item.maxAttendees)) ? Number(item.maxAttendees) : null,
+            allowedRoles: normalizeUnknownIdListToCsv(item.allowedRoles, warnings, "eventTemplates.allowedRoles.invalid"),
+            color: toStringOrNull(item.color),
+        });
+    }
+    return sanitized;
+}
+
+function sanitizePollTemplates(items: Record<string, unknown>[], fallbackUserId: string): Array<Record<string, unknown>> {
+    const sanitized: Array<Record<string, unknown>> = [];
+    for (const item of items) {
+        if (typeof item.name !== "string") continue;
+        sanitized.push({
+            id: typeof item.id === "string" ? item.id : undefined,
+            guildId: undefined,
+            creatorId: typeof item.creatorId === "string" ? item.creatorId : fallbackUserId,
+            name: item.name,
+            description: toStringOrNull(item.description),
+            question: toStringOrNull(item.question),
+            pollDescription: toStringOrNull(item.pollDescription),
+            type: item.type === "TIME" || item.type === "ANONYMOUS" ? item.type : "STANDARD",
+            allowMultipleVotes: toBoolean(item.allowMultipleVotes, false),
+            maxVotesPerUser: Number.isFinite(Number(item.maxVotesPerUser)) ? Number(item.maxVotesPerUser) : null,
+            allowCustomOptions: toBoolean(item.allowCustomOptions, false),
+            defaultOptions: Array.isArray(item.defaultOptions) ? item.defaultOptions.filter(o => typeof o === "string") : null,
+        });
+    }
+    return sanitized;
+}
+
+function sanitizeEventPollSettings(item: Record<string, unknown> | null | undefined, warnings: ImportWarnings): Record<string, unknown> | null {
+    if (!item) return null;
+    return {
+        defaultEventChannelId: normalizeNullableDiscordId(item.defaultEventChannelId, warnings, "eventPollSettings.defaultEventChannelId.invalid"),
+        defaultPollChannelId: normalizeNullableDiscordId(item.defaultPollChannelId, warnings, "eventPollSettings.defaultPollChannelId.invalid"),
+        defaultMentionOnCreate: toBoolean(item.defaultMentionOnCreate, false),
+        defaultMentionOnStart: toBoolean(item.defaultMentionOnStart, false),
+        allowedEventCreators: Array.isArray(item.allowedEventCreators) ? normalizeDiscordIdList(item.allowedEventCreators) : null,
+        allowedPollCreators: Array.isArray(item.allowedPollCreators) ? normalizeDiscordIdList(item.allowedPollCreators) : null,
+        serverTimezone: typeof item.serverTimezone === "string" ? item.serverTimezone : "UTC",
+        aiEnabled: toBoolean(item.aiEnabled, true),
+        aiRateLimitPerHour: toInteger(item.aiRateLimitPerHour, 10),
+        mirrorToDiscordEvents: toBoolean(item.mirrorToDiscordEvents, true),
+    };
+}
+
+function sanitizeRbacConfig(item: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+    if (!item) return null;
+    return {
+        enabled: toBoolean(item.enabled, false),
+        defaultAccess: item.defaultAccess === "deny" ? "deny" : "manage_guild_only",
+    };
+}
+
+function sanitizeRbacRules(items: Record<string, unknown>[]): Array<Record<string, unknown>> {
+    const sanitized: Array<Record<string, unknown>> = [];
+    for (const item of items) {
+        if (typeof item.moduleId !== "string") continue;
+        sanitized.push({
+            guildId: undefined,
+            moduleId: item.moduleId,
+            allowedViewRoles: Array.isArray(item.allowedViewRoles) ? normalizeDiscordIdList(item.allowedViewRoles) : [],
+            allowedEditRoles: Array.isArray(item.allowedEditRoles) ? normalizeDiscordIdList(item.allowedEditRoles) : [],
+        });
+    }
+    return sanitized;
+}
+
 export async function POST(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const { guildId } = params;
@@ -508,6 +625,12 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
         const safeBirthdayEntries = sanitizeBirthdayEntries(payload.birthdayEntries);
         const safeAliases = sanitizeMessageAliases(payload.messageAliases, auth.userId, warnings);
         const safeCommandConfigs = sanitizeCommandConfigs(payload.commandConfigs, warnings);
+        const safeModuleStates = sanitizeModuleStates(payload.moduleStates, auth.userId);
+        const safeEventTemplates = sanitizeEventTemplates(payload.eventTemplates, auth.userId, warnings);
+        const safePollTemplates = sanitizePollTemplates(payload.pollTemplates, auth.userId);
+        const safeEventPollSettings = sanitizeEventPollSettings(payload.eventPollSettings, warnings);
+        const safeRbacConfig = sanitizeRbacConfig(payload.dashboardRbacConfig);
+        const safeRbacRules = sanitizeRbacRules(payload.dashboardRbacRules);
 
         await db.transaction(async (tx: any) => {
             await tx.insert(guildConfig)
@@ -531,6 +654,12 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
             await tx.delete(commandConfig).where(eq(commandConfig.guildId, guildId));
             await tx.delete(moderationSettings).where(eq(moderationSettings.guildId, guildId));
             await tx.delete(birthdayConfig).where(eq(birthdayConfig.guildId, guildId));
+            await tx.delete(moduleState).where(eq(moduleState.guildId, guildId));
+            await tx.delete(eventTemplate).where(eq(eventTemplate.guildId, guildId));
+            await tx.delete(pollTemplate).where(eq(pollTemplate.guildId, guildId));
+            await tx.delete(eventPollSettings).where(eq(eventPollSettings.guildId, guildId));
+            await tx.delete(dashboardRbacConfig).where(eq(dashboardRbacConfig.guildId, guildId));
+            await tx.delete(dashboardRbacRules).where(eq(dashboardRbacRules.guildId, guildId));
 
             if (safeTemplates.length > 0) {
                 await tx.insert(messageTemplate).values(safeTemplates.map((template) => ({ ...template, guildId })));
@@ -580,6 +709,24 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
 
             if (safeCommandConfigs.length > 0) {
                 await tx.insert(commandConfig).values(safeCommandConfigs.map((configRow) => ({ ...configRow, guildId })));
+            }
+            if (safeModuleStates.length > 0) {
+                await tx.insert(moduleState).values(safeModuleStates.map((state) => ({ ...state, guildId })));
+            }
+            if (safeEventTemplates.length > 0) {
+                await tx.insert(eventTemplate).values(safeEventTemplates.map((template) => ({ ...template, guildId })));
+            }
+            if (safePollTemplates.length > 0) {
+                await tx.insert(pollTemplate).values(safePollTemplates.map((template) => ({ ...template, guildId })));
+            }
+            if (safeEventPollSettings) {
+                await tx.insert(eventPollSettings).values({ guildId, ...safeEventPollSettings });
+            }
+            if (safeRbacConfig) {
+                await tx.insert(dashboardRbacConfig).values({ guildId, ...safeRbacConfig });
+            }
+            if (safeRbacRules.length > 0) {
+                await tx.insert(dashboardRbacRules).values(safeRbacRules.map((rule) => ({ ...rule, guildId })));
             }
         });
 

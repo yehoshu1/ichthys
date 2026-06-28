@@ -1,4 +1,4 @@
-import Link from "next/link";
+
 import { ArrowRight, BookOpen, Code, Command, FolderKanban, Wrench } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../components/ui/card";
 import { Button } from "../../../../components/ui/button";
@@ -83,12 +83,12 @@ function NavCard({
                 <CardDescription>{description}</CardDescription>
             </CardHeader>
             <CardContent>
-                <Link href={href}>
+                <a href={href}>
                     <Button className="w-full gap-2">
                         Open {title}
                         <ArrowRight className="h-4 w-4" />
                     </Button>
-                </Link>
+                </a>
             </CardContent>
         </Card>
     );

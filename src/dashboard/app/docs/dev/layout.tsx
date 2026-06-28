@@ -15,18 +15,18 @@ export default function DocsDevLayout({ children }: { children: React.ReactNode 
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        <Link href="/">
+                        <a href="/">
                             <Button variant="outline" className="gap-2">
                                 <Home className="h-4 w-4" />
                                 Home
                             </Button>
-                        </Link>
-                        <Link href="/guilds">
+                        </a>
+                        <a href="/guilds">
                             <Button variant="outline" className="gap-2">
                                 <BookOpen className="h-4 w-4" />
                                 Dashboard
                             </Button>
-                        </Link>
+                        </a>
                         <Link href="/docs">
                             <Button className="gap-2">
                                 <Code className="h-4 w-4" />
