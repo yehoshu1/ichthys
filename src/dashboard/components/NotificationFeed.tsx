@@ -32,7 +32,6 @@ interface Notification {
     actorUserId: string | null;
     targetUserId: string | null;
     occurredAt: string;
-    unread: boolean;
 }
 
 interface NotificationFeedProps {
@@ -53,18 +52,12 @@ function SeverityIcon({ severity }: { severity: Notification['severity'] }) {
 }
 
 function NotificationItem({ 
-    notification, 
-    onMarkRead 
+    notification 
 }: { 
     notification: Notification;
-    onMarkRead: (id: string) => void;
 }) {
     return (
-        <div 
-            className={`flex items-start gap-4 p-4 border-b last:border-0 transition-colors ${
-                notification.unread ? 'bg-accent/50' : ''
-            }`}
-        >
+        <div className="flex items-start gap-4 p-4 border-b last:border-0 transition-colors">
             <div className="mt-1">
                 <SeverityIcon severity={notification.severity} />
             </div>
@@ -72,16 +65,6 @@ function NotificationItem({
             <div className="flex-1 space-y-1">
                 <div className="flex items-center justify-between gap-2">
                     <h4 className="text-sm font-semibold">{notification.title}</h4>
-                    {notification.unread && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onMarkRead(notification.id)}
-                            className="h-6 px-2 text-xs"
-                        >
-                            Mark read
-                        </Button>
-                    )}
                 </div>
                 
                 {notification.body && (
@@ -104,21 +87,15 @@ function NotificationItem({
 export function NotificationFeed({ guildId }: NotificationFeedProps) {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<'all' | 'unread'>('all');
-    const [unreadCount, setUnreadCount] = useState(0);
 
     useEffect(() => {
         fetchNotifications();
-        fetchUnreadCount();
-    }, [guildId, filter]);
+    }, [guildId]);
 
     const fetchNotifications = async () => {
         setLoading(true);
         try {
             const params = new URLSearchParams({ limit: '50' });
-            if (filter === 'unread') {
-                params.append('unreadOnly', 'true');
-            }
             
             const response = await fetch(`/api/guilds/${guildId}/notifications?${params}`);
             if (response.ok) {
@@ -132,87 +109,11 @@ export function NotificationFeed({ guildId }: NotificationFeedProps) {
         }
     };
 
-    const fetchUnreadCount = async () => {
-        try {
-            const response = await fetch(`/api/guilds/${guildId}/notifications/unread-count`);
-            if (response.ok) {
-                const data = await response.json();
-                setUnreadCount(data.count || 0);
-            }
-        } catch (error) {
-            console.error('Failed to fetch unread count:', error);
-        }
-    };
-
-    const markAsRead = async (notificationId: string) => {
-        try {
-            const response = await fetch(`/api/guilds/${guildId}/notifications/read`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notificationIds: [notificationId] }),
-            });
-
-            if (response.ok) {
-                setNotifications(prev =>
-                    prev.map(n => n.id === notificationId ? { ...n, unread: false } : n)
-                );
-                setUnreadCount(prev => Math.max(0, prev - 1));
-            }
-        } catch (error) {
-            console.error('Failed to mark notification as read:', error);
-        }
-    };
-
-    const markAllAsRead = async () => {
-        const unreadIds = notifications.filter(n => n.unread).map(n => n.id);
-        if (unreadIds.length === 0) return;
-
-        try {
-            const response = await fetch(`/api/guilds/${guildId}/notifications/read`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notificationIds: unreadIds }),
-            });
-
-            if (response.ok) {
-                setNotifications(prev =>
-                    prev.map(n => ({ ...n, unread: false }))
-                );
-                setUnreadCount(0);
-            }
-        } catch (error) {
-            console.error('Failed to mark all as read:', error);
-        }
-    };
-
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <Tabs value={filter} onValueChange={(v) => setFilter(v as 'all' | 'unread')}>
-                    <TabsList>
-                        <TabsTrigger value="all">
-                            All
-                        </TabsTrigger>
-                        <TabsTrigger value="unread">
-                            Unread {unreadCount > 0 && `(${unreadCount})`}
-                        </TabsTrigger>
-                    </TabsList>
-                </Tabs>
-
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={markAllAsRead}
-                    disabled={unreadCount === 0}
-                >
-                    <CheckCheck className="h-4 w-4 mr-2" />
-                    Mark all read
-                </Button>
-            </div>
-
             <Card>
                 <CardHeader>
-                    <CardTitle>Notification Stream</CardTitle>
+                    <CardTitle>Log Stream</CardTitle>
                     <CardDescription>
                         Recent bot events and actions
                     </CardDescription>
@@ -224,11 +125,8 @@ export function NotificationFeed({ guildId }: NotificationFeedProps) {
                         </div>
                     ) : notifications.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
-                            <BellOff className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p>No notifications found</p>
-                            {filter === 'unread' && (
-                                <p className="text-sm mt-2">You're all caught up!</p>
-                            )}
+                            <Info className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <p>No logs found</p>
                         </div>
                     ) : (
                         <ScrollArea className="h-[600px]">
@@ -237,7 +135,6 @@ export function NotificationFeed({ guildId }: NotificationFeedProps) {
                                     <NotificationItem
                                         key={notification.id}
                                         notification={notification}
-                                        onMarkRead={markAsRead}
                                     />
                                 ))}
                             </div>
