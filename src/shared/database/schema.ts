@@ -467,6 +467,7 @@ export const welcomeConfig = pgTable('welcome_config', {
     messageTemplate: text('message_template'),
     embedEnabled: boolean('embed_enabled').default(false).notNull(),
     embedConfig: jsonb('embed_config'),
+    welcomeBotsEnabled: boolean('welcome_bots_enabled').default(false).notNull(),
 
     // ═══════════════════════════════════════════════════════════
     // GOODBYE MESSAGE SETTINGS
@@ -476,6 +477,19 @@ export const welcomeConfig = pgTable('welcome_config', {
     goodbyeChannelId: text('goodbye_channel_id'),
     goodbyeMessageTemplate: text('goodbye_message_template'),
     goodbyeEmbedEnabled: boolean('goodbye_embed_enabled').default(false).notNull(),
+    goodbyeEmbedConfig: jsonb('goodbye_embed_config'),
+    goodbyeBotsEnabled: boolean('goodbye_bots_enabled').default(false).notNull(),
+    goodbyeImageEnabled: boolean('goodbye_image_enabled').default(false).notNull(),
+
+    // ═══════════════════════════════════════════════════════════
+    // PRIVATE (DM) MESSAGE SETTINGS
+    // ═══════════════════════════════════════════════════════════
+
+    privateEnabled: boolean('private_enabled').default(false).notNull(),
+    privateMessageTemplate: text('private_message_template'),
+    privateEmbedEnabled: boolean('private_embed_enabled').default(false).notNull(),
+    privateEmbedConfig: jsonb('private_embed_config'),
+    privateImageEnabled: boolean('private_image_enabled').default(false).notNull(),
 
     // ═══════════════════════════════════════════════════════════
     // WELCOME IMAGE CARD SETTINGS
@@ -493,6 +507,7 @@ export const welcomeConfig = pgTable('welcome_config', {
     // Background settings
     backgroundType: welcomeBackgroundTypeEnum('background_type').default('COLOR').notNull(),
     backgroundValue: text('background_value').default('#36393f'), // Color, gradient, image URL
+    overlayOpacity: integer('overlay_opacity').default(50),
 
     // Avatar settings
     avatarShape: welcomeAvatarShapeEnum('avatar_shape').default('CIRCLE').notNull(),

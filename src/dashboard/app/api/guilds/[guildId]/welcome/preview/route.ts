@@ -11,10 +11,19 @@ const welcomeConfigSchema = z.object({
     messageTemplate: z.string().max(2000).nullable().optional(),
     embedEnabled: z.boolean(),
     embedConfig: z.record(z.string(), z.unknown()).nullable().optional(),
+    welcomeBotsEnabled: z.boolean().optional(),
     goodbyeEnabled: z.boolean().optional(),
     goodbyeChannelId: z.string().nullable().optional(),
     goodbyeMessageTemplate: z.string().max(2000).nullable().optional(),
     goodbyeEmbedEnabled: z.boolean().optional(),
+    goodbyeEmbedConfig: z.record(z.string(), z.unknown()).nullable().optional(),
+    goodbyeBotsEnabled: z.boolean().optional(),
+    goodbyeImageEnabled: z.boolean().optional(),
+    privateEnabled: z.boolean().optional(),
+    privateMessageTemplate: z.string().max(2000).nullable().optional(),
+    privateEmbedEnabled: z.boolean().optional(),
+    privateEmbedConfig: z.record(z.string(), z.unknown()).nullable().optional(),
+    privateImageEnabled: z.boolean().optional(),
     imageEnabled: z.boolean(),
     imageSendMode: z.enum(["WITH_TEXT", "BEFORE_TEXT", "TO_CHANNEL", "IMAGE_ONLY"]),
     imageChannelId: z.string().nullable().optional(),
@@ -49,11 +58,11 @@ const welcomeConfigSchema = z.object({
     serverNameColor: z.string().max(32),
     cooldownEnabled: z.boolean(),
     cooldownSeconds: z.number().int().min(0).max(3600),
-}).partial().strict();
+}).partial();
 
 const previewSchema = z.object({
     config: welcomeConfigSchema.optional(),
-}).strict();
+});
 
 const previewMessageSchema = z.object({
     template: z.string().min(1).max(2000),
@@ -78,6 +87,7 @@ export async function POST(
         const body = await req.json();
         const parsed = previewSchema.safeParse(body.config ? body : { config: body });
         if (!parsed.success) {
+            console.error("ZOD VALIDATION FAILED:", JSON.stringify(parsed.error.issues, null, 2));
             return NextResponse.json(
                 { error: "Invalid request body", details: parsed.error.issues },
                 { status: 400 }

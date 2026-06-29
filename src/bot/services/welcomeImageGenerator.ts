@@ -12,6 +12,7 @@ export interface WelcomeImageOptions {
     serverName: string;
     memberCount: number;
     config: WelcomeConfig;
+    prefix?: string;
 }
 
 /**
@@ -48,6 +49,21 @@ export async function generateWelcomeImage(
         // Create canvas with custom dimensions
         const canvas = createCanvas(width, height);
         const ctx = canvas.getContext('2d');
+
+        // Clip the entire canvas to have rounded corners
+        ctx.beginPath();
+        const radius = 20;
+        ctx.moveTo(radius, 0);
+        ctx.lineTo(width - radius, 0);
+        ctx.quadraticCurveTo(width, 0, width, radius);
+        ctx.lineTo(width, height - radius);
+        ctx.quadraticCurveTo(width, height, width - radius, height);
+        ctx.lineTo(radius, height);
+        ctx.quadraticCurveTo(0, height, 0, height - radius);
+        ctx.lineTo(0, radius);
+        ctx.quadraticCurveTo(0, 0, radius, 0);
+        ctx.closePath();
+        ctx.clip();
 
         // Draw background
         await drawBackground(ctx, config);
@@ -113,14 +129,32 @@ async function drawBackground(
             await drawImageBackground(ctx, config.backgroundValue, width, height);
             break;
 
-        default:
+    default:
             ctx.fillStyle = '#36393f';
             ctx.fillRect(0, 0, width, height);
     }
 
-    // Add semi-transparent overlay for better text readability
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.fillRect(0, 0, width, height);
+    // Add semi-transparent inset overlay for better text readability
+    const opacity = typeof config.overlayOpacity === 'number' ? config.overlayOpacity / 100 : 0.5;
+    if (opacity > 0) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+        // Use a proportional margin so small canvases don't get squished
+        const margin = Math.max(15, Math.min(width, height) * 0.05);
+        const overlayRadius = 15;
+        
+        ctx.beginPath();
+        ctx.moveTo(margin + overlayRadius, margin);
+        ctx.lineTo(width - margin - overlayRadius, margin);
+        ctx.quadraticCurveTo(width - margin, margin, width - margin, margin + overlayRadius);
+        ctx.lineTo(width - margin, height - margin - overlayRadius);
+        ctx.quadraticCurveTo(width - margin, height - margin, width - margin - overlayRadius, height - margin);
+        ctx.lineTo(margin + overlayRadius, height - margin);
+        ctx.quadraticCurveTo(margin, height - margin, margin, height - margin - overlayRadius);
+        ctx.lineTo(margin, margin + overlayRadius);
+        ctx.quadraticCurveTo(margin, margin, margin + overlayRadius, margin);
+        ctx.closePath();
+        ctx.fill();
+    }
 }
 
 /**

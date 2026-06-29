@@ -56,206 +56,192 @@ export async function saveWelcomeConfig(
 }
 
 /**
- * Send welcome message for a new member
+ * Helper to build and send a message payload
+ */
+async function sendConfiguredMessage(
+    member: GuildMember,
+    config: any,
+    type: 'welcome' | 'private' | 'goodbye',
+    target: 'CHANNEL' | 'DM' = 'CHANNEL',
+    channelId: string | null = null,
+    isBot: boolean
+): Promise<boolean> {
+    const isWelcome = type === 'welcome';
+    const isPrivate = type === 'private';
+    const isGoodbye = type === 'goodbye';
+
+    const enabledKey = isPrivate ? 'privateEnabled' : isGoodbye ? 'goodbyeEnabled' : 'enabled';
+    const botsKey = isPrivate ? null : isGoodbye ? 'goodbyeBotsEnabled' : 'welcomeBotsEnabled';
+    const msgKey = isPrivate ? 'privateMessageTemplate' : isGoodbye ? 'goodbyeMessageTemplate' : 'messageTemplate';
+    const embedEnabledKey = isPrivate ? 'privateEmbedEnabled' : isGoodbye ? 'goodbyeEmbedEnabled' : 'embedEnabled';
+    const embedConfigKey = isPrivate ? 'privateEmbedConfig' : isGoodbye ? 'goodbyeEmbedConfig' : 'embedConfig';
+    const imageEnabledKey = isPrivate ? 'privateImageEnabled' : isGoodbye ? 'goodbyeImageEnabled' : 'imageEnabled';
+
+    if (!config[enabledKey]) return false;
+    if (isBot && botsKey && !config[botsKey]) return false;
+
+    // Check cooldown for public welcome/leave (skip private)
+    if (!isPrivate && config.cooldownEnabled && config.cooldownSeconds) {
+        const cooldownKey = `${member.guild.id}:${type}`;
+        const lastSent = welcomeCooldowns.get(cooldownKey) || 0;
+        const now = Date.now();
+
+        if (now - lastSent < config.cooldownSeconds * 1000) {
+            logger.debug(`${type} cooldown active for guild ${member.guild.id}`);
+            return false;
+        }
+
+        welcomeCooldowns.set(cooldownKey, now);
+    }
+
+    const variables = {
+        user: member.toString(),
+        username: member.user.username,
+        tag: member.user.tag,
+        server: member.guild.name,
+        memberCount: member.guild.memberCount,
+        accountCreated: member.user.createdAt.toLocaleDateString(),
+        joinDate: new Date().toLocaleDateString()
+    };
+
+    let imageAttachment: AttachmentBuilder | null = null;
+    if (config[imageEnabledKey]) {
+        const imageResult = await generateWelcomeImage({
+            username: member.user.username,
+            discriminator: member.user.discriminator,
+            avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
+            serverName: member.guild.name,
+            memberCount: member.guild.memberCount,
+            config,
+            prefix: isPrivate ? 'private' : isGoodbye ? 'goodbye' : ''
+        });
+
+        if (imageResult) {
+            imageAttachment = new AttachmentBuilder(imageResult.buffer, {
+                name: `${type}-${member.user.username}.png`
+            });
+        }
+    }
+
+    let content: string | undefined;
+    let embeds: any[] = [];
+
+    const template = config[msgKey];
+    if (template) {
+        content = processWelcomeTemplate(template, variables);
+    }
+
+    if (config[embedEnabledKey] && config[embedConfigKey]) {
+        const embedConfig = config[embedConfigKey] as any;
+        const embedTitle = embedConfig.title ? processWelcomeTemplate(embedConfig.title, variables) : undefined;
+        const embedDesc = embedConfig.description ? processWelcomeTemplate(embedConfig.description, variables) : undefined;
+        
+        let colorInt = 0x7289da;
+        if (embedConfig.color) {
+            const hex = embedConfig.color.replace('#', '');
+            if (hex) colorInt = parseInt(hex, 16);
+        }
+
+        embeds = [{
+            title: embedTitle,
+            description: embedDesc,
+            color: colorInt,
+            timestamp: new Date().toISOString(),
+            thumbnail: embedConfig.showAvatar ? {
+                url: member.user.displayAvatarURL()
+            } : undefined
+        }];
+    }
+
+    const payload: any = {};
+    if (imageAttachment && config.imageSendMode === 'IMAGE_ONLY') {
+        payload.files = [imageAttachment];
+    } else {
+        if (content) payload.content = content;
+        if (embeds.length) payload.embeds = embeds;
+        if (imageAttachment) payload.files = [imageAttachment];
+    }
+
+    if (Object.keys(payload).length === 0) return false;
+
+    if (target === 'DM') {
+        try {
+            await member.send(payload);
+            return true;
+        } catch (error) {
+            logger.warn(`Failed to send ${type} DM to ${member.user.tag}:`, error);
+            return false;
+        }
+    } else {
+        if (!channelId) return false;
+        const channel = member.guild.channels.cache.get(channelId) as TextChannel;
+        if (!channel || !channel.isTextBased()) return false;
+
+        const permissions = channel.permissionsFor(member.guild.members.me!);
+        if (!permissions?.has('SendMessages') || (imageAttachment && !permissions?.has('AttachFiles'))) {
+            return false;
+        }
+
+        try {
+            await channel.send(payload);
+            return true;
+        } catch (error) {
+            logger.error(`Failed to send ${type} message for ${member.user.tag}:`, error);
+            return false;
+        }
+    }
+}
+
+/**
+ * Send welcome messages (both channel and DM) for a new member
  */
 export async function sendWelcomeMessage(member: GuildMember): Promise<boolean> {
     try {
         const config = await getWelcomeConfig(member.guild.id);
+        if (!config) return false;
 
-        if (!config?.enabled) {
-            return false;
+        const isBot = member.user.bot;
+        let sentAny = false;
+
+        // 1. Send public welcome message
+        if (config.enabled) {
+            const sent = await sendConfiguredMessage(member, config, 'welcome', 'CHANNEL', config.channelId, isBot);
+            if (sent) sentAny = true;
         }
 
-        // Check cooldown
-        if (config.cooldownEnabled && config.cooldownSeconds) {
-            const cooldownKey = `${member.guild.id}:welcome`;
-            const lastWelcome = welcomeCooldowns.get(cooldownKey) || 0;
-            const now = Date.now();
-
-            if (now - lastWelcome < config.cooldownSeconds * 1000) {
-                logger.debug(`Welcome cooldown active for guild ${member.guild.id}`);
-                return false;
-            }
-
-            welcomeCooldowns.set(cooldownKey, now);
-        }
-
-        // Prepare variables
-        const variables = {
-            user: member.toString(),
-            username: member.user.username,
-            tag: member.user.tag,
-            server: member.guild.name,
-            memberCount: member.guild.memberCount,
-            accountCreated: member.user.createdAt.toLocaleDateString(),
-            joinDate: new Date().toLocaleDateString()
-        };
-
-        // Generate welcome image if enabled
-        let imageAttachment: AttachmentBuilder | null = null;
-        if (config.imageEnabled) {
-            const imageResult = await generateWelcomeImage({
-                username: member.user.username,
-                discriminator: member.user.discriminator,
-                avatarUrl: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
-                serverName: member.guild.name,
-                memberCount: member.guild.memberCount,
-                config
-            });
-
-            if (imageResult) {
-                imageAttachment = new AttachmentBuilder(imageResult.buffer, {
-                    name: `welcome-${member.user.username}.png`
-                });
+        // 2. Send private welcome message
+        if (config.privateEnabled) {
+            // we don't pass botsKey for private since bots can't be DMed anyway
+            if (!isBot) {
+                const sent = await sendConfiguredMessage(member, config, 'private', 'DM', null, false);
+                if (sent) sentAny = true;
             }
         }
 
-        // Prepare message content
-        let content: string | undefined;
-        let embeds: any[] = [];
-
-        if (config.messageTemplate) {
-            const processedMessage = processWelcomeTemplate(config.messageTemplate, variables);
-
-            if (config.embedEnabled && config.embedConfig) {
-                // Send as embed
-                const embedConfig = config.embedConfig as any;
-                embeds = [{
-                    description: processedMessage,
-                    color: embedConfig.color || 0x7289da,
-                    timestamp: new Date().toISOString(),
-                    thumbnail: embedConfig.showAvatar ? {
-                        url: member.user.displayAvatarURL()
-                    } : undefined
-                }];
-            } else {
-                // Send as plain text
-                content = processedMessage;
-            }
-        }
-
-        // Send message based on target type
-        if (config.targetType === 'DM') {
-            // Send DM
-            try {
-                const dmPayload: any = {};
-
-                if (imageAttachment && config.imageSendMode === 'IMAGE_ONLY') {
-                    dmPayload.files = [imageAttachment];
-                } else {
-                    if (content) dmPayload.content = content;
-                    if (embeds.length) dmPayload.embeds = embeds;
-                    if (imageAttachment) dmPayload.files = [imageAttachment];
-                }
-
-                await member.send(dmPayload);
-
-                logger.info(`Sent welcome DM to ${member.user.tag} in ${member.guild.name}`);
-                await emitGuildNotificationSafe({
-                    guildId: member.guild.id,
-                    eventType: 'WELCOME_MESSAGE_SENT',
-                    severity: 'INFO',
-                    source: 'BOT_EVENT',
-                    title: `Welcome DM sent to ${member.user.tag}`,
-                    targetUserId: member.id,
-                    metadata: {
-                        targetType: 'DM',
-                        hasImage: !!imageAttachment
-                    }
-                });
-
-                return true;
-            } catch (error) {
-                logger.warn(`Failed to send welcome DM to ${member.user.tag}:`, error);
-                await emitGuildNotificationSafe({
-                    guildId: member.guild.id,
-                    eventType: 'WELCOME_MESSAGE_FAILED',
-                    severity: 'WARNING',
-                    source: 'BOT_EVENT',
-                    title: `Welcome DM failed for ${member.user.tag}`,
-                    body: 'User may have DMs disabled',
-                    targetUserId: member.id,
-                    metadata: { targetType: 'DM' }
-                });
-                return false;
-            }
-        } else {
-            // Send to channel
-            if (!config.channelId) {
-                logger.warn(`Welcome channel not set for guild ${member.guild.id}`);
-                return false;
-            }
-
-            const channel = member.guild.channels.cache.get(config.channelId) as TextChannel;
-            if (!channel || !channel.isTextBased()) {
-                logger.warn(`Welcome channel ${config.channelId} not found or not text-based`);
-                return false;
-            }
-
-            // Check bot permissions
-            const permissions = channel.permissionsFor(member.guild.members.me!);
-            if (!permissions?.has('SendMessages') || !permissions?.has('AttachFiles')) {
-                logger.warn(`Bot lacks permissions to send welcome message in ${channel.name}`);
-                await emitGuildNotificationSafe({
-                    guildId: member.guild.id,
-                    eventType: 'WELCOME_MESSAGE_FAILED',
-                    severity: 'ERROR',
-                    source: 'BOT_EVENT',
-                    title: `Welcome message failed - missing permissions`,
-                    body: `Cannot send messages in ${channel.name}`,
-                    targetUserId: member.id,
-                    metadata: { channelId: config.channelId }
-                });
-                return false;
-            }
-
-            try {
-                const messagePayload: any = {};
-
-                // Handle image send mode
-                if (imageAttachment && config.imageSendMode === 'IMAGE_ONLY') {
-                    messagePayload.files = [imageAttachment];
-                } else {
-                    if (content) messagePayload.content = content;
-                    if (embeds.length) messagePayload.embeds = embeds;
-                    if (imageAttachment) messagePayload.files = [imageAttachment];
-                }
-
-                await channel.send(messagePayload);
-
-                logger.info(`Sent welcome message for ${member.user.tag} in ${member.guild.name}`);
-                await emitGuildNotificationSafe({
-                    guildId: member.guild.id,
-                    eventType: 'WELCOME_MESSAGE_SENT',
-                    severity: 'INFO',
-                    source: 'BOT_EVENT',
-                    title: `Welcome message sent for ${member.user.tag}`,
-                    targetUserId: member.id,
-                    metadata: {
-                        targetType: 'CHANNEL',
-                        channelId: config.channelId,
-                        hasImage: !!imageAttachment
-                    }
-                });
-
-                return true;
-            } catch (error) {
-                logger.error(`Failed to send welcome message for ${member.user.tag}:`, error);
-                await emitGuildNotificationSafe({
-                    guildId: member.guild.id,
-                    eventType: 'WELCOME_MESSAGE_FAILED',
-                    severity: 'ERROR',
-                    source: 'BOT_EVENT',
-                    title: `Welcome message failed for ${member.user.tag}`,
-                    body: error instanceof Error ? error.message : 'Unknown error',
-                    targetUserId: member.id,
-                    metadata: { channelId: config.channelId }
-                });
-                return false;
-            }
-        }
+        return sentAny;
     } catch (error) {
         logger.error('Error sending welcome message:', error);
+        return false;
+    }
+}
+
+/**
+ * Send leave message for a member that left
+ */
+export async function sendLeaveMessage(member: GuildMember): Promise<boolean> {
+    try {
+        const config = await getWelcomeConfig(member.guild.id);
+        if (!config) return false;
+
+        const isBot = member.user.bot;
+        
+        if (config.goodbyeEnabled) {
+            return await sendConfiguredMessage(member, config, 'goodbye', 'CHANNEL', config.goodbyeChannelId, isBot);
+        }
+
+        return false;
+    } catch (error) {
+        logger.error('Error sending leave message:', error);
         return false;
     }
 }
