@@ -203,6 +203,7 @@ export default function EventsPage() {
             ? (requestedTab as EventTab)
             : "calendar";
     const [activeTab, setActiveTab] = useState<EventTab>(resolvedTab);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
         setActiveTab(resolvedTab);
@@ -234,19 +235,19 @@ export default function EventsPage() {
                         <TabsTrigger value="settings">Settings</TabsTrigger>
                     </TabsList>
 
-                    {(activeTab === "calendar" || activeTab === "upcoming") && <CreateEventButton guildId={guildId} />}
+                    {(activeTab === "calendar" || activeTab === "upcoming") && <CreateEventButton guildId={guildId} onSuccess={() => setRefreshKey(k => k + 1)} />}
                 </div>
 
                 <TabsContent value="calendar" className="space-y-4">
-                    <CalendarTab guildId={guildId} />
+                    <CalendarTab key={`cal-${refreshKey}`} guildId={guildId} />
                 </TabsContent>
 
                 <TabsContent value="upcoming" className="space-y-4">
-                    <EventsList guildId={guildId} status="upcoming" />
+                    <EventsList key={`up-${refreshKey}`} guildId={guildId} status="upcoming" />
                 </TabsContent>
 
                 <TabsContent value="past" className="space-y-4">
-                    <EventsList guildId={guildId} status="past" />
+                    <EventsList key={`past-${refreshKey}`} guildId={guildId} status="past" />
                 </TabsContent>
 
                 <TabsContent value="templates" className="space-y-4">
@@ -261,7 +262,7 @@ export default function EventsPage() {
     );
 }
 
-function CreateEventButton({ guildId }: { guildId: string }) {
+function CreateEventButton({ guildId, onSuccess }: { guildId: string; onSuccess?: () => void }) {
     const [open, setOpen] = useState(false);
 
     return (
@@ -276,7 +277,7 @@ function CreateEventButton({ guildId }: { guildId: string }) {
                 title="Create New Event"
                 description="Schedule a new event for your server members."
             >
-                <EventForm guildId={guildId} onSuccess={() => setOpen(false)} />
+                <EventForm guildId={guildId} onSuccess={() => { setOpen(false); onSuccess?.(); }} />
             </EventDialogShell>
         </Dialog>
     );
@@ -309,11 +310,13 @@ function EventDialogShell({
 function EventForm({
     guildId,
     event,
+    initialEvent,
     initialDate,
     onSuccess,
 }: {
     guildId: string;
     event?: Event;
+    initialEvent?: Event;
     initialDate?: Date | null;
     onSuccess: () => void;
 }) {
@@ -321,32 +324,37 @@ function EventForm({
     const [savingTemplate, setSavingTemplate] = useState(false);
     const [templates, setTemplates] = useState<EventTemplate[]>([]);
     const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+    const sourceEvent = event || initialEvent;
     const [templateName, setTemplateName] = useState(
-        event?.title ? `${event.title} Template` : ""
+        sourceEvent?.title ? `${sourceEvent.title} Template` : ""
     );
     const [formData, setFormData] = useState<EventFormData>({
-        title: event?.title || "",
-        description: event?.description || "",
-        location: event?.location || "",
-        locationChannelId: event?.locationChannelId || "",
-        channelId: event?.channelId || "",
-        startTime: event?.startTime ? new Date(event.startTime) : (initialDate || null),
-        endTime: event?.endTime ? new Date(event.endTime) : null,
-        durationMinutes: event?.durationMinutes || null,
-        color: event?.color || "#5865F2",
-        maxAttendees: event?.maxAttendees || null,
-        enableWaitlist: event?.enableWaitlist ?? true,
-        mentionRoleIdsOnCreate: (event?.mentionRoleIds && event?.mentionOnCreate) ? event.mentionRoleIds : [],
-        mentionRoleIdsOnStart: (event?.mentionRoleIds && event?.mentionOnStart) ? event.mentionRoleIds : [],
-        mentionOnCreate: event?.mentionOnCreate ?? false,
-        mentionOnStart: event?.mentionOnStart ?? false,
-        requiredRoleIds: event?.requiredRoleIds || [],
-        blockedRoleIds: event?.blockedRoleIds || [],
-        attendeeRoleId: event?.attendeeRoleId || "",
-        repeatFrequency: event?.repeatFrequency || "NONE",
-        repeatUntil: event?.repeatUntil ? new Date(event.repeatUntil) : null,
-        mirrorToDiscord: event?.mirrorToDiscord ?? true,
-        imageUrl: event?.imageUrl || "",
+        title: sourceEvent?.title ? (initialEvent ? `${sourceEvent.title} (Copy)` : sourceEvent.title) : "",
+        description: sourceEvent?.description || "",
+        location: sourceEvent?.location || "",
+        locationChannelId: sourceEvent?.locationChannelId || "",
+        channelId: sourceEvent?.channelId || "",
+        startTime: sourceEvent?.startTime 
+            ? (initialEvent ? new Date(Date.now() + 24 * 60 * 60 * 1000) : new Date(sourceEvent.startTime)) 
+            : (initialDate || null),
+        endTime: sourceEvent?.endTime 
+            ? (initialEvent ? new Date(new Date(sourceEvent.endTime).getTime() + 24 * 60 * 60 * 1000) : new Date(sourceEvent.endTime)) 
+            : null,
+        durationMinutes: sourceEvent?.durationMinutes || null,
+        color: sourceEvent?.color || "#5865F2",
+        maxAttendees: sourceEvent?.maxAttendees || null,
+        enableWaitlist: sourceEvent?.enableWaitlist ?? true,
+        mentionRoleIdsOnCreate: (sourceEvent?.mentionRoleIds && sourceEvent?.mentionOnCreate) ? sourceEvent.mentionRoleIds : [],
+        mentionRoleIdsOnStart: (sourceEvent?.mentionRoleIds && sourceEvent?.mentionOnStart) ? sourceEvent.mentionRoleIds : [],
+        mentionOnCreate: sourceEvent?.mentionOnCreate ?? false,
+        mentionOnStart: sourceEvent?.mentionOnStart ?? false,
+        requiredRoleIds: sourceEvent?.requiredRoleIds || [],
+        blockedRoleIds: sourceEvent?.blockedRoleIds || [],
+        attendeeRoleId: sourceEvent?.attendeeRoleId || "",
+        repeatFrequency: sourceEvent?.repeatFrequency || "NONE",
+        repeatUntil: sourceEvent?.repeatUntil ? new Date(sourceEvent.repeatUntil) : null,
+        mirrorToDiscord: sourceEvent?.mirrorToDiscord ?? true,
+        imageUrl: sourceEvent?.imageUrl || "",
     });
 
     useEffect(() => {
@@ -1055,6 +1063,7 @@ function EventsList({
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+    const [duplicatingEvent, setDuplicatingEvent] = useState<Event | null>(null);
 
     useEffect(() => {
         fetchEvents();
@@ -1101,43 +1110,8 @@ function EventsList({
         }
     }
 
-    async function duplicateEvent(event: Event) {
-        try {
-            const res = await fetch(`/api/guilds/${guildId}/events`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: `${event.title} (Copy)`,
-                    description: event.description,
-                    location: event.location,
-                    locationChannelId: event.locationChannelId,
-                    channelId: event.channelId,
-                    startTime: new Date(
-                        Date.now() + 24 * 60 * 60 * 1000
-                    ).toISOString(), // Tomorrow
-                    durationMinutes: event.durationMinutes,
-                    color: event.color,
-                    imageUrl: event.imageUrl,
-                    maxAttendees: event.maxAttendees,
-                    enableWaitlist: event.enableWaitlist,
-                    requiredRoleIds: event.requiredRoleIds,
-                    blockedRoleIds: event.blockedRoleIds,
-                    attendeeRoleId: event.attendeeRoleId,
-                    repeatFrequency: event.repeatFrequency,
-                    mirrorToDiscord: event.mirrorToDiscord,
-                }),
-            });
-
-            if (res.ok) {
-                toast.success("Event duplicated");
-                fetchEvents();
-            } else {
-                toast.error("Failed to duplicate event");
-            }
-        } catch (error) {
-            console.error("Error duplicating event:", error);
-            toast.error("Failed to duplicate event");
-        }
+    function duplicateEvent(event: Event) {
+        setDuplicatingEvent(event);
     }
 
     const filteredEvents = events.filter(
@@ -1229,6 +1203,28 @@ function EventsList({
                             event={editingEvent}
                             onSuccess={() => {
                                 setEditingEvent(null);
+                                fetchEvents();
+                            }}
+                        />
+                    )}
+                </EventDialogShell>
+            </Dialog>
+
+            {/* Duplicate Dialog */}
+            <Dialog
+                open={!!duplicatingEvent}
+                onOpenChange={(open) => !open && setDuplicatingEvent(null)}
+            >
+                <EventDialogShell
+                    title="Duplicate Event"
+                    description="Create a new event based on this template."
+                >
+                    {duplicatingEvent && (
+                        <EventForm
+                            guildId={guildId}
+                            initialEvent={duplicatingEvent}
+                            onSuccess={() => {
+                                setDuplicatingEvent(null);
                                 fetchEvents();
                             }}
                         />

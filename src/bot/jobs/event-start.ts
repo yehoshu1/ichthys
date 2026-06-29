@@ -46,8 +46,11 @@ export async function execute(client: Client) {
                 }
 
                 // Get attendees
-                const rsvps = await eventService.getRsvpsByEvent(evt.id, 'YES');
-                const attendeeIds = rsvps.map(r => r.userId);
+                const rsvpsYes = await eventService.getRsvpsByEvent(evt.id, 'YES');
+                const rsvpsMaybe = await eventService.getRsvpsByEvent(evt.id, 'MAYBE');
+                
+                const attendeeIds = rsvpsYes.map(r => r.userId);
+                const dmRecipientIds = [...attendeeIds, ...rsvpsMaybe.map(r => r.userId)];
 
                 // Build start announcement
                 const embed = new EmbedBuilder()
@@ -96,6 +99,30 @@ export async function execute(client: Client) {
                         } catch (error) {
                             logger.warn(`Could not assign attendee role to ${userId}:`, error);
                         }
+                    }
+                }
+
+                // Send DM to all attendees and maybes
+                for (const userId of dmRecipientIds) {
+                    try {
+                        const user = await client.users.fetch(userId);
+                        if (user) {
+                            const dmEmbed = new EmbedBuilder()
+                                .setTitle('🎉 Event Starting Now!')
+                                .setDescription(`The event **${evt.title}** in **${guild.name}** is starting right now!`)
+                                .setColor('#57F287')
+                                .addFields(
+                                    { name: 'Channel', value: `<#${evt.channelId}>`, inline: true }
+                                );
+
+                            if (evt.location) {
+                                dmEmbed.addFields({ name: 'Location', value: evt.location, inline: true });
+                            }
+
+                            await user.send({ embeds: [dmEmbed] });
+                        }
+                    } catch (error) {
+                        logger.warn(`Could not send start DM to attendee ${userId} for event ${evt.id}:`, error);
                     }
                 }
 

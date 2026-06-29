@@ -60,7 +60,12 @@ import {
     EyeOff,
     Calendar,
     List,
+    SmilePlus,
 } from "lucide-react";
+
+import data from "@emoji-mart/data";
+import Picker from "@emoji-mart/react";
+import { Popover, PopoverContent, PopoverTrigger } from "../../../../components/ui/popover";
 
 import { toast } from "sonner";
 import { Badge } from "../../../../components/ui/badge";
@@ -298,6 +303,7 @@ export default function PollsPage() {
             ? (requestedTab as PollTab)
             : "active";
     const [activeTab, setActiveTab] = useState<PollTab>(resolvedTab);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
         setActiveTab(resolvedTab);
@@ -327,11 +333,11 @@ export default function PollsPage() {
                         <TabsTrigger value="templates">Templates</TabsTrigger>
                     </TabsList>
 
-                    {activeTab === "active" && <CreatePollButton guildId={guildId} />}
+                    {activeTab === "active" && <CreatePollButton guildId={guildId} onSuccess={() => setRefreshKey(k => k + 1)} />}
                 </div>
 
                 <TabsContent value="active" className="space-y-4">
-                    <PollsList guildId={guildId} status="active" />
+                    <PollsList key={refreshKey} guildId={guildId} status="active" />
                 </TabsContent>
 
                 <TabsContent value="ended" className="space-y-4">
@@ -346,7 +352,7 @@ export default function PollsPage() {
     );
 }
 
-function CreatePollButton({ guildId }: { guildId: string }) {
+function CreatePollButton({ guildId, onSuccess }: { guildId: string; onSuccess?: () => void }) {
     const [open, setOpen] = useState(false);
     const [pollType, setPollType] = useState<"STANDARD" | "TIME" | "ANONYMOUS">("STANDARD");
 
@@ -393,9 +399,9 @@ function CreatePollButton({ guildId }: { guildId: string }) {
                 </div>
 
                 {pollType === "TIME" ? (
-                    <TimePollForm guildId={guildId} onSuccess={() => setOpen(false)} />
+                    <TimePollForm guildId={guildId} onSuccess={() => { setOpen(false); onSuccess?.(); }} />
                 ) : (
-                    <StandardPollForm guildId={guildId} pollType={pollType} onSuccess={() => setOpen(false)} />
+                    <StandardPollForm guildId={guildId} pollType={pollType} onSuccess={() => { setOpen(false); onSuccess?.(); }} />
                 )}
                     </div>
                 </div>
@@ -630,14 +636,26 @@ function StandardPollForm({
                 
                 {options.map((option, index) => (
                     <div key={index} className="flex gap-2">
-                        <Input
-                            placeholder="Emoji (optional)"
-                            value={option.emoji}
-                            onChange={(e) =>
-                                updateOption(index, "emoji", e.target.value)
-                            }
-                            className="w-24"
-                        />
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" size="icon" className="shrink-0 w-10">
+                                    {option.emoji ? (
+                                        <span className="text-lg">{option.emoji}</span>
+                                    ) : (
+                                        <SmilePlus className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Picker
+                                    data={data}
+                                    onEmojiSelect={(emoji: any) =>
+                                        updateOption(index, "emoji", emoji.native)
+                                    }
+                                    theme="light"
+                                />
+                            </PopoverContent>
+                        </Popover>
                         <Input
                             placeholder={`Option ${index + 1}`}
                             value={option.text}
