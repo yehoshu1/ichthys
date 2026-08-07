@@ -44,6 +44,7 @@ interface WelcomeConfig {
     canvasHeight: number;
     backgroundType: 'COLOR' | 'GRADIENT' | 'IMAGE';
     backgroundValue: string;
+    overlayOpacity: number;
     avatarShape: 'CIRCLE' | 'SQUARE' | 'ROUNDED';
     avatarX: number;
     avatarY: number;
@@ -109,6 +110,7 @@ const defaultConfig: Partial<WelcomeConfig> = {
     canvasHeight: 200,
     backgroundType: 'COLOR',
     backgroundValue: '#1a1a2e',
+    overlayOpacity: 50,
     avatarShape: 'CIRCLE',
     avatarX: 155,
     avatarY: 10,

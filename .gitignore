@@ -20,3 +20,4 @@ coverage/
 src/dashboard/.next.root*
 src/dashboard/.source/
 .source/
+.mimocode/

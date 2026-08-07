@@ -31,6 +31,7 @@ const welcomeConfigSchema = z.object({
     canvasHeight: z.number().int().min(100).max(2000),
     backgroundType: z.enum(["COLOR", "GRADIENT", "IMAGE"]),
     backgroundValue: z.string().max(2048),
+    overlayOpacity: z.number().int().min(0).max(100).optional(),
     avatarShape: z.enum(["CIRCLE", "SQUARE", "ROUNDED"]),
     avatarX: z.number().int().min(0).max(4000),
     avatarY: z.number().int().min(0).max(4000),
