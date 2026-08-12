@@ -12,6 +12,7 @@ const createRuleSchema = z.object({
     notifyChannelId: discordIdSchema,
     message: z.string().trim().min(1).max(2000),
     messageEmbed: optionalEmbedSchema,
+    welcomeMessage: z.string().trim().max(2000).optional(),
     enabled: z.boolean().optional(),
 }).strict();
 
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
             notifyChannelId: body.notifyChannelId,
             message: body.message,
             messageEmbed: body.messageEmbed ? JSON.parse(JSON.stringify(body.messageEmbed)) : null,
+            welcomeMessage: body.welcomeMessage || null,
             enabled: body.enabled ?? true,
         }).returning();
 

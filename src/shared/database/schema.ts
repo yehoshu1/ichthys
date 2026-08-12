@@ -146,6 +146,7 @@ export const verificationMessageRule = pgTable('verification_message_rule', {
     notifyChannelId: text('notify_channel_id'),
     message: text('message').notNull(),
     messageEmbed: jsonb('message_embed'),
+    welcomeMessage: text('welcome_message'),
     enabled: boolean('enabled').default(true).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),

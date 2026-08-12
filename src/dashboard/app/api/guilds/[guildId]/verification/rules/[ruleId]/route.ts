@@ -12,6 +12,7 @@ const updateRuleSchema = z.object({
     notifyChannelId: discordIdSchema.optional(),
     message: z.string().trim().min(1).max(2000).optional(),
     messageEmbed: optionalEmbedSchema,
+    welcomeMessage: z.string().trim().max(2000).optional().nullable(),
     enabled: z.boolean().optional(),
 }).strict();
 
@@ -56,6 +57,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ guildId
         if (body.roleId !== undefined) updates.roleId = body.roleId;
         if (body.notifyChannelId !== undefined) updates.notifyChannelId = body.notifyChannelId;
         if (body.message !== undefined) updates.message = body.message;
+        if (body.welcomeMessage !== undefined) updates.welcomeMessage = body.welcomeMessage;
         if (body.messageEmbed !== undefined) {
             // Clean undefined values from embed object for JSON serialization
             updates.messageEmbed = body.messageEmbed ? JSON.parse(JSON.stringify(body.messageEmbed)) : null;

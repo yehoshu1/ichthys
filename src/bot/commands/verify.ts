@@ -74,7 +74,36 @@ export const verify: Command = {
                     return;
                 }
 
-                // Note: Message will be sent automatically by guildMemberUpdate event handler
+                // Note: Notification channel message will be sent automatically by guildMemberUpdate event handler
+
+                // Send the profile's welcome message in the channel where the user is verified,
+                // unless a welcome trigger already handles messages for this role.
+                if (profile.welcomeMessage) {
+                    try {
+                        const hasWelcomeTrigger = await db.query.welcomeTrigger.findFirst({
+                            where: and(
+                                eq(welcomeTrigger.guildId, guildId),
+                                eq(welcomeTrigger.roleId, profile.roleId),
+                                eq(welcomeTrigger.enabled, true)
+                            )
+                        });
+
+                        if (!hasWelcomeTrigger && interaction.channel && interaction.channel.isSendable()) {
+                            const variables = {
+                                user: member.toString(),
+                                username: member.user.username,
+                                server: interaction.guild!.name,
+                                memberCount: interaction.guild!.memberCount.toString()
+                            };
+                            const messageData = buildMessage(profile.welcomeMessage, null, variables);
+                            if (messageData) {
+                                await interaction.channel.send(messageData);
+                            }
+                        }
+                    } catch (error) {
+                        logger.error('Failed to send profile welcome message:', error);
+                    }
+                }
 
                 const profileLabel = profile.name || interaction.guild!.roles.cache.get(profile.roleId)?.name || 'profile';
                 await interaction.editReply(`✅ Applied verification profile **${profileLabel}** to ${member.user.username}.`);

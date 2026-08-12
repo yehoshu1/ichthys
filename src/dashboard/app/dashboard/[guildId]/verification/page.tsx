@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { RoleSelect, ChannelSelect } from "../../../../components/DiscordSelectors";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
@@ -14,6 +14,7 @@ import { useDiscordData } from "../../../../components/useDiscordData";
 import { ConfirmDeleteDialog } from "../../../../components/ConfirmDeleteDialog";
 import { toast } from "sonner";
 import { HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 
 // Types
 interface VerificationConfig {
@@ -31,6 +32,7 @@ interface VerificationRule {
     roleId: string;
     notifyChannelId: string | null;
     message: string;
+    welcomeMessage: string | null;
     enabled: boolean;
 }
 
@@ -61,9 +63,19 @@ interface RoleMessageRule {
     enabled: boolean;
 }
 
+const VERIFICATION_TABS = ["config", "role-messages", "profiles", "statistics"] as const;
+type VerificationTab = (typeof VERIFICATION_TABS)[number];
+
 export default function VerificationPage() {
     const params = useParams();
+    const searchParams = useSearchParams();
     const guildId = params.guildId as string;
+    const requestedTab = searchParams.get("tab");
+    const resolvedTab: VerificationTab =
+        requestedTab && VERIFICATION_TABS.includes(requestedTab as VerificationTab)
+            ? (requestedTab as VerificationTab)
+            : "config";
+    const [activeTab, setActiveTab] = useState<VerificationTab>(resolvedTab);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -81,6 +93,7 @@ export default function VerificationPage() {
     const [newRuleRoleId, setNewRuleRoleId] = useState("");
     const [newRuleChannelId, setNewRuleChannelId] = useState("");
     const [newRuleMessage, setNewRuleMessage] = useState("");
+    const [newRuleWelcomeMessage, setNewRuleWelcomeMessage] = useState("");
     const [addingRule, setAddingRule] = useState(false);
     const [ruleError, setRuleError] = useState<string | null>(null);
     const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
@@ -103,6 +116,10 @@ export default function VerificationPage() {
     useEffect(() => {
         fetchData();
     }, [guildId]);
+
+    useEffect(() => {
+        setActiveTab(resolvedTab);
+    }, [resolvedTab]);
 
     async function fetchData() {
         try {
@@ -185,6 +202,7 @@ export default function VerificationPage() {
                     roleId: newRuleRoleId,
                     notifyChannelId: newRuleChannelId || null,
                     message: newRuleMessage,
+                    welcomeMessage: newRuleWelcomeMessage || null,
                     enabled: true
                 }),
             });
@@ -200,6 +218,7 @@ export default function VerificationPage() {
                 setNewRuleRoleId("");
                 setNewRuleChannelId("");
                 setNewRuleMessage("");
+                setNewRuleWelcomeMessage("");
                 setEditingRuleId(null);
             } else {
                 const data = await res.json().catch(() => ({}));
@@ -339,6 +358,7 @@ export default function VerificationPage() {
         setNewRuleRoleId(rule.roleId);
         setNewRuleChannelId(rule.notifyChannelId || "");
         setNewRuleMessage(rule.message);
+        setNewRuleWelcomeMessage(rule.welcomeMessage || "");
         setRuleError(null);
     }
 
@@ -348,6 +368,7 @@ export default function VerificationPage() {
         setNewRuleRoleId("");
         setNewRuleChannelId("");
         setNewRuleMessage("");
+        setNewRuleWelcomeMessage("");
         setRuleError(null);
     }
 
@@ -363,8 +384,19 @@ export default function VerificationPage() {
                 <p className="text-muted-foreground">Automatically kick unverified members after a grace period.</p>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-2 space-y-6">
+            <Tabs
+                value={activeTab}
+                onValueChange={(value) => setActiveTab(value as VerificationTab)}
+                className="space-y-6"
+            >
+                <TabsList className="w-full justify-start overflow-x-auto whitespace-nowrap bg-muted">
+                    <TabsTrigger value="config">Configuration</TabsTrigger>
+                    <TabsTrigger value="role-messages">Role-Specific Messages</TabsTrigger>
+                    <TabsTrigger value="profiles">Additional Verification Profiles</TabsTrigger>
+                    <TabsTrigger value="statistics">Statistics</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="config" className="space-y-6">
                     <Card>
                         <CardHeader>
                             <CardTitle>Configuration</CardTitle>
@@ -464,7 +496,9 @@ export default function VerificationPage() {
                             </form>
                         </CardContent>
                     </Card>
+                </TabsContent>
 
+                <TabsContent value="role-messages" className="space-y-6">
                     <Card>
                         <CardHeader>
                             <div className="mb-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
@@ -563,7 +597,9 @@ export default function VerificationPage() {
                             </div>
                         </CardContent>
                     </Card>
+                </TabsContent>
 
+                <TabsContent value="profiles" className="space-y-6">
                     <Card>
                         <CardHeader>
                             <div className="mb-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
@@ -596,6 +632,11 @@ export default function VerificationPage() {
                                                 Notify: {rule.notifyChannelId ? `#${channelsById.get(rule.notifyChannelId)?.name || rule.notifyChannelId}` : "Not set"}
                                             </p>
                                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{rule.message}</p>
+                                            {rule.welcomeMessage && (
+                                                <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                                                    <span className="font-medium text-foreground">Welcome:</span> {rule.welcomeMessage}
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Button
@@ -670,6 +711,21 @@ export default function VerificationPage() {
                                         onChange={(e) => setNewRuleMessage(e.target.value)}
                                     />
                                 </div>
+                                <div className="space-y-2">
+                                    <LabelWithTooltip
+                                        label="Welcome Message (Optional)"
+                                        tooltip="Posted in the channel where the user is verified (like the default verification message). Leave empty to disable."
+                                    />
+                                    <textarea
+                                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        placeholder="Welcome {user}! You now have access to restricted channels."
+                                        value={newRuleWelcomeMessage}
+                                        onChange={(e) => setNewRuleWelcomeMessage(e.target.value)}
+                                    />
+                                    <HelperText>
+                                        Sent in the channel where the user is verified, when applied with <code>/verify</code>. The message above is sent to the selected notification channel.
+                                    </HelperText>
+                                </div>
                                 <Button
                                     onClick={handleAddRule}
                                     disabled={addingRule || !newRuleName || !newRuleRoleId || !newRuleChannelId || !newRuleMessage}
@@ -689,9 +745,9 @@ export default function VerificationPage() {
                             </div>
                         </CardContent>
                     </Card>
-                </div>
+                </TabsContent>
 
-                <div className="space-y-6">
+                <TabsContent value="statistics" className="space-y-6">
                     <Card>
                         <CardHeader>
                             <CardTitle>Statistics</CardTitle>
@@ -724,7 +780,7 @@ export default function VerificationPage() {
                             </div>
                         </CardContent>
                     </Card>
-                    <Card>
+                <Card>
                         <CardHeader>
                             <CardTitle>Recently Auto-Kicked</CardTitle>
                         </CardHeader>
@@ -798,8 +854,8 @@ export default function VerificationPage() {
                             )}
                         </CardContent>
                     </Card>
-                </div>
-            </div>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

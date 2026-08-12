@@ -325,6 +325,7 @@ function sanitizeVerificationRules(items: Record<string, unknown>[], warnings: I
             notifyChannelId: normalizeNullableDiscordId(item.notifyChannelId, warnings, "verificationRules.notifyChannelId.invalid"),
             message: item.message,
             messageEmbed: item.messageEmbed ?? null,
+            welcomeMessage: toStringOrNull(item.welcomeMessage),
             enabled: toBoolean(item.enabled, true),
         });
     }
