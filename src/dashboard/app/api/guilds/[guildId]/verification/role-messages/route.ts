@@ -3,13 +3,15 @@ import { db, verificationRoleMessage } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireGuildManageAccess, requireGuildManageRolesAccess } from "@/lib/guild-auth";
-import { discordIdSchema, optionalEmbedSchema, parseJsonBody } from "@/lib/validation";
+import { discordIdSchema, optionalEmbedSchema, nullableDiscordIdSchema, optionalTextSchema, parseJsonBody } from "@/lib/validation";
 import logger from "@/lib/logger";
 
 const createRoleMessageSchema = z.object({
     roleId: discordIdSchema,
     message: z.string().trim().min(1).max(2000),
     messageEmbed: optionalEmbedSchema,
+    notifyChannelId: nullableDiscordIdSchema,
+    welcomeMessage: optionalTextSchema,
     enabled: z.boolean().optional(),
 }).strict();
 
@@ -45,8 +47,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
         const [newRule] = await db.insert(verificationRoleMessage).values({
             guildId,
             roleId: body.roleId,
+            notifyChannelId: body.notifyChannelId || null,
             message: body.message,
             messageEmbed: body.messageEmbed ? JSON.parse(JSON.stringify(body.messageEmbed)) : null,
+            welcomeMessage: body.welcomeMessage || null,
             enabled: body.enabled ?? true,
         }).returning();
 

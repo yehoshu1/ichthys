@@ -24,6 +24,8 @@ interface VerificationConfig {
     verificationGraceDays: number;
     verificationKickDmEnabled: boolean;
     verificationMessage: string | null;
+    verificationMessageChannelId: string | null;
+    verificationWelcomeMessage: string | null;
 }
 
 interface VerificationRule {
@@ -59,7 +61,9 @@ interface UnverifiedUser {
 interface RoleMessageRule {
     id: string;
     roleId: string;
+    notifyChannelId?: string | null;
     message: string;
+    welcomeMessage?: string | null;
     enabled: boolean;
 }
 
@@ -86,6 +90,8 @@ export default function VerificationPage() {
         verificationGraceDays: 30,
         verificationKickDmEnabled: true,
         verificationMessage: "",
+        verificationMessageChannelId: "",
+        verificationWelcomeMessage: "",
     });
 
     const [rules, setRules] = useState<VerificationRule[]>([]);
@@ -99,7 +105,9 @@ export default function VerificationPage() {
     const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
     const [roleMessages, setRoleMessages] = useState<RoleMessageRule[]>([]);
     const [newRoleMessageRoleId, setNewRoleMessageRoleId] = useState("");
+    const [newRoleMessageChannelId, setNewRoleMessageChannelId] = useState("");
     const [newRoleMessageText, setNewRoleMessageText] = useState("");
+    const [newRoleMessageWelcomeText, setNewRoleMessageWelcomeText] = useState("");
     const [roleMessageError, setRoleMessageError] = useState<string | null>(null);
     const [addingRoleMessage, setAddingRoleMessage] = useState(false);
     const [editingRoleMessageId, setEditingRoleMessageId] = useState<string | null>(null);
@@ -147,6 +155,8 @@ export default function VerificationPage() {
                 const data = await roleMessageRes.json();
                 setRoleMessages(data.map((rule: RoleMessageRule) => ({
                     ...rule,
+                    notifyChannelId: rule.notifyChannelId || null,
+                    welcomeMessage: rule.welcomeMessage || null,
                     enabled: rule.enabled ?? true
                 })));
             }
@@ -279,7 +289,9 @@ export default function VerificationPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     roleId: newRoleMessageRoleId,
+                    notifyChannelId: newRoleMessageChannelId || null,
                     message: newRoleMessageText,
+                    welcomeMessage: newRoleMessageWelcomeText || null,
                     enabled: true
                 }),
             });
@@ -293,7 +305,9 @@ export default function VerificationPage() {
                     setRoleMessages([...roleMessages, updatedRule]);
                 }
                 setNewRoleMessageRoleId("");
+                setNewRoleMessageChannelId("");
                 setNewRoleMessageText("");
+                setNewRoleMessageWelcomeText("");
                 setEditingRoleMessageId(null);
             } else {
                 const data = await res.json().catch(() => ({}));
@@ -342,13 +356,17 @@ export default function VerificationPage() {
         setEditingRoleMessageId(rule.id);
         setNewRoleMessageRoleId(rule.roleId);
         setNewRoleMessageText(rule.message);
+        setNewRoleMessageChannelId(rule.notifyChannelId || "");
+        setNewRoleMessageWelcomeText(rule.welcomeMessage || "");
         setRoleMessageError(null);
     }
 
     function resetRoleMessageForm() {
         setEditingRoleMessageId(null);
         setNewRoleMessageRoleId("");
+        setNewRoleMessageChannelId("");
         setNewRoleMessageText("");
+        setNewRoleMessageWelcomeText("");
         setRoleMessageError(null);
     }
 
@@ -490,6 +508,30 @@ export default function VerificationPage() {
                                     </HelperText>
                                 </div>
 
+                                <div className="space-y-2">
+                                    <Label>Send verification message to</Label>
+                                    <ChannelSelect guildId={guildId} value={config.verificationMessageChannelId || ""} onChange={(v) => setConfig({ ...config, verificationMessageChannelId: v })} allowNone={true} />
+                                    <HelperText>
+                                        Channel where the verification message will be posted. Leave empty to post in the current channel.
+                                    </HelperText>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <LabelWithTooltip
+                                        label="Welcome Message (Optional)"
+                                        tooltip="Posted in the channel where the user is verified (like the default verification message). Leave empty to disable."
+                                    />
+                                    <textarea
+                                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        placeholder="Welcome {user}! You now have access to restricted channels."
+                                        value={config.verificationWelcomeMessage || ""}
+                                        onChange={(e) => setConfig({ ...config, verificationWelcomeMessage: e.target.value })}
+                                    />
+                                    <HelperText>
+                                        Sent in the channel where the user is verified. Use <code>{'{user}'}</code> to mention.
+                                    </HelperText>
+                                </div>
+
                                 <Button type="submit" disabled={saving}>
                                     {saving ? "Saving..." : "Save Settings"}
                                 </Button>
@@ -525,6 +567,12 @@ export default function VerificationPage() {
                                                 />
                                             </div>
                                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{rule.message}</p>
+                                            {rule.notifyChannelId && (
+                                                <p className="text-xs text-muted-foreground">Notify: #{channelsById.get(rule.notifyChannelId)?.name || rule.notifyChannelId}</p>
+                                            )}
+                                            {rule.welcomeMessage && (
+                                                <p className="text-xs text-muted-foreground whitespace-pre-wrap"><span className="font-medium text-foreground">Welcome:</span> {rule.welcomeMessage}</p>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Button
@@ -570,12 +618,25 @@ export default function VerificationPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
+                                    <Label>Notification Channel</Label>
+                                    <ChannelSelect guildId={guildId} value={newRoleMessageChannelId} onChange={setNewRoleMessageChannelId} allowNone={true} />
+                                </div>
+                                <div className="space-y-2">
                                     <Label>Message</Label>
                                     <textarea
                                         className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         placeholder="Welcome {user}!"
                                         value={newRoleMessageText}
                                         onChange={(e) => setNewRoleMessageText(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Welcome Message (Optional)</Label>
+                                    <textarea
+                                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        placeholder="Welcome {user}!"
+                                        value={newRoleMessageWelcomeText}
+                                        onChange={(e) => setNewRoleMessageWelcomeText(e.target.value)}
                                     />
                                 </div>
                                 <Button

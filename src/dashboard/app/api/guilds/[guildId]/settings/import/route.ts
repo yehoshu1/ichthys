@@ -347,8 +347,10 @@ function sanitizeVerificationRoleMessages(items: Record<string, unknown>[], warn
             id: typeof item.id === "string" ? item.id : undefined,
             guildId: undefined,
             roleId,
+            notifyChannelId: normalizeNullableDiscordId(item.notifyChannelId, warnings, "verificationRoleMessages.notifyChannelId.invalid"),
             message: item.message,
             messageEmbed: item.messageEmbed ?? null,
+            welcomeMessage: toStringOrNull(item.welcomeMessage),
             enabled: toBoolean(item.enabled, true),
         });
     }

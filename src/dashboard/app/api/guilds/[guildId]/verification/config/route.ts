@@ -14,6 +14,8 @@ const verificationConfigSchema = z.object({
     verificationGraceDays: z.number().int().min(1).max(365).optional(),
     verificationKickDmEnabled: z.boolean().optional(),
     verificationMessage: optionalTextSchema,
+    verificationMessageChannelId: nullableDiscordIdSchema,
+    verificationWelcomeMessage: optionalTextSchema,
 }).passthrough();
 
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
@@ -35,6 +37,8 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
                 verificationGraceDays: 30,
                 verificationKickDmEnabled: true,
                 verificationMessage: null,
+                verificationMessageChannelId: null,
+                verificationWelcomeMessage: null,
             });
         }
 
@@ -64,7 +68,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
             verificationRoleId: body.verificationRoleId || null,
             verificationGraceDays: body.verificationGraceDays ?? 30,
             verificationKickDmEnabled: body.verificationKickDmEnabled ?? true,
-            verificationMessage: body.verificationMessage || null,
+                verificationMessage: body.verificationMessage || null,
+                verificationMessageChannelId: body.verificationMessageChannelId || null,
+                verificationWelcomeMessage: body.verificationWelcomeMessage || null,
         }).onConflictDoUpdate({
             target: guildConfig.guildId,
             set: {
@@ -73,7 +79,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
                 verificationRoleId: body.verificationRoleId || null,
                 verificationGraceDays: body.verificationGraceDays ?? 30,
                 verificationKickDmEnabled: body.verificationKickDmEnabled ?? true,
-                verificationMessage: body.verificationMessage || null,
+                    verificationMessage: body.verificationMessage || null,
+                    verificationMessageChannelId: body.verificationMessageChannelId || null,
+                    verificationWelcomeMessage: body.verificationWelcomeMessage || null,
                 lastMemberSync: null,
                 updatedAt: new Date(),
             },

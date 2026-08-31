@@ -179,40 +179,75 @@ export const verify: Command = {
                 messageContent = matchedRoleMessage.message;
             }
 
-            // Fetch role-based rules
-            // Additional profiles do not affect normal verification messaging.
-
-            // Send custom verification message if configured
+            // Send custom verification/notification message if configured, honoring welcome triggers
             const variables = {
                 user: member.toString(),
                 username: member.user.username,
                 server: interaction.guild!.name,
                 memberCount: interaction.guild!.memberCount.toString()
             };
-            const hasVerificationWelcomeTrigger = await db.query.welcomeTrigger.findFirst({
-                where: and(
-                    eq(welcomeTrigger.guildId, guildId),
-                    eq(welcomeTrigger.roleId, config.verificationRoleId),
-                    eq(welcomeTrigger.enabled, true)
-                )
-            });
 
-            const messageData = hasVerificationWelcomeTrigger
-                ? null
-                : buildMessage(
+            const roleToCheck = matchedRoleMessage ? matchedRoleMessage.roleId : config.verificationRoleId;
+            const hasWelcomeTrigger = roleToCheck
+                ? await db.query.welcomeTrigger.findFirst({
+                    where: and(
+                        eq(welcomeTrigger.guildId, guildId),
+                        eq(welcomeTrigger.roleId, roleToCheck),
+                        eq(welcomeTrigger.enabled, true)
+                    )
+                })
+                : null;
+
+            if (!hasWelcomeTrigger) {
+                const messageData = buildMessage(
                     messageContent,
                     (matchedRoleMessage?.messageEmbed as any) || (config.verificationMessageEmbed as any) || null,
                     variables
                 );
 
-            if (messageData) {
-                try {
-                    if (interaction.channel && interaction.channel.isSendable()) {
-                        await interaction.channel.send(messageData);
+                if (messageData) {
+                    try {
+                        // Determine target channel: role-specific notifyChannel, then guild config channel, then current channel
+                        const targetChannelId = (matchedRoleMessage && (matchedRoleMessage as any).notifyChannelId) || (config.verificationMessageChannelId as any) || null;
+                        if (targetChannelId && interaction.guild) {
+                            const target = interaction.guild.channels.cache.get(targetChannelId as string) as any;
+                            if (target && typeof target.isTextBased === 'function' && target.isTextBased() && typeof target.isSendable === 'function' && target.isSendable()) {
+                                await target.send(messageData);
+                            } else if (interaction.channel && interaction.channel.isSendable()) {
+                                await interaction.channel.send(messageData);
+                            }
+                        } else if (interaction.channel && interaction.channel.isSendable()) {
+                            await interaction.channel.send(messageData);
+                        }
+                    } catch (error) {
+                        logger.error('Failed to send verification message:', error);
                     }
-                } catch (error) {
-                    logger.error('Failed to send verification message:', error);
                 }
+            }
+
+            // Send welcome message in verification channel if configured (role-specific welcome overrides config)
+            try {
+                const welcomeText = (matchedRoleMessage && (matchedRoleMessage as any).welcomeMessage) || (config.verificationWelcomeMessage as any) || null;
+                if (welcomeText && interaction.channel && interaction.channel.isSendable()) {
+                    const welcomeHasTrigger = roleToCheck
+                        ? await db.query.welcomeTrigger.findFirst({
+                            where: and(
+                                eq(welcomeTrigger.guildId, guildId),
+                                eq(welcomeTrigger.roleId, roleToCheck),
+                                eq(welcomeTrigger.enabled, true)
+                            )
+                        })
+                        : null;
+
+                    if (!welcomeHasTrigger) {
+                        const welcomeData = buildMessage(welcomeText, null, variables);
+                        if (welcomeData) {
+                            await interaction.channel.send(welcomeData);
+                        }
+                    }
+                }
+            } catch (error) {
+                logger.error('Failed to send verification welcome message:', error);
             }
 
             logger.info(`${interaction.user.tag} manually verified ${member.user.tag} in ${interaction.guild!.name}`);

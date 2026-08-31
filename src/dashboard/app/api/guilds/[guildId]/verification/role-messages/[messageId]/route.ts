@@ -8,8 +8,10 @@ import logger from "@/lib/logger";
 
 const updateRoleMessageSchema = z.object({
     roleId: discordIdSchema.optional(),
+    notifyChannelId: z.preprocess((v) => (v === '' ? null : v), z.string().regex(/^\d{17,20}$/).nullable().optional()),
     message: z.string().trim().min(1).max(2000).optional(),
     messageEmbed: optionalEmbedSchema,
+    welcomeMessage: z.string().max(2000).nullable().optional(),
     enabled: z.boolean().optional(),
 }).strict();
 
@@ -49,11 +51,13 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ guildId
         const updates: Record<string, unknown> = { updatedAt: new Date() };
 
         if (body.roleId !== undefined) updates.roleId = body.roleId;
+        if (body.notifyChannelId !== undefined) updates.notifyChannelId = body.notifyChannelId || null;
         if (body.message !== undefined) updates.message = body.message;
         if (body.messageEmbed !== undefined) {
             // Clean undefined values from embed object for JSON serialization
             updates.messageEmbed = body.messageEmbed ? JSON.parse(JSON.stringify(body.messageEmbed)) : null;
         }
+        if (body.welcomeMessage !== undefined) updates.welcomeMessage = body.welcomeMessage || null;
         if (body.enabled !== undefined) updates.enabled = body.enabled;
 
         const [updated] = await db.update(verificationRoleMessage)

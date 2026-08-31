@@ -266,8 +266,10 @@ export const verificationRuleSchema = z.object({
 export const verificationRoleMessageSchema = z.object({
     id: uuid.optional(),
     roleId: snowflake,
+    notifyChannelId: z.string().nullable().optional(),
     message: z.string().min(1).max(2000),
     messageEmbed: embedData,
+    welcomeMessage: z.string().nullable().optional(),
     enabled: z.boolean().default(true),
 });
 
