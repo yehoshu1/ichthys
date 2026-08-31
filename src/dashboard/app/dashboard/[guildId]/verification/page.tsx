@@ -35,7 +35,7 @@ interface VerificationRule {
     name: string;
     roleId: string;
     notifyChannelId: string | null;
-    message: string;
+    message?: string | null;
     welcomeMessage: string | null;
     enabled: boolean;
 }
@@ -64,7 +64,7 @@ interface RoleMessageRule {
     id: string;
     roleId: string;
     notifyChannelId?: string | null;
-    message: string;
+    message?: string | null;
     messageEmbed?: EmbedData | null;
     messageEmbedEnabled?: boolean;
     welcomeMessage?: string | null;
@@ -201,8 +201,10 @@ export default function VerificationPage() {
     }
 
     async function handleAddRule() {
-        if (!newRuleName || !newRuleRoleId || !newRuleChannelId || !newRuleMessage) {
-            setRuleError("Please provide a profile name, role, notification channel, and message.");
+        if (!newRuleName || !newRuleRoleId || !newRuleChannelId) {
+            setRuleError("Please provide a profile name, role, and notification channel.");
+            return;
+        }
             return;
         }
         setAddingRule(true);
@@ -220,7 +222,7 @@ export default function VerificationPage() {
                     name: newRuleName,
                     roleId: newRuleRoleId,
                     notifyChannelId: newRuleChannelId || null,
-                    message: newRuleMessage,
+                    message: newRuleMessage || null,
                     welcomeMessage: newRuleWelcomeMessage || null,
                     enabled: true
                 }),
@@ -281,8 +283,8 @@ export default function VerificationPage() {
     }
 
     async function handleAddRoleMessage() {
-        if (!newRoleMessageRoleId || !newRoleMessageText) {
-            setRoleMessageError("Please provide a role and message.");
+        if (!newRoleMessageRoleId) {
+            setRoleMessageError("Please provide a role.");
             return;
         }
         setAddingRoleMessage(true);
@@ -299,7 +301,7 @@ export default function VerificationPage() {
                 body: JSON.stringify({
                     roleId: newRoleMessageRoleId,
                     notifyChannelId: newRoleMessageChannelId || null,
-                    message: newRoleMessageText,
+                    message: newRoleMessageText || null,
                     messageEmbed: newRoleMessageEmbedEnabled ? newRoleMessageEmbed : null,
                     welcomeMessage: newRoleMessageWelcomeText || null,
                     enabled: true
@@ -664,7 +666,7 @@ export default function VerificationPage() {
                                 </div>
                                 <Button
                                     onClick={handleAddRoleMessage}
-                                    disabled={addingRoleMessage || !newRoleMessageRoleId || !newRoleMessageText}
+                                    disabled={addingRoleMessage || !newRoleMessageRoleId}
                                     className="w-full"
                                 >
                                     <Plus className="mr-2 h-4 w-4" />
@@ -812,7 +814,7 @@ export default function VerificationPage() {
                                 </div>
                                 <Button
                                     onClick={handleAddRule}
-                                    disabled={addingRule || !newRuleName || !newRuleRoleId || !newRuleChannelId || !newRuleMessage}
+                                    disabled={addingRule || !newRuleName || !newRuleRoleId || !newRuleChannelId}
                                     className="w-full"
                                 >
                                     <Plus className="mr-2 h-4 w-4" />

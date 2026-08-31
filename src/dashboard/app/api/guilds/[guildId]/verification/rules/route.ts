@@ -10,7 +10,8 @@ const createRuleSchema = z.object({
     name: z.string().trim().min(1).max(100),
     roleId: discordIdSchema,
     notifyChannelId: discordIdSchema,
-    message: z.string().trim().min(1).max(2000),
+    // Notification message optional — allow only welcome message or embed
+    message: z.string().trim().max(2000).optional(),
     messageEmbed: optionalEmbedSchema,
     welcomeMessage: z.string().trim().max(2000).optional(),
     enabled: z.boolean().optional(),
