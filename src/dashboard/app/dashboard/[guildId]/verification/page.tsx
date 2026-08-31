@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { RoleSelect, ChannelSelect } from "../../../../components/DiscordSelectors";
+import { MessageEditor, EmbedData } from "../../../../components/MessageEditor";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "../../../../components/ui/card";
@@ -24,6 +25,7 @@ interface VerificationConfig {
     verificationGraceDays: number;
     verificationKickDmEnabled: boolean;
     verificationMessage: string | null;
+    verificationMessageEmbed?: EmbedData | null;
     verificationMessageChannelId: string | null;
     verificationWelcomeMessage: string | null;
 }
@@ -63,6 +65,8 @@ interface RoleMessageRule {
     roleId: string;
     notifyChannelId?: string | null;
     message: string;
+    messageEmbed?: EmbedData | null;
+    messageEmbedEnabled?: boolean;
     welcomeMessage?: string | null;
     enabled: boolean;
 }
@@ -90,6 +94,7 @@ export default function VerificationPage() {
         verificationGraceDays: 30,
         verificationKickDmEnabled: true,
         verificationMessage: "",
+        verificationMessageEmbed: {},
         verificationMessageChannelId: "",
         verificationWelcomeMessage: "",
     });
@@ -107,6 +112,8 @@ export default function VerificationPage() {
     const [newRoleMessageRoleId, setNewRoleMessageRoleId] = useState("");
     const [newRoleMessageChannelId, setNewRoleMessageChannelId] = useState("");
     const [newRoleMessageText, setNewRoleMessageText] = useState("");
+    const [newRoleMessageEmbed, setNewRoleMessageEmbed] = useState<EmbedData>({});
+    const [newRoleMessageEmbedEnabled, setNewRoleMessageEmbedEnabled] = useState(false);
     const [newRoleMessageWelcomeText, setNewRoleMessageWelcomeText] = useState("");
     const [roleMessageError, setRoleMessageError] = useState<string | null>(null);
     const [addingRoleMessage, setAddingRoleMessage] = useState(false);
@@ -156,6 +163,8 @@ export default function VerificationPage() {
                 setRoleMessages(data.map((rule: RoleMessageRule) => ({
                     ...rule,
                     notifyChannelId: rule.notifyChannelId || null,
+                    messageEmbed: (rule as any).messageEmbed || null,
+                    messageEmbedEnabled: !!((rule as any).messageEmbed as any)?.enabled,
                     welcomeMessage: rule.welcomeMessage || null,
                     enabled: rule.enabled ?? true
                 })));
@@ -291,6 +300,7 @@ export default function VerificationPage() {
                     roleId: newRoleMessageRoleId,
                     notifyChannelId: newRoleMessageChannelId || null,
                     message: newRoleMessageText,
+                    messageEmbed: newRoleMessageEmbedEnabled ? newRoleMessageEmbed : null,
                     welcomeMessage: newRoleMessageWelcomeText || null,
                     enabled: true
                 }),
@@ -307,6 +317,8 @@ export default function VerificationPage() {
                 setNewRoleMessageRoleId("");
                 setNewRoleMessageChannelId("");
                 setNewRoleMessageText("");
+                setNewRoleMessageEmbed({});
+                setNewRoleMessageEmbedEnabled(false);
                 setNewRoleMessageWelcomeText("");
                 setEditingRoleMessageId(null);
             } else {
@@ -357,6 +369,8 @@ export default function VerificationPage() {
         setNewRoleMessageRoleId(rule.roleId);
         setNewRoleMessageText(rule.message);
         setNewRoleMessageChannelId(rule.notifyChannelId || "");
+        setNewRoleMessageEmbed(rule.messageEmbed || {});
+        setNewRoleMessageEmbedEnabled(!!rule.messageEmbedEnabled);
         setNewRoleMessageWelcomeText(rule.welcomeMessage || "");
         setRoleMessageError(null);
     }
@@ -366,6 +380,8 @@ export default function VerificationPage() {
         setNewRoleMessageRoleId("");
         setNewRoleMessageChannelId("");
         setNewRoleMessageText("");
+        setNewRoleMessageEmbed({});
+        setNewRoleMessageEmbedEnabled(false);
         setNewRoleMessageWelcomeText("");
         setRoleMessageError(null);
     }
@@ -492,28 +508,26 @@ export default function VerificationPage() {
 
                                 <div className="space-y-2">
                                     <LabelWithTooltip
-                                        label="Default Verification Message (Optional)"
-                                        tooltip="Posted in channel when a user verifies. Use {user} to mention them."
+                                        label="Notification Channel (Optional)"
+                                        tooltip="Channel where the verification notification will be posted. Leave blank to post in the context channel."
                                     />
-                                    <div className="relative">
-                                        <textarea
-                                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                            placeholder="Example: Welcome {user}! You are now verified."
-                                            value={config.verificationMessage || ""}
-                                            onChange={(e) => setConfig({ ...config, verificationMessage: e.target.value })}
-                                        />
-                                    </div>
-                                    <HelperText>
-                                        Message sent to the channel when a user is verified. Use <code>{'{user}'}</code> to mention the user.
-                                    </HelperText>
+                                    <ChannelSelect guildId={guildId} value={config.verificationMessageChannelId || ""} onChange={(v) => setConfig({ ...config, verificationMessageChannelId: v })} allowNone={true} placeholder="Select a channel or leave blank for context channel" />
+                                    <HelperText>If left blank, the notification will be sent to the context channel where verification occurred.</HelperText>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>Send verification message to</Label>
-                                    <ChannelSelect guildId={guildId} value={config.verificationMessageChannelId || ""} onChange={(v) => setConfig({ ...config, verificationMessageChannelId: v })} allowNone={true} />
-                                    <HelperText>
-                                        Channel where the verification message will be posted. Leave empty to post in the current channel.
-                                    </HelperText>
+                                    <LabelWithTooltip
+                                        label="Send this message"
+                                        tooltip="This is the notification message posted to the selected channel when a user verifies. Use {user} to mention them."
+                                    />
+                                    <MessageEditor
+                                        content={config.verificationMessage || ""}
+                                        embed={config.verificationMessageEmbed || {}}
+                                        embedEnabled={!!(config.verificationMessageEmbed as any)?.enabled}
+                                        onChange={(content, enabled, embed) => setConfig({ ...config, verificationMessage: content, verificationMessageEmbed: { ...embed, enabled } })}
+                                        variables={["{user}", "{username}", "{server}", "{memberCount}"]}
+                                        placeholder="Welcome {user}! You are now verified."
+                                    />
                                 </div>
 
                                 <div className="space-y-2">
@@ -567,6 +581,9 @@ export default function VerificationPage() {
                                                 />
                                             </div>
                                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{rule.message}</p>
+                                            {rule.messageEmbed && (
+                                                <p className="text-xs text-muted-foreground">Embed configured</p>
+                                            )}
                                             {rule.notifyChannelId && (
                                                 <p className="text-xs text-muted-foreground">Notify: #{channelsById.get(rule.notifyChannelId)?.name || rule.notifyChannelId}</p>
                                             )}
@@ -623,11 +640,17 @@ export default function VerificationPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Message</Label>
-                                    <textarea
-                                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    <MessageEditor
+                                        content={newRoleMessageText}
+                                        embed={newRoleMessageEmbed}
+                                        embedEnabled={newRoleMessageEmbedEnabled}
+                                        onChange={(content, enabled, embed) => {
+                                            setNewRoleMessageText(content);
+                                            setNewRoleMessageEmbed(embed || {});
+                                            setNewRoleMessageEmbedEnabled(enabled);
+                                        }}
+                                        variables={["{user}", "{username}", "{server}", "{memberCount}"]}
                                         placeholder="Welcome {user}!"
-                                        value={newRoleMessageText}
-                                        onChange={(e) => setNewRoleMessageText(e.target.value)}
                                     />
                                 </div>
                                 <div className="space-y-2">
