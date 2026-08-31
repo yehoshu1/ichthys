@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { RoleSelect, ChannelSelect } from "../../../../components/DiscordSelectors";
 import { Button } from "../../../../components/ui/button";
 import { Input } from "../../../../components/ui/input";
@@ -40,9 +41,19 @@ interface Booster {
     roleRemoved: boolean;
 }
 
+const BOOST_TABS = ["config", "analytics"] as const;
+type BoostTab = (typeof BOOST_TABS)[number];
+
 export default function BoostsPage() {
     const params = useParams();
+    const searchParams = useSearchParams();
     const guildId = params.guildId as string;
+    const requestedTab = searchParams.get("tab");
+    const resolvedTab: BoostTab =
+        requestedTab && BOOST_TABS.includes(requestedTab as BoostTab)
+            ? (requestedTab as BoostTab)
+            : "config";
+    const [activeTab, setActiveTab] = useState<BoostTab>(resolvedTab);
 
     const [config, setConfig] = useState<BoostConfig | null>(null);
     const [boosters, setBoosters] = useState<Booster[]>([]);
@@ -55,6 +66,10 @@ export default function BoostsPage() {
     useEffect(() => {
         fetchData();
     }, [guildId]);
+
+    useEffect(() => {
+        setActiveTab(resolvedTab);
+    }, [resolvedTab]);
 
     async function fetchData() {
         try {
@@ -132,37 +147,23 @@ export default function BoostsPage() {
                 <p className="text-muted-foreground">Automate rewards and announcements for your server boosters.</p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 mb-8">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active Boosters</CardTitle>
-                        <Zap className="h-4 w-4 text-primary" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{stats.activeCount}</div>
-                        <p className="text-xs text-muted-foreground">Currently boosting the server</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">All-Time Boosts</CardTitle>
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{stats.totalBoosts}</div>
-                        <p className="text-xs text-muted-foreground">Total boosts claimed over time</p>
-                    </CardContent>
-                </Card>
-            </div>
+            <Tabs
+                value={activeTab}
+                onValueChange={(value) => setActiveTab(value as BoostTab)}
+                className="space-y-6"
+            >
+                <TabsList className="w-full justify-start overflow-x-auto whitespace-nowrap bg-muted">
+                    <TabsTrigger value="config">Configuration</TabsTrigger>
+                    <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                </TabsList>
 
-            <ExampleBox>
-                When a user boosts, they use <code>/boost claim</code> to receive the <strong>Booster</strong> role. 
-                If they stop boosting, the bot waits the grace period (e.g., 7 days) before removing their role, 
-                giving them time to re-boost without losing benefits.
-            </ExampleBox>
+                <TabsContent value="config" className="space-y-6">
+                    <ExampleBox>
+                        When a user boosts, they use <code>/boost claim</code> to receive the <strong>Booster</strong> role. 
+                        If they stop boosting, the bot waits the grace period (e.g., 7 days) before removing their role, 
+                        giving them time to re-boost without losing benefits.
+                    </ExampleBox>
 
-            <div className="grid gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-2 space-y-6">
                     <Card>
                         <CardHeader>
                             <CardTitle>Configuration</CardTitle>
@@ -305,9 +306,32 @@ export default function BoostsPage() {
                             </form>
                         </CardContent>
                     </Card>
-                </div>
+                </TabsContent>
 
-                <div className="space-y-6">
+                <TabsContent value="analytics" className="space-y-6">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Active Boosters</CardTitle>
+                                <Zap className="h-4 w-4 text-primary" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{stats.activeCount}</div>
+                                <p className="text-xs text-muted-foreground">Currently boosting the server</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">All-Time Boosts</CardTitle>
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{stats.totalBoosts}</div>
+                                <p className="text-xs text-muted-foreground">Total boosts claimed over time</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+
                     <Card>
                         <CardHeader>
                             <CardTitle>Recent Boosters</CardTitle>
@@ -364,8 +388,8 @@ export default function BoostsPage() {
                             </Table>
                         </CardContent>
                     </Card>
-                </div>
-            </div>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }
