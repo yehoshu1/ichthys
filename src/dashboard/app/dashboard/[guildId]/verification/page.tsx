@@ -26,6 +26,7 @@ interface VerificationConfig {
     verificationKickDmEnabled: boolean;
     verificationMessage: string | null;
     verificationMessageEmbed?: EmbedData | null;
+    verificationMessageEmbedEnabled?: boolean;
     verificationMessageChannelId: string | null;
     verificationWelcomeMessage: string | null;
 }
@@ -94,7 +95,8 @@ export default function VerificationPage() {
         verificationGraceDays: 30,
         verificationKickDmEnabled: true,
         verificationMessage: "",
-        verificationMessageEmbed: {},
+        verificationMessageEmbed: undefined,
+        verificationMessageEmbedEnabled: false,
         verificationMessageChannelId: "",
         verificationWelcomeMessage: "",
     });
@@ -367,7 +369,7 @@ export default function VerificationPage() {
     function startEditRoleMessage(rule: RoleMessageRule) {
         setEditingRoleMessageId(rule.id);
         setNewRoleMessageRoleId(rule.roleId);
-        setNewRoleMessageText(rule.message);
+        setNewRoleMessageText(rule.message ?? "");
         setNewRoleMessageChannelId(rule.notifyChannelId || "");
         setNewRoleMessageEmbed(rule.messageEmbed || {});
         setNewRoleMessageEmbedEnabled(!!rule.messageEmbedEnabled);
@@ -391,7 +393,7 @@ export default function VerificationPage() {
         setNewRuleName(rule.name || "");
         setNewRuleRoleId(rule.roleId);
         setNewRuleChannelId(rule.notifyChannelId || "");
-        setNewRuleMessage(rule.message);
+        setNewRuleMessage(rule.message ?? "");
         setNewRuleWelcomeMessage(rule.welcomeMessage || "");
         setRuleError(null);
     }
@@ -523,8 +525,8 @@ export default function VerificationPage() {
                                     <MessageEditor
                                         content={config.verificationMessage || ""}
                                         embed={config.verificationMessageEmbed || {}}
-                                        embedEnabled={!!(config.verificationMessageEmbed as any)?.enabled}
-                                        onChange={(content, enabled, embed) => setConfig({ ...config, verificationMessage: content, verificationMessageEmbed: { ...embed, enabled } })}
+                                        embedEnabled={!!config.verificationMessageEmbedEnabled}
+                                        onChange={(content, enabled, embed) => setConfig({ ...config, verificationMessage: content, verificationMessageEmbed: embed, verificationMessageEmbedEnabled: enabled })}
                                         variables={["{user}", "{username}", "{server}", "{memberCount}"]}
                                         placeholder="Welcome {user}! You are now verified."
                                     />
