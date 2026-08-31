@@ -205,8 +205,6 @@ export default function VerificationPage() {
             setRuleError("Please provide a profile name, role, and notification channel.");
             return;
         }
-            return;
-        }
         setAddingRule(true);
         setRuleError(null);
         try {

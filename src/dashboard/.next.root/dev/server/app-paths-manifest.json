@@ -1,9 +1,0 @@
-{
-  "/api/guilds/[guildId]/route": "app/api/guilds/[guildId]/route.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/guilds/[guildId]/notifications/unread-count/route": "app/api/guilds/[guildId]/notifications/unread-count/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/guilds/page": "app/guilds/page.js",
-  "/dashboard/[guildId]/events/page": "app/dashboard/[guildId]/events/page.js",
-  "/dashboard/[guildId]/polls/page": "app/dashboard/[guildId]/polls/page.js"
-}

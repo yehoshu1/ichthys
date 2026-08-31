@@ -1,5 +1,0 @@
-{
-  "/api/guilds/[guildId]/notifications/unread-count/route": "app/api/guilds/[guildId]/notifications/unread-count/route.js",
-  "/api/guilds/[guildId]/events/templates/route": "app/api/guilds/[guildId]/events/templates/route.js",
-  "/dashboard/[guildId]/events/page": "app/dashboard/[guildId]/events/page.js"
-}
