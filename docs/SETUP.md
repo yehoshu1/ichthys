@@ -57,7 +57,7 @@ NEXTAUTH_URL=http://localhost:4002
 NEXTAUTH_SECRET=$(openssl rand -base64 32)
 
 # Required - Database
-DATABASE_URL=postgresql://ixoye:your_secure_password@postgres:5432/ixoye
+DATABASE_URL=postgresql://ichthys:your_secure_password@postgres:5432/ichthys
 POSTGRES_PASSWORD=your_secure_password
 
 # Recommended - URLs
@@ -83,19 +83,19 @@ This starts:
 ### 4. Initialize the Database
 
 ```bash
-docker compose exec ixoye npm run db:push
+docker compose exec ichthys npm run db:push
 ```
 
 For production, use migrations instead:
 
 ```bash
-docker compose exec ixoye npm run db:migrate
+docker compose exec ichthys npm run db:migrate
 ```
 
 ### 5. Deploy Discord Commands
 
 ```bash
-docker compose exec ixoye npm run deploy
+docker compose exec ichthys npm run deploy
 ```
 
 ### 6. Access the Dashboard
@@ -122,9 +122,9 @@ Create a database:
 
 ```bash
 sudo -u postgres psql
-CREATE DATABASE ixoye;
-CREATE USER ixoye WITH PASSWORD 'your_secure_password';
-GRANT ALL PRIVILEGES ON DATABASE ixoye TO ixoye;
+CREATE DATABASE ichthys;
+CREATE USER ichthys WITH PASSWORD 'your_secure_password';
+GRANT ALL PRIVILEGES ON DATABASE ichthys TO ichthys;
 \q
 ```
 
@@ -247,7 +247,7 @@ Or manually:
 
 ```bash
 # 1. Backup database
-docker compose exec ixoye npm run db:backup
+docker compose exec ichthys npm run db:backup
 
 # 2. Pull latest code
 git pull
@@ -256,7 +256,7 @@ git pull
 docker compose up -d --build
 
 # 4. Run any pending migrations
-docker compose exec ixoye npm run db:migrate
+docker compose exec ichthys npm run db:migrate
 ```
 
 ### Manual Update
@@ -290,7 +290,7 @@ pm2 restart all
 
 ```bash
 # Docker
-docker compose exec ixoye npm run db:backup
+docker compose exec ichthys npm run db:backup
 
 # Manual
 npm run db:backup
@@ -306,12 +306,12 @@ npm run db:backup:list
 npm run db:restore
 
 # Restore specific file
-npm run db:restore ./backups/ixoye-2026-01-15T12-00-00Z.dump
+npm run db:restore ./backups/ichthys-2026-01-15T12-00-00Z.dump
 ```
 
 ### Automated Backups
 
-Docker compose includes automated daily backups via the `ixoye-pg-backup` service.
+Docker compose includes automated daily backups via the `ichthys-pg-backup` service.
 
 Configure with environment variables:
 - `BACKUP_INTERVAL_SECONDS` - How often to backup (default: 86400 = daily)
@@ -326,7 +326,7 @@ Configure with environment variables:
 **Check logs:**
 ```bash
 # Docker
-docker compose logs ixoye
+docker compose logs ichthys
 
 # Manual
 cat logs/bot.log

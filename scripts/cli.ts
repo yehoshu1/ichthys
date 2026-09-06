@@ -96,7 +96,7 @@ function runCommandAsync(name: string, command: string): Promise<void> {
 }
 
 program
-  .name('ixoye')
+  .name('ichthys')
   .description('CLI to manage the Ixoye Discord Bot & Dashboard deployments, backups, and restores.')
   .version('0.1.0')
   .hook('preAction', (thisCommand) => {
@@ -209,7 +209,7 @@ program
   .description('View real-time logs from the docker containers')
   .action(async () => {
     logInfo('📄 Tailing logs (Ctrl+C to exit)...');
-    await runCommandAsync('Docker Logs', 'docker-compose logs -f ixoye');
+    await runCommandAsync('Docker Logs', 'docker-compose logs -f ichthys');
   });
 
 program.parse(process.argv);

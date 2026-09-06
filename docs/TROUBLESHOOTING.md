@@ -22,7 +22,7 @@ Common issues and solutions for ΙΧΘΥΣ (Ixoye) Discord Bot.
 **Check the logs:**
 ```bash
 # Docker
-docker compose logs ixoye --tail 100
+docker compose logs ichthys --tail 100
 
 # Manual
 cat logs/bot.log
@@ -74,7 +74,7 @@ pm2 status
 
 **Check logs:**
 ```bash
-docker compose logs ixoye --tail 50
+docker compose logs ichthys --tail 50
 ```
 
 ### Symptom: "Unauthorized" or login loop
@@ -278,7 +278,7 @@ netstat -tlnp | grep 4002
 
 **Check logs:**
 ```bash
-docker compose logs ixoye
+docker compose logs ichthys
 docker compose logs postgres
 docker compose logs redis
 ```
@@ -392,7 +392,7 @@ Please gather the following information:
 
 | Deployment Type | Log Location |
 |----------------|--------------|
-| Docker | `docker compose logs ixoye` |
+| Docker | `docker compose logs ichthys` |
 | PM2 | `~/.pm2/logs/` or configured log path |
 | Manual | `logs/` directory in project folder |
 

@@ -1,7 +1,7 @@
 module.exports = {
     apps: [
         {
-            name: "ixoye-bot",
+            name: "ichthys-bot",
             script: "./dist/bot/index.js",
             interpreter: "node",
             max_memory_restart: process.env.BOT_MAX_MEMORY_RESTART || "700M",
@@ -10,7 +10,7 @@ module.exports = {
             },
         },
         {
-            name: "ixoye-dashboard",
+            name: "ichthys-dashboard",
             script: "npm",
             args: "run dashboard:start",
             max_memory_restart: process.env.DASHBOARD_MAX_MEMORY_RESTART || "900M",

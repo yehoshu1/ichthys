@@ -1,0 +1,36 @@
+# Ichthys Dashboard - Caddyfile
+# Docs: https://caddyserver.com/docs/caddyfile
+
+# Replace YOUR_DOMAIN.com with your actual domain
+# Requires DNS A record pointing to your server's public IP
+
+YOUR_DOMAIN.com {
+    # Reverse proxy to the Ichthys app
+    reverse_proxy ixoye:4002 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+
+    # Logging
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+
+    encode gzip
+
+    tls {
+        protocols tls1.2 tls1.3
+    }
+}

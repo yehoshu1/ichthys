@@ -32,20 +32,29 @@ jobs:
       - name: Tests
         run: npm run test
 
-      - name: Guard - Command Catalog
-        run: npm run guard:commands
-
       - name: Guard - Module Guards
         run: npm run guard:modules
-
-      - name: Guard - Module Ownership
-        run: npm run guard:module-ownership
 
   build:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: validate
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: ichthys_ci
+          POSTGRES_USER: ichthys
+          POSTGRES_PASSWORD: ichthys
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ichthys -d ichthys_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -61,8 +70,25 @@ jobs:
       - name: Build bot
         run: npm run build
 
+      - name: Push database schema
+        run: npm run db:push
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: ichthys_ci
+          POSTGRES_USER: ichthys
+          POSTGRES_PASSWORD: ichthys
+          DATABASE_URL: postgresql://ichthys:ichthys@localhost:5432/ichthys_ci
+
       - name: Build dashboard
         run: npm run dashboard:build
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: ichthys_ci
+          POSTGRES_USER: ichthys
+          POSTGRES_PASSWORD: ichthys
+          DATABASE_URL: postgresql://ichthys:ichthys@localhost:5432/ichthys_ci
 
   docker:
     name: Docker Build

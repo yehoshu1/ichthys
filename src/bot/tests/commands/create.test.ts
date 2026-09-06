@@ -7,9 +7,11 @@ const mockEventService = {
 };
 
 const mockIsSupportedPostChannel = vi.fn();
+const mockGetEventPollSettingsForGuild = vi.fn();
 const mockGetCommandPolicyContext = vi.fn();
 const mockParseNaturalLanguageDate = vi.fn();
 const mockFormatDiscordTimestamp = vi.fn();
+const mockCreateEventMessage = vi.fn();
 const mockLogger = {
     info: vi.fn(),
     warn: vi.fn(),
@@ -22,10 +24,17 @@ vi.mock('../../services/event-service', () => ({
 
 vi.mock('../../services/event-poll-settings-service', () => ({
     isSupportedPostChannel: mockIsSupportedPostChannel,
+    getEventPollSettingsForGuild: mockGetEventPollSettingsForGuild,
 }));
 
 vi.mock('../../services/command-policy-service', () => ({
     getCommandPolicyContext: mockGetCommandPolicyContext,
+}));
+
+vi.mock('../../services/event-discord-service', () => ({
+    eventDiscordService: {
+        createEventMessage: mockCreateEventMessage,
+    },
 }));
 
 vi.mock('../../utils/date-parser', () => ({
@@ -137,6 +146,7 @@ describe('/create command', () => {
         vi.clearAllMocks();
         mockIsSupportedPostChannel.mockReturnValue(true);
         mockGetCommandPolicyContext.mockReturnValue(null);
+        mockGetEventPollSettingsForGuild.mockResolvedValue(null);
         mockFormatDiscordTimestamp.mockImplementation((date: Date, style: string) =>
             `<t:${Math.floor(new Date(date).getTime() / 1000)}:${style}>`
         );
@@ -169,7 +179,7 @@ describe('/create command', () => {
 
     it('creates event, posts embed message, and stores message id', async () => {
         const { execute } = await import('../../commands/create');
-        const { interaction, channelSend } = createCreateInteraction({
+        const { interaction } = createCreateInteraction({
             optionRoles: {
                 mention_on_create: { id: 'role-1' },
                 mention_on_start: null,
@@ -183,24 +193,29 @@ describe('/create command', () => {
             input === 'tomorrow 6pm' ? startTime : null
         ));
         mockEventService.createEvent.mockResolvedValue(createCreatedEvent({ startTime }));
+        mockCreateEventMessage.mockImplementation(async (event: any) => {
+            await mockEventService.setEventMessageId(event.id, 'message-1');
+            return { id: 'message-1' };
+        });
 
         await execute(interaction);
 
         expect(mockEventService.createEvent).toHaveBeenCalledTimes(1);
-        expect(channelSend).toHaveBeenCalledTimes(1);
+        expect(mockCreateEventMessage).toHaveBeenCalledTimes(1);
         expect(mockEventService.setEventMessageId).toHaveBeenCalledWith('event-1', 'message-1');
         expect(interaction.editReply).toHaveBeenCalledWith({ content: '✅ Event created successfully! ' });
     });
 
     it('returns success with warning when event is saved but channel post fails', async () => {
         const { execute } = await import('../../commands/create');
-        const { interaction } = createCreateInteraction({ channelSendReject: true });
+        const { interaction } = createCreateInteraction();
         const startTime = new Date(Date.now() + 2 * 60 * 60_000);
 
         mockParseNaturalLanguageDate.mockImplementation((input: string) => (
             input === 'tomorrow 6pm' ? startTime : null
         ));
         mockEventService.createEvent.mockResolvedValue(createCreatedEvent({ startTime }));
+        mockCreateEventMessage.mockRejectedValue(new Error('send failed'));
 
         await execute(interaction);
 
@@ -238,6 +253,7 @@ describe('/create command', () => {
             repeatFrequency: 'WEEKLY',
             repeatUntil,
         }));
+        mockCreateEventMessage.mockResolvedValue({ id: 'message-1' });
         mockEventService.createRepeatingEvents.mockResolvedValue([
             { id: 'event-2' },
             { id: 'event-3' },

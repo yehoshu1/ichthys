@@ -72,19 +72,18 @@ export async function execute(client: Client) {
                     inline: false,
                 });
 
-                // The mentionRoleIds array stores [createRole (if set), startRole (if set)].
-                // When mentionOnCreate is also set, the start role sits at index 1; otherwise index 0.
-                const startRoleIndex = evt.mentionOnCreate ? 1 : 0;
-                const startRoleId = evt.mentionOnStart && evt.mentionRoleIds?.length
-                    ? evt.mentionRoleIds[startRoleIndex]
+                const uniqueRoleIds = evt.mentionOnStart && evt.mentionRoleIds?.length
+                    ? [...new Set(evt.mentionRoleIds)]
+                    : [];
+                const startMentions = uniqueRoleIds.length
+                    ? uniqueRoleIds.map(id => `<@&${id}>`).join(' ')
                     : undefined;
-                const startMentions = startRoleId ? `<@&${startRoleId}>` : undefined;
 
                 await channel.send({
                     content: startMentions,
                     embeds: [embed],
-                    allowedMentions: startRoleId
-                        ? { roles: [startRoleId] }
+                    allowedMentions: uniqueRoleIds.length
+                        ? { roles: uniqueRoleIds }
                         : undefined,
                 });
 

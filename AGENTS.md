@@ -1,6 +1,85 @@
-# ΙΧΘΥΣ (Ixoye) Discord Bot & Dashboard - Agent Guide
+# ΙΧΘΥΣ (Ichthys) Discord Bot & Dashboard - Agent Guide
 
-This document provides essential information for AI coding agents working on the ΙΧΘΥΣ project.
+This document provides essential information for AI coding agents working on the Ichthys project.
+
+> **CRITICAL**: All agents MUST follow the branching guidelines below for every change.
+> Never commit directly to `main`. Always create a feature/fix/chore/refactor branch.
+
+## Branching Guidelines
+
+### Branch Structure
+
+```
+main                    # Production-ready code, protected
+├── feature/*           # New features and enhancements
+├── fix/*               # Bug fixes
+├── chore/*             # Maintenance, deps, config, docs
+└── refactor/*          # Code refactoring (no functional changes)
+```
+
+### Branch Naming Convention
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| Feature | `feature/<short-description>` | `feature/birthday-timezone-selector` |
+| Fix | `fix/<short-description>` | `fix/welcome-image-canvas-size` |
+| Chore | `chore/<short-description>` | `chore/update-deps-sept-2026` |
+| Refactor | `refactor/<short-description>` | `refactor/extract-event-service` |
+
+Use lowercase with hyphens. Keep descriptions under 50 characters.
+
+### Workflow for ALL Changes
+
+Every change, no matter how small, MUST follow this workflow:
+
+1. **Create a branch from `main`:**
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b <type>/<description>
+   ```
+
+2. **Make your changes** on the branch
+
+3. **Verify before committing:**
+   ```bash
+   npm run typecheck    # Must pass
+   npm run test         # Must pass (pre-existing failures are OK)
+   npm run build        # Must succeed
+   ```
+
+4. **Commit with conventional format:**
+   ```
+   type(scope): short description
+
+   - detail 1
+   - detail 2
+   ```
+
+   Types: `feat`, `fix`, `chore`, `refactor`, `docs`, `test`, `ci`
+
+5. **Push and create a Pull Request:**
+   ```bash
+   git push origin <branch>
+   ```
+
+6. **Merge only after CI passes and review**
+
+### What Counts as Each Type
+
+- **feature/**: New functionality, new commands, new dashboard pages, new API endpoints
+- **fix/**: Bug fixes, error handling improvements, behavior corrections
+- **chore/**: Dependency updates, config changes, documentation, cleanup, CI changes
+- **refactor/**: Code restructuring with no behavior change, extracting functions, reorganizing files
+
+### Rules
+
+- **NEVER** commit directly to `main`
+- **NEVER** skip typecheck/tests before committing
+- **ALWAYS** use conventional commit messages
+- **ALWAYS** create a PR even for small changes (enables review and CI)
+- Database schema changes MUST be non-destructive (no data loss)
+- Schema changes MUST have a backup step documented in the PR
 
 ## Project Overview
 
@@ -36,7 +115,7 @@ This document provides essential information for AI coding agents working on the
 ## Project Structure
 
 ```
-ixoye/
+ichthys/
 ├── src/
 │   ├── bot/                    # Discord bot code
 │   │   ├── commands/           # Slash commands
@@ -163,19 +242,24 @@ DISCORD_CLIENT_ID=your_client_id
 DISCORD_CLIENT_SECRET=your_client_secret
 
 # NextAuth (Required for dashboard)
-NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_URL=https://yourdomain.com
 NEXTAUTH_SECRET=generate_with_openssl_rand_base64_32
 
-# Database
-DATABASE_URL=postgresql://ixoye:change_me@localhost:5432/ixoye
+# Database (all required - no defaults)
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=ichthys
+POSTGRES_USER=ichthys
+POSTGRES_PASSWORD=your_secure_password
 
 # Optional
 LOG_LEVEL=info                    # debug, info, warn, error
 NODE_ENV=development              # development, production
-PORT=3000                         # Dashboard port
+PORT=4002                         # Dashboard port
 GUILD_ID=your_test_guild_id       # For testing slash commands
 DASHBOARD_URL=https://yourdomain.com  # For /dashboard command
-DOMAIN=yourdomain.com             # Domain for Traefik routing
+DOMAIN=yourdomain.com             # Domain for reverse proxy routing
 ```
 
 ## Security Considerations
