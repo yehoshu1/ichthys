@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shared/database/client";
 import { guildConfig } from "@shared/database/schema";
+import { dashboardRbacConfig } from "@/lib/db";
 import { inArray } from "drizzle-orm";
 import { requireSession } from "@/lib/guild-auth";
 import logger from "@/lib/logger";
@@ -54,14 +55,36 @@ async function fetchUserGuilds(accessToken: string, userId: string): Promise<Gui
 
         const discordGuilds: DiscordGuild[] = await response.json();
 
-        // Filter guilds where user has manage permission
+        // Manage-Server users see the guild unconditionally.
         const manageableGuilds = discordGuilds.filter((guild) => {
             const permissions = BigInt(guild.permissions);
             return guild.owner || (permissions & BigInt(MANAGE_GUILD)) !== BigInt(0);
         });
 
+        // Members without Manage Server can still enter guilds where RBAC is
+        // enabled and rules may grant them module access. Detect candidate
+        // guilds with a single DB query (no per-guild Discord calls): the
+        // actual allow/deny decision is made by the entry gate and /me/access.
+        const memberGuildIds = discordGuilds
+            .filter((g) => !manageableGuilds.some((m) => m.id === g.id))
+            .map((g) => g.id);
+
+        let rbacGuildIds = new Set<string>();
+        if (memberGuildIds.length > 0) {
+            const rbacConfigs = await db
+                .select({ guildId: dashboardRbacConfig.guildId })
+                .from(dashboardRbacConfig)
+                .where(inArray(dashboardRbacConfig.guildId, memberGuildIds));
+            rbacGuildIds = new Set(rbacConfigs.map((c) => c.guildId));
+        }
+
+        const visibleGuilds = discordGuilds.filter(
+            (guild) =>
+                manageableGuilds.some((m) => m.id === guild.id) || rbacGuildIds.has(guild.id)
+        );
+
         // Get guild IDs to check which ones have the bot
-        const guildIds = manageableGuilds.map((g) => g.id);
+        const guildIds = visibleGuilds.map((g) => g.id);
 
         // Check database for guild configs (indicates bot is present)
         const botGuildConfigs = guildIds.length > 0
@@ -74,14 +97,16 @@ async function fetchUserGuilds(accessToken: string, userId: string): Promise<Gui
         const botGuildIds = new Set(botGuildConfigs.map((g) => g.guildId));
 
         // Transform guilds with bot presence info
-        const guilds: Guild[] = manageableGuilds.map((guild) => ({
+        const guilds: Guild[] = visibleGuilds.map((guild) => ({
             id: guild.id,
             name: guild.name,
             icon: guild.icon,
             iconUrl: guild.icon
                 ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.${guild.icon.startsWith("a_") ? "gif" : "png"}`
                 : null,
-            hasManagePermission: true,
+            hasManagePermission:
+                guild.owner ||
+                (BigInt(guild.permissions) & BigInt(MANAGE_GUILD)) !== BigInt(0),
             botPresent: botGuildIds.has(guild.id),
         }));
 

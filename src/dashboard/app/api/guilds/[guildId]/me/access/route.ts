@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, getGuildInfoForUser } from "@/lib/guild-auth";
-import { evaluateRbacBatch, isHardBypassUser } from "@/lib/rbac";
+import {
+    evaluateRbacBatch,
+    resolveTrustTier,
+} from "@/lib/rbac";
 import { RBAC_MODULE_IDS, type RbacModuleId } from "@/lib/rbac-modules";
 import logger from "@/lib/logger";
 
@@ -11,6 +14,8 @@ interface ModuleAccess {
 
 interface AccessResponse {
     isBypassUser: boolean;
+    /** True for owner / admin / manage-guild: can open the Access Control page. */
+    canManageRbac: boolean;
     modules: Record<RbacModuleId, ModuleAccess>;
 }
 
@@ -18,8 +23,11 @@ interface AccessResponse {
  * GET /api/guilds/[guildId]/me/access
  *
  * Returns the authenticated user's view/edit access for each dashboard module.
- * Hard-bypass users (owner / ADMINISTRATOR / MANAGE_GUILD) get full access to
- * everything.  All others are evaluated via the RBAC system.
+ *  - Bypass users (owner / ADMINISTRATOR) get full access to everything.
+ *  - Manage-Guild users are governed by the RBAC config: with the
+ *    `manage_guild_only` default they get full access on modules without
+ *    explicit rules; with `deny` they are evaluated like members.
+ *  - Members are evaluated purely by RBAC rules.
  *
  * Uses evaluateRbacBatch to fetch config and all rules in a single DB round-trip
  * rather than issuing separate queries for each module.
@@ -50,7 +58,9 @@ export async function GET(
         return NextResponse.json({ error: "Failed to fetch guild permissions" }, { status: 503 });
     }
 
-    const isBypassUser = isHardBypassUser(guild ?? undefined);
+    const tier = resolveTrustTier(guild ?? undefined);
+    const isBypassUser = tier === "bypass";
+    const canManageRbac = tier !== "member";
 
     let moduleResults: Record<string, ModuleAccess>;
 
@@ -82,6 +92,7 @@ export async function GET(
 
     const response: AccessResponse = {
         isBypassUser,
+        canManageRbac,
         modules: moduleResults as Record<RbacModuleId, ModuleAccess>,
     };
     return NextResponse.json(response);

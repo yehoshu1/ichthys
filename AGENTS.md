@@ -260,6 +260,15 @@ PORT=4002                         # Dashboard port
 GUILD_ID=your_test_guild_id       # For testing slash commands
 DASHBOARD_URL=https://bot.ichthys.qzz.io  # For /dashboard command
 DOMAIN=bot.ichthys.qzz.io         # Domain for Traefik routing
+
+# Security (dashboard)
+# Comma-separated allowlist of origins for CSRF same-origin checks. When set,
+# client-supplied X-Forwarded-* headers are ignored for origin validation.
+TRUSTED_ORIGINS=https://bot.ichthys.qzz.io
+# Number of trusted proxies in front of the dashboard (e.g. 1 behind Traefik
+# or a reverse proxy). 0/unset = treat the app as directly exposed and ignore
+# X-Forwarded-For for rate limiting.
+TRUST_PROXY_DEPTH=1
 ```
 
 ## Security Considerations

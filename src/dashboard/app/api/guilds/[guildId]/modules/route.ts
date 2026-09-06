@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireGuildManageAccess } from '@/lib/guild-auth';
+import { requireGuildManageAccess, requireGuildEntryAccess } from '@/lib/guild-auth';
 import logger from '@/lib/logger';
 import { MODULE_IDS, MODULE_MANIFEST_MAP, type ModuleId } from '@shared/modules/registry';
 import { getGuildModuleStates } from '@shared/modules/state';
@@ -17,7 +17,9 @@ export async function GET(
 ) {
     const { guildId } = await props.params;
 
-    const auth = await requireGuildManageAccess(guildId, req);
+    // Module enabled/disabled states are needed by the dashboard shell for
+    // every user, including RBAC-delegated members — use the entry gate.
+    const auth = await requireGuildEntryAccess(guildId, req);
     if ('response' in auth) return auth.response;
 
     try {

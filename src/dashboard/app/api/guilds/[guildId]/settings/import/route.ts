@@ -21,7 +21,9 @@ import {
     dashboardRbacConfig,
     dashboardRbacRules,
 } from "@/lib/db";
-import { requireGuildManageRolesAccess } from "@/lib/guild-auth";
+import { requireGuildManageStrictAccess } from "@/lib/guild-auth";
+import { invalidateRbacCache } from "@/lib/rbac";
+import { RBAC_MODULE_IDS } from "@/lib/rbac-modules";
 import { eq } from "drizzle-orm";
 import logger from "@/lib/logger";
 import { emitGuildNotification } from "@shared/services/notification-service";
@@ -574,10 +576,15 @@ function sanitizeRbacConfig(item: Record<string, unknown> | null | undefined): R
     };
 }
 
+const RBAC_MODULE_ID_SET = new Set<string>(RBAC_MODULE_IDS);
+
 function sanitizeRbacRules(items: Record<string, unknown>[]): Array<Record<string, unknown>> {
     const sanitized: Array<Record<string, unknown>> = [];
     for (const item of items) {
         if (typeof item.moduleId !== "string") continue;
+        // Only known RBAC module IDs are accepted. Importing arbitrary strings
+        // could create rules for non-module paths (e.g. "api-keys").
+        if (!RBAC_MODULE_ID_SET.has(item.moduleId)) continue;
         sanitized.push({
             guildId: undefined,
             moduleId: item.moduleId,
@@ -592,7 +599,12 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
     const params = await props.params;
     const { guildId } = params;
 
-    const auth = await requireGuildManageRolesAccess(guildId, req);
+    // Strict access: settings import overwrites dashboard_rbac_config and
+    // dashboard_rbac_rules, so it must NEVER be reachable through RBAC
+    // delegation — otherwise a user with edit access to the settings module
+    // could rewrite RBAC rules and escalate to full control (privilege
+    // escalation via import). RBAC config changes require Manage Server.
+    const auth = await requireGuildManageStrictAccess(guildId, req);
     if ("response" in auth) return auth.response;
 
     let body: unknown;
@@ -732,6 +744,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ guildId:
                 await tx.insert(dashboardRbacRules).values(safeRbacRules.map((rule) => ({ ...rule, guildId })));
             }
         });
+
+        // RBAC config/rules may have been replaced by this import — make the
+        // change effective immediately instead of waiting for cache expiry.
+        invalidateRbacCache(guildId);
 
         const warningEntries = Object.entries(warnings)
             .filter(([, count]) => count > 0)
