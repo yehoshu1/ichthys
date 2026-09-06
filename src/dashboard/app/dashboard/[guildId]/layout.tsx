@@ -74,6 +74,7 @@ interface ModuleAccess {
 
 interface AccessResponse {
     isBypassUser: boolean;
+    canManageRbac?: boolean;
     modules: Record<string, ModuleAccess>;
 }
 
@@ -301,8 +302,12 @@ export default function DashboardLayout({
     }, [guildId]);
 
     function isNavItemVisible(item: { id: DashboardNavId }): boolean {
-        // Access Control is exclusively for bypass users; hidden until confirmed.
+        // Access Control is for users who can manage RBAC: bypass users
+        // (owner/admin) and Manage-Guild users. Hidden until confirmed.
         if (item.id === "access") {
+            if (accessData?.canManageRbac !== undefined) {
+                return accessData.canManageRbac;
+            }
             return accessData?.isBypassUser === true;
         }
         // Bypass users and unresolved access: show everything else.

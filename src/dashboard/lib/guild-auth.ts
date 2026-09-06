@@ -6,13 +6,20 @@ import logger from "./logger";
 import { requireGuildModuleEnabledForPath } from "./module-gate";
 import { requireSameOrigin } from "./csrf";
 import { buildRateLimitKey, checkRateLimit, DEFAULT_RATE_LIMIT } from "./rate-limit";
-import { evaluateRbac, getModuleIdFromPath, type DiscordGuildInfo } from "./rbac";
+import {
+    evaluateRbac,
+    evaluateRbacBatchHasAnyAccess,
+    getModuleIdFromPath,
+    isRbacEnabled,
+    type DiscordGuildInfo,
+} from "./rbac";
+import { RBAC_MODULE_IDS } from "./rbac-modules";
 
 const MANAGE_GUILD = 0x20n;
 const MANAGE_ROLES = 0x10000000n;
 const ADMINISTRATOR = 0x8n;
 const GUILD_CACHE_TTL_MS = 5 * 60_000; // 5 minutes
-const GUILD_CACHE_STALE_WINDOW_MS = 15 * 60_000; // Serve stale data on Discord rate limits
+const GUILD_CACHE_STALE_WINDOW_MS = 2 * 60_000; // Serve stale data on Discord failures (short window: auth-critical)
 const MAX_GUILD_CACHE_ENTRIES = 2_000;
 
 interface GuildAccessCacheEntry {
@@ -208,41 +215,40 @@ async function requireGuildAccess(
     const guildPermissionsResult = await getGuildPermissions(sessionResult.userId, sessionResult.accessToken);
     if (guildPermissionsResult instanceof Map) {
         const guild = guildPermissionsResult.get(guildId);
-        logger.info("Guild permissions check", { 
-            guildId, 
-            userId: sessionResult.userId,
-            hasGuild: !!guild,
-            isOwner: guild?.owner,
-            permissions: guild?.permissions
-        });
 
-        const hasPerms = hasRequiredPermissions(guild, requiredPermissions);
-        if (!hasPerms) {
-            // Attempt RBAC delegation (unless this route skips it)
-            if (!options.skipRbac) {
-                const moduleId = getModuleIdFromPath(req.nextUrl.pathname);
-                const action = req.method === 'GET' ? 'view' : 'edit';
-                const rbacAllowed = await evaluateRbac(guildId, sessionResult.userId, moduleId, action, guild).catch((err) => {
-                    logger.error("RBAC evaluation error", { error: err instanceof Error ? err.message : String(err), guildId, userId: sessionResult.userId });
-                    return false as const;
-                });
+        if (hasRequiredPermissions(guild, requiredPermissions)) {
+            const moduleGuardResponse = await requireGuildModuleEnabledForPath(guildId, req.nextUrl.pathname);
+            if (moduleGuardResponse) {
+                return { response: moduleGuardResponse };
+            }
+            return sessionResult;
+        }
 
-                if (!rbacAllowed) {
-                    logger.warn("Permission denied (RBAC)", { guildId, userId: sessionResult.userId, moduleId, action });
-                    return jsonError(403, "Forbidden - You don't have permission to access this resource");
+        // Discord-level permission check failed. If RBAC is enabled for this
+        // guild, delegated access is decided by RBAC rules instead.
+        if (options.skipRbac) {
+            return jsonError(403, "Forbidden - You don't have permission to access this resource");
+        }
+
+        if (await isRbacEnabled(guildId)) {
+            const moduleId = getModuleIdFromPath(req.nextUrl.pathname);
+            const action = req.method === 'GET' ? 'view' : 'edit';
+            const rbacAllowed = await evaluateRbac(guildId, sessionResult.userId, moduleId, action, guild).catch((err) => {
+                logger.error("RBAC evaluation error", { error: err instanceof Error ? err.message : String(err), guildId, userId: sessionResult.userId });
+                return false as const;
+            });
+
+            if (rbacAllowed) {
+                const moduleGuardResponse = await requireGuildModuleEnabledForPath(guildId, req.nextUrl.pathname);
+                if (moduleGuardResponse) {
+                    return { response: moduleGuardResponse };
                 }
-            } else {
-                logger.error("Permission denied (strict)", { guildId, userId: sessionResult.userId });
-                return jsonError(403, "Forbidden - You don't have MANAGE_GUILD permission");
+                return sessionResult;
             }
         }
 
-        const moduleGuardResponse = await requireGuildModuleEnabledForPath(guildId, req.nextUrl.pathname);
-        if (moduleGuardResponse) {
-            return { response: moduleGuardResponse };
-        }
-
-        return sessionResult;
+        logger.warn("Permission denied", { guildId, userId: sessionResult.userId, viaRbac: false });
+        return jsonError(403, "Forbidden - You don't have permission to access this resource");
     }
 
     return guildPermissionsResult;
@@ -272,6 +278,58 @@ export async function requireGuildManageRolesAccess(
     req: NextRequest
 ): Promise<GuildAuthSuccess | GuildAuthFailure> {
     return requireGuildAccess(guildId, req, [MANAGE_GUILD, MANAGE_ROLES]);
+}
+
+/**
+ * Dashboard entry gate: allows the request when the user either
+ *  (a) has MANAGE_GUILD / owner / ADMINISTRATOR at the Discord level, or
+ *  (b) RBAC is enabled for the guild and at least one module grants them view
+ *      or edit access.
+ *
+ * Used by the guild-info route so members with RBAC roles can enter the
+ * dashboard shell (previously they were blocked with 403 and never saw their
+ * assigned modules).
+ */
+export async function requireGuildEntryAccess(
+    guildId: string,
+    req: NextRequest
+): Promise<GuildAuthSuccess | GuildAuthFailure> {
+    const sessionResult = await requireSession(req);
+    if (isFailure(sessionResult)) {
+        return sessionResult;
+    }
+
+    const rateLimit = await checkRateLimit(buildRateLimitKey(req, `session:${sessionResult.userId}`), DEFAULT_RATE_LIMIT);
+    if (!rateLimit.allowed) {
+        return jsonError(429, "Too many requests");
+    }
+
+    const guildPermissionsResult = await getGuildPermissions(sessionResult.userId, sessionResult.accessToken);
+    if (!(guildPermissionsResult instanceof Map)) {
+        return guildPermissionsResult;
+    }
+
+    const guild = guildPermissionsResult.get(guildId);
+    if (hasRequiredPermissions(guild, [MANAGE_GUILD])) {
+        return sessionResult;
+    }
+
+    const hasRbacAccess = await evaluateRbacBatchHasAnyAccess(
+        guildId,
+        sessionResult.userId,
+        RBAC_MODULE_IDS,
+        guild
+    ).catch((err) => {
+        logger.error("RBAC entry evaluation error", { error: err instanceof Error ? err.message : String(err), guildId, userId: sessionResult.userId });
+        return false as const;
+    });
+
+    if (!hasRbacAccess) {
+        logger.warn("Entry denied", { guildId, userId: sessionResult.userId });
+        return jsonError(403, "Forbidden - You don't have permission to access this server");
+    }
+
+    return sessionResult;
 }
 
 /**

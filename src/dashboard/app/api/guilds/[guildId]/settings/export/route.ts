@@ -21,7 +21,7 @@ import {
     dashboardRbacRules,
 } from "@/lib/db";
 import { eq } from "drizzle-orm";
-import { requireGuildManageAccess } from "@/lib/guild-auth";
+import { requireGuildManageStrictAccess } from "@/lib/guild-auth";
 import logger from "@/lib/logger";
 import { emitGuildNotification } from "@shared/services/notification-service";
 
@@ -29,7 +29,10 @@ export async function GET(req: NextRequest, props: { params: Promise<{ guildId: 
     const params = await props.params;
     const { guildId } = params;
 
-    const auth = await requireGuildManageAccess(guildId, req);
+    // Strict access: the export contains the full RBAC configuration (role IDs
+    // that could be used to craft a targeted escalation) and member PII such
+    // as birthday entries. It must never be delegatable via RBAC.
+    const auth = await requireGuildManageStrictAccess(guildId, req);
     if ("response" in auth) return auth.response;
 
     try {

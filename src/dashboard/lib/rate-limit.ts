@@ -204,9 +204,24 @@ async function checkRateLimitRedis(
 }
 
 export function getClientIp(request: NextRequest): string {
-    const forwarded = request.headers.get('x-forwarded-for');
-    if (forwarded) {
-        return forwarded.split(',')[0]?.trim() || 'unknown';
+    // The number of trusted proxies in front of the app. Only entries to the
+    // LEFT of the untrusted client-appended values are trustworthy.
+    //  TRUST_PROXY_DEPTH unset/0  -> direct exposure, ignore XFF entirely
+    //  TRUST_PROXY_DEPTH=1        -> "client, proxy1" -> take proxy1 (last)
+    //  TRUST_PROXY_DEPTH=2        -> "client, proxy1, proxy2" -> proxy2
+    const depth = Number.parseInt(process.env.TRUST_PROXY_DEPTH ?? "0", 10);
+
+    if (Number.isFinite(depth) && depth > 0) {
+        const forwarded = request.headers.get('x-forwarded-for');
+        if (forwarded) {
+            const parts = forwarded.split(',').map((p) => p.trim()).filter(Boolean);
+            // Take the entry depth hops from the right (the innermost trusted proxy).
+            const trustedIndex = parts.length - 1 - (depth - 1);
+            if (trustedIndex >= 0) {
+                return parts[trustedIndex] || 'unknown';
+            }
+            // Fewer entries than trusted proxies: fall through to safer headers below.
+        }
     }
 
     const realIp = request.headers.get('x-real-ip');
