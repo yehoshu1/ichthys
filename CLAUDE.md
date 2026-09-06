@@ -2,17 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **All development guidelines, branching rules, and conventions are in [AGENTS.md](./AGENTS.md). Read it before making any changes.**
+
 ## Project Overview
 
-ΙΧΘΥΣ (Ixoye) is a full-stack Discord community management bot with a web dashboard. It's a TypeScript monorepo with two main processes: a Discord.js v14 bot and a Next.js 16 dashboard.
+Ichthys is a full-stack Discord community management bot with a web dashboard. It's a TypeScript monorepo with two main processes: a Discord.js v14 bot and a Next.js 16 dashboard.
 
 ## Development Guidelines
 
-These rules apply to all AI-assisted work in this repository:
-
-- **UI Components**: Always prioritize shadcn/ui components for all dashboard UI. Use the existing shadcn components in `src/dashboard/components/ui/` before writing custom elements. Only use raw HTML/Tailwind primitives when no shadcn component fits.
-- **Database safety**: Never make breaking schema changes. All changes to `src/shared/database/schema.ts` must be non-destructive (new columns require a default or `nullable()`, no column/table drops, no destructive renames). Run `npm run db:generate` and review the migration before applying. Data loss of any kind is unacceptable.
-- **Scope**: Do not go beyond what is explicitly requested. Avoid refactoring unrelated code, adding unrequested features, or improving adjacent areas.
+See [AGENTS.md](./AGENTS.md) for all guidelines including branching, code style, naming conventions, and workflows.
 
 ## Common Commands
 

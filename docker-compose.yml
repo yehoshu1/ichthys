@@ -18,6 +18,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
   ixoye:
     build: .
     container_name: ixoye-app
@@ -47,22 +48,61 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    labels:
-      - traefik.docker.network=dokploy-network
-      - traefik.http.routers.ixoye-web.rule=Host(`${DOMAIN:-bot.example.com}`)
-      - traefik.http.routers.ixoye-web.entrypoints=web
-      - traefik.http.services.ixoye-web.loadbalancer.server.port=4002
-      - traefik.http.routers.ixoye-web.service=ixoye-web
-      - traefik.http.routers.ixoye-web.middlewares=redirect-to-https@file
-      - traefik.http.routers.ixoye-websecure.rule=Host(`${DOMAIN:-bot.example.com}`)
-      - traefik.http.routers.ixoye-websecure.entrypoints=websecure
-      - traefik.http.services.ixoye-websecure.loadbalancer.server.port=4002
-      - traefik.http.routers.ixoye-websecure.service=ixoye-websecure
-      - traefik.http.routers.ixoye-websecure.tls.certresolver=letsencrypt
-      - traefik.enable=true
-    networks:
-      - dokploy-network
-      - default
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: ixoye-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - ixoye
+
+  # =============================================================================
+  # Alternative: Traefik (uncomment below and comment out the Caddy service above)
+  # =============================================================================
+  # traefik:
+  #   image: traefik:v3.0
+  #   container_name: ixoye-traefik
+  #   restart: always
+  #   command:
+  #     - --providers.docker=true
+  #     - --providers.docker.exposedbydefault=false
+  #     - --entrypoints.web.address=:80
+  #     - --entrypoints.websecure.address=:443
+  #     - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+  #     - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+  #     - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-you@example.com}
+  #     - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #     - traefik_certs:/letsencrypt
+  #   networks:
+  #     - ixoye-net
+  #
+  # # Then add these labels to the ixoye service:
+  # #   labels:
+  # #     - traefik.enable=true
+  # #     - traefik.http.routers.ixoye-web.rule=Host(`${DOMAIN:-example.com}`)
+  # #     - traefik.http.routers.ixoye-web.entrypoints=web
+  # #     - traefik.http.routers.ixoye-web.middlewares=redirect-to-https
+  # #     - traefik.http.routers.ixoye-websecure.rule=Host(`${DOMAIN:-example.com}`)
+  # #     - traefik.http.routers.ixoye-websecure.entrypoints=websecure
+  # #     - traefik.http.routers.ixoye-websecure.tls.certresolver=letsencrypt
+  # #     - traefik.http.services.ixoye.loadbalancer.server.port=4002
+  # #     - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+  # #   networks:
+  # #     - ixoye-net
+
   ixoye-pg-backup:
     image: postgres:17
     container_name: ixoye-pg-backup
@@ -105,8 +145,9 @@ services:
 
           sleep "$${BACKUP_INTERVAL_SECONDS:-86400}"
         done
+
 volumes:
   ixoye_pg_data: null
-networks:
-  dokploy-network:
-    external: true
+  caddy_data: null
+  caddy_config: null
+  # traefik_certs: null
