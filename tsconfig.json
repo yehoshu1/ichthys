@@ -1,0 +1,73 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "esnext",
+        "lib": [
+            "dom",
+            "dom.iterable",
+            "ES2022"
+        ],
+        "outDir": "./dist",
+        "strict": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true,
+        "strictBindCallApply": true,
+        "strictPropertyInitialization": true,
+        "noImplicitThis": true,
+        "alwaysStrict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "moduleResolution": "bundler",
+        "jsx": "react-jsx",
+        "incremental": true,
+        "plugins": [
+            {
+                "name": "next"
+            }
+        ],
+        "baseUrl": ".",
+        "paths": {
+            "@/*": [
+                "./src/*"
+            ],
+            "@/lib/*": [
+                "./src/dashboard/lib/*"
+            ],
+            "@/components/*": [
+                "./src/dashboard/components/*"
+            ],
+            "@shared/*": [
+                "./src/shared/*"
+            ],
+            "@/.source": [
+                "./src/dashboard/.source/server.ts"
+            ],
+            "@/mdx-components": [
+                "./src/dashboard/mdx-components.tsx"
+            ]
+        },
+        "allowJs": true,
+        "noEmit": true
+    },
+    "include": [
+        "next-env.d.ts",
+        "src/**/*",
+        "**/*.ts",
+        "**/*.tsx",
+        ".next/types/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "src/**/__tests__/**/*",
+        "vitest.config.ts"
+    ]
+}

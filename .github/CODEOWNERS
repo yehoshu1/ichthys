@@ -1,0 +1,27 @@
+# Default code owners for the repository
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners (fallback)
+* @yehoshu1
+
+# Bot code
+/src/bot/ @yehoshu1
+
+# Dashboard code
+/src/dashboard/ @yehoshu1
+
+# Shared code
+/src/shared/ @yehoshu1
+
+# Database schema and migrations
+/src/shared/database/ @yehoshu1
+/drizzle/ @yehoshu1
+
+# Infrastructure and deployment
+/Dockerfile @yehoshu1
+/docker-compose*.yml @yehoshu1
+/ecosystem.config.js @yehoshu1
+/scripts/ @yehoshu1
+
+# CI/CD
+/.github/ @yehoshu1

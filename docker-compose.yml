@@ -1,0 +1,112 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: ixoye-postgres
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ixoye}
+      POSTGRES_USER: ${POSTGRES_USER:-ixoye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
+    volumes:
+      - ixoye_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-ixoye} -d ${POSTGRES_DB:-ixoye}
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  ixoye:
+    build: .
+    container_name: ixoye-app
+    restart: always
+    command:
+      - pm2-runtime
+      - start
+      - ecosystem.config.js
+    ports:
+      - 4002:4002
+    volumes:
+      - ./backups:/app/backups
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DASHBOARD_URL: ${DASHBOARD_URL:-http://localhost:4002}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      PG_SSL: "false"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-ixoye}
+      POSTGRES_USER: ${POSTGRES_USER:-ixoye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ixoye}:${POSTGRES_PASSWORD:-ixoye}@postgres:5432/${POSTGRES_DB:-ixoye}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.ixoye-web.rule=Host(`${DOMAIN:-bot.example.com}`)
+      - traefik.http.routers.ixoye-web.entrypoints=web
+      - traefik.http.services.ixoye-web.loadbalancer.server.port=4002
+      - traefik.http.routers.ixoye-web.service=ixoye-web
+      - traefik.http.routers.ixoye-web.middlewares=redirect-to-https@file
+      - traefik.http.routers.ixoye-websecure.rule=Host(`${DOMAIN:-bot.example.com}`)
+      - traefik.http.routers.ixoye-websecure.entrypoints=websecure
+      - traefik.http.services.ixoye-websecure.loadbalancer.server.port=4002
+      - traefik.http.routers.ixoye-websecure.service=ixoye-websecure
+      - traefik.http.routers.ixoye-websecure.tls.certresolver=letsencrypt
+      - traefik.enable=true
+    networks:
+      - dokploy-network
+      - default
+  ixoye-pg-backup:
+    image: postgres:17
+    container_name: ixoye-pg-backup
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-ixoye}
+      POSTGRES_USER: ${POSTGRES_USER:-ixoye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-10}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-ixoye}
+    volumes:
+      - ./backups:/backups
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        mkdir -p /backups
+        while true; do
+          TS=$$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+          DUMP_PATH="/backups/ixoye-$${TS}.dump"
+          pg_dump \
+            --host="$${POSTGRES_HOST}" \
+            --port="$${POSTGRES_PORT}" \
+            --username="$${POSTGRES_USER}" \
+            --format=custom \
+            --file="$${DUMP_PATH}" \
+            "$${POSTGRES_DB}"
+
+          KEEP="$${BACKUP_RETENTION_COUNT:-10}"
+          ls -1t /backups/*.dump 2>/dev/null | awk "NR>$${KEEP}" | xargs -r rm -f
+
+          sleep "$${BACKUP_INTERVAL_SECONDS:-86400}"
+        done
+volumes:
+  ixoye_pg_data: null
+networks:
+  dokploy-network:
+    external: true

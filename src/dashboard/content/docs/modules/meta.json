@@ -1,0 +1,23 @@
+{
+    "title": "Feature Guides",
+    "pages": [
+        "index",
+        "welcome",
+        "verification",
+        "leveling",
+        "boosts",
+        "birthdays",
+        "events",
+        "polls",
+        "reaction-roles",
+        "role-actions",
+        "moderation",
+        "aliases",
+        "analytics",
+        "logs",
+        "notifications",
+        "watchlist",
+        "webhooks",
+        "settings-and-backups"
+    ]
+}

@@ -1,0 +1,92 @@
+@import "tailwindcss";
+@config "../../../tailwind.config.ts";
+
+@layer base {
+  :root {
+
+    --background: 30 40% 97%;
+    --foreground: 222 25% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 25% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 25% 12%;
+
+    --primary: 190 85% 36%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 18% 92%;
+    --secondary-foreground: 222 25% 14%;
+
+    --muted: 220 20% 94%;
+    --muted-foreground: 220 12% 42%;
+
+    --accent: 44 90% 55%;
+    --accent-foreground: 20 20% 12%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 16% 88%;
+    --input: 220 16% 88%;
+    --ring: 190 85% 36%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222 30% 6%;
+    --foreground: 210 40% 96%;
+
+    --card: 222 28% 10%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 222 28% 10%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 190 85% 45%;
+    --primary-foreground: 222 40% 8%;
+
+    --secondary: 225 18% 16%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 225 18% 16%;
+    --muted-foreground: 220 12% 62%;
+
+    --accent: 44 90% 60%;
+    --accent-foreground: 24 20% 10%;
+
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 225 18% 20%;
+    --input: 225 18% 20%;
+    --ring: 190 85% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    background-image:
+      radial-gradient(1200px 500px at 20% -10%, hsl(var(--primary) / 0.12), transparent 60%),
+      radial-gradient(900px 400px at 90% 0%, hsl(var(--accent) / 0.16), transparent 55%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+}

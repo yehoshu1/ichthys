@@ -1,0 +1,122 @@
+name: ixoye-dev
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ixoye_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-ixoye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
+    volumes:
+      - ixoye_pg_data_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ixoye} -d ${POSTGRES_DB:-ixoye_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ixoye_dev_net
+
+  ixoye-dev:
+    build:
+      context: .
+      target: dev
+    restart: no
+    ports:
+      - "${PORT:-4002}:${PORT:-4002}"
+    volumes:
+      - ./logs:/app/logs
+      - ./src:/app/src
+      - ./drizzle:/app/drizzle
+      - ./drizzle.config.ts:/app/drizzle.config.ts
+      - ./scripts:/app/scripts
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./tsconfig.bot.json:/app/tsconfig.bot.json
+      - ./tailwind.config.ts:/app/tailwind.config.ts
+      - ./postcss.config.js:/app/postcss.config.js
+      - ixoye_node_modules:/app/node_modules
+      - ixoye_backups:/app/backups
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: 1
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-ixoye_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-ixoye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ixoye}:${POSTGRES_PASSWORD:-ixoye}@postgres:5432/${POSTGRES_DB:-ixoye_dev}
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ixoye_dev_net
+    develop:
+      watch:
+        - action: rebuild
+          path: ./Dockerfile
+        - action: rebuild
+          path: ./src/dashboard/next.config.mjs
+
+  ixoye-pg-backup-dev:
+    image: postgres:17
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-ixoye_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-ixoye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-10}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-ixoye}
+    volumes:
+      - ixoye_backups:/backups
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        mkdir -p /backups
+        while true; do
+          TS=$$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+          DUMP_PATH="/backups/ixoye-dev-$${TS}.dump"
+          pg_dump \
+            --host="$${POSTGRES_HOST}" \
+            --port="$${POSTGRES_PORT}" \
+            --username="$${POSTGRES_USER}" \
+            --format=custom \
+            --file="$${DUMP_PATH}" \
+            "$${POSTGRES_DB}"
+
+          KEEP="$${BACKUP_RETENTION_COUNT:-10}"
+          ls -1t /backups/*.dump 2>/dev/null | awk "NR>$${KEEP}" | xargs -r rm -f
+
+          sleep "$${BACKUP_INTERVAL_SECONDS:-86400}"
+        done
+    networks:
+      - ixoye_dev_net
+
+volumes:
+  ixoye_node_modules:
+  ixoye_backups:
+  ixoye_pg_data_dev:
+
+networks:
+  ixoye_dev_net:
+    name: ixoye_dev_net
