@@ -1,22 +1,4 @@
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: ixoye-redis
-    restart: always
-    command:
-      - redis-server
-      - --appendonly
-      - yes
-    volumes:
-      - ixoye_redis_data:/data
-    healthcheck:
-      test:
-        - CMD
-        - redis-cli
-        - ping
-      interval: 10s
-      timeout: 5s
-      retries: 10
   postgres:
     image: postgres:17
     container_name: ixoye-postgres
@@ -55,7 +37,6 @@ services:
       NODE_ENV: production
       DASHBOARD_URL: ${DASHBOARD_URL:-http://localhost:4002}
       METRICS_TOKEN: ${METRICS_TOKEN:-}
-      REDIS_URL: ${REDIS_URL:-}
       PG_SSL: "false"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
@@ -64,18 +45,16 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
       DATABASE_URL: postgresql://${POSTGRES_USER:-ixoye}:${POSTGRES_PASSWORD:-ixoye}@postgres:5432/${POSTGRES_DB:-ixoye}
     depends_on:
-      redis:
-        condition: service_healthy
       postgres:
         condition: service_healthy
     labels:
       - traefik.docker.network=dokploy-network
-      - traefik.http.routers.ixoye-web.rule=Host(`${DOMAIN:-bot.example.com}`)
+      - traefik.http.routers.ixoye-web.rule=Host(`${DOMAIN:-bot.ichthys.qzz.io}`)
       - traefik.http.routers.ixoye-web.entrypoints=web
       - traefik.http.services.ixoye-web.loadbalancer.server.port=4002
       - traefik.http.routers.ixoye-web.service=ixoye-web
       - traefik.http.routers.ixoye-web.middlewares=redirect-to-https@file
-      - traefik.http.routers.ixoye-websecure.rule=Host(`${DOMAIN:-bot.example.com}`)
+      - traefik.http.routers.ixoye-websecure.rule=Host(`${DOMAIN:-bot.ichthys.qzz.io}`)
       - traefik.http.routers.ixoye-websecure.entrypoints=websecure
       - traefik.http.services.ixoye-websecure.loadbalancer.server.port=4002
       - traefik.http.routers.ixoye-websecure.service=ixoye-websecure
@@ -128,7 +107,6 @@ services:
         done
 volumes:
   ixoye_pg_data: null
-  ixoye_redis_data: null
 networks:
   dokploy-network:
     external: true
