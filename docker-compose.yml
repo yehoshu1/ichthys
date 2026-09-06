@@ -39,7 +39,7 @@ services:
       DASHBOARD_URL: ${DASHBOARD_URL:-http://localhost:4002}
       METRICS_TOKEN: ${METRICS_TOKEN:-}
       TRUST_PROXY_DEPTH: "1"
-      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-https://${DOMAIN:-bot.ichthys.qzz.io}}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-https://${DOMAIN:-yourdomain.com}}
       PG_SSL: "false"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
