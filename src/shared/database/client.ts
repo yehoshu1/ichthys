@@ -1,4 +1,4 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
+import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
 // eslint-disable-next-line no-restricted-imports
@@ -27,8 +27,6 @@ function buildDatabaseUrl(): string {
     return `postgresql://${encodedUser}:${encodedPassword}@${host}:${port}/${db}`;
 }
 
-const databaseUrl = buildDatabaseUrl();
-
 function getNumericEnv(name: string, fallback: number): number {
     const raw = process.env[name];
     if (!raw) return fallback;
@@ -53,40 +51,69 @@ function resolveSslConfig(): false | { rejectUnauthorized: boolean } {
     return false;
 }
 
-export const pool = new Pool({
-    connectionString: databaseUrl,
-    max: getNumericEnv('PG_POOL_MAX', 8),
-    idleTimeoutMillis: getNumericEnv('PG_IDLE_TIMEOUT_MS', 30_000),
-    connectionTimeoutMillis: getNumericEnv('PG_CONNECT_TIMEOUT_MS', 10_000),
-    query_timeout: getNumericEnv('PG_QUERY_TIMEOUT_MS', 30_000),
-    statement_timeout: getNumericEnv('PG_STATEMENT_TIMEOUT_MS', 30_000),
-    ssl: resolveSslConfig(),
-});
+// Lazy initialization — pool and db are created on first access, not at import time.
+// This allows the module to be imported during Next.js build without a database.
+let _pool: Pool | null = null;
+let _db: NodePgDatabase<typeof schema> | null = null;
 
-pool.on('error', (error) => {
-    consoleLogger.error('Unexpected PostgreSQL pool error:', error);
-});
+function getPool(): Pool {
+    if (!_pool) {
+        const databaseUrl = buildDatabaseUrl();
+        _pool = new Pool({
+            connectionString: databaseUrl,
+            max: getNumericEnv('PG_POOL_MAX', 8),
+            idleTimeoutMillis: getNumericEnv('PG_IDLE_TIMEOUT_MS', 30_000),
+            connectionTimeoutMillis: getNumericEnv('PG_CONNECT_TIMEOUT_MS', 10_000),
+            query_timeout: getNumericEnv('PG_QUERY_TIMEOUT_MS', 30_000),
+            statement_timeout: getNumericEnv('PG_STATEMENT_TIMEOUT_MS', 30_000),
+            ssl: resolveSslConfig(),
+        });
 
-pool.on('connect', (client) => {
-    client.on('error', (err) => {
-        consoleLogger.error('PostgreSQL client error:', err);
-    });
-});
+        _pool.on('error', (error) => {
+            consoleLogger.error('Unexpected PostgreSQL pool error:', error);
+        });
 
-pool.on('acquire', () => {
-    if (process.env.NODE_ENV === 'development') {
-        const metrics = {
-            total: pool.totalCount,
-            idle: pool.idleCount,
-            waiting: pool.waitingCount
-        };
-        if (metrics.waiting > 0) {
-            consoleLogger.warn('PostgreSQL pool contention:', metrics);
-        }
+        _pool.on('connect', (client) => {
+            client.on('error', (err) => {
+                consoleLogger.error('PostgreSQL client error:', err);
+            });
+        });
+
+        _pool.on('acquire', () => {
+            if (process.env.NODE_ENV === 'development') {
+                const metrics = {
+                    total: _pool!.totalCount,
+                    idle: _pool!.idleCount,
+                    waiting: _pool!.waitingCount
+                };
+                if (metrics.waiting > 0) {
+                    consoleLogger.warn('PostgreSQL pool contention:', metrics);
+                }
+            }
+        });
     }
+    return _pool;
+}
+
+function getDb(): NodePgDatabase<typeof schema> {
+    if (!_db) {
+        _db = drizzle(getPool(), { schema });
+    }
+    return _db;
+}
+
+// Proxy that delegates to the lazy getters on access
+export const pool: Pool = new Proxy({} as Pool, {
+    get(_target, prop) {
+        return (getPool() as unknown as Record<string | symbol, unknown>)[prop];
+    },
 });
 
-export const db = drizzle(pool, { schema });
+export const db: NodePgDatabase<typeof schema> = new Proxy({} as NodePgDatabase<typeof schema>, {
+    get(_target, prop) {
+        return (getDb() as unknown as Record<string | symbol, unknown>)[prop];
+    },
+});
 
 let shutdownHookRegistered = false;
 
@@ -95,9 +122,11 @@ function registerShutdownHook(): void {
     shutdownHookRegistered = true;
 
     const shutdown = async () => {
-        await pool.end().catch((error) => {
-            consoleLogger.error('Error closing PostgreSQL pool:', error);
-        });
+        if (_pool) {
+            await _pool.end().catch((error) => {
+                consoleLogger.error('Error closing PostgreSQL pool:', error);
+            });
+        }
     };
 
     process.once('SIGINT', () => {
@@ -119,7 +148,7 @@ export interface PoolMetrics {
 
 export async function checkPoolHealth(): Promise<{ healthy: boolean; metrics: PoolMetrics }> {
     try {
-        const client = await pool.connect();
+        const client = await getPool().connect();
         await client.query('SELECT 1');
         client.release();
 
@@ -137,10 +166,11 @@ export async function checkPoolHealth(): Promise<{ healthy: boolean; metrics: Po
 }
 
 export function getPoolMetrics(): PoolMetrics {
+    const p = getPool();
     return {
-        total: pool.totalCount,
-        idle: pool.idleCount,
-        waiting: pool.waitingCount
+        total: p.totalCount,
+        idle: p.idleCount,
+        waiting: p.waitingCount
     };
 }
 
