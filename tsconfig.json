@@ -68,6 +68,7 @@
         "**/*.test.ts",
         "**/*.test.tsx",
         "src/**/__tests__/**/*",
-        "vitest.config.ts"
+        "vitest.config.ts",
+        "scripts/archive/**/*"
     ]
 }
