@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireGuildManageAccess } from "@/lib/guild-auth";
+import { requireGuildEntryAccess } from "@/lib/guild-auth";
 import logger from "../../../../lib/logger";
 import { discordCache, dedupeRequest } from "@/lib/discord-cache";
 import { emitGuildNotification } from "@shared/services/notification-service";
@@ -109,10 +109,13 @@ async function fetchGuildData(guildId: string, auth: { accessToken: string }): P
 export async function GET(req: NextRequest, props: { params: Promise<{ guildId: string }> }) {
     const params = await props.params;
     const guildId = params.guildId;
-    
+
     logger.info(`Fetching guild info for ${guildId}`);
-    
-    const auth = await requireGuildManageAccess(guildId, req);
+
+    // Entry gate: Manage-Guild users pass at the Discord level; members pass
+    // when RBAC grants them access to at least one module. This is what lets
+    // role-based (non-Manage-Server) users enter the dashboard at all.
+    const auth = await requireGuildEntryAccess(guildId, req);
     if ("response" in auth) {
         return auth.response;
     }
