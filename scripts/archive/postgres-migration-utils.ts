@@ -94,7 +94,7 @@ const BOOLEAN_COLUMNS = new Set([
 export type AnyRow = Record<string, unknown>;
 
 export function resolveSqlitePath(): string {
-    const source = process.env.SQLITE_DATABASE_URL ?? process.env.SQLITE_PATH ?? './data/ixoye.db';
+    const source = process.env.SQLITE_DATABASE_URL ?? process.env.SQLITE_PATH ?? './data/ichthys.db';
     return source.startsWith('file:') ? source.replace('file:', '') : source;
 }
 

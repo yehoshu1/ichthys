@@ -1321,7 +1321,7 @@ export const setupSections = [
             "DISCORD_CLIENT_SECRET",
             "NEXTAUTH_SECRET",
             "NEXTAUTH_URL (local: http://localhost:4002)",
-            "DATABASE_URL (default: postgresql://ixoye:change_me@localhost:5432/ixoye)",
+            "DATABASE_URL (default: postgresql://ichthys:change_me@localhost:5432/ichthys)",
         ],
     },
     {
@@ -1337,7 +1337,7 @@ export const setupSections = [
         title: "Docker Development",
         commands: [
             "docker compose -f docker-compose.dev.yml up -d --build",
-            "docker compose -f docker-compose.dev.yml logs -f ixoye-dev",
+            "docker compose -f docker-compose.dev.yml logs -f ichthys-dev",
             "docker compose -f docker-compose.dev.yml down",
         ],
         bullets: [

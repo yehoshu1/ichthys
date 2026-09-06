@@ -115,7 +115,7 @@ Every change, no matter how small, MUST follow this workflow:
 ## Project Structure
 
 ```
-ixoye/
+ichthys/
 ├── src/
 │   ├── bot/                    # Discord bot code
 │   │   ├── commands/           # Slash commands
@@ -249,8 +249,8 @@ NEXTAUTH_SECRET=generate_with_openssl_rand_base64_32
 DATABASE_URL=postgresql://user:password@host:5432/dbname
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
-POSTGRES_DB=ixoye
-POSTGRES_USER=ixoye
+POSTGRES_DB=ichthys
+POSTGRES_USER=ichthys
 POSTGRES_PASSWORD=your_secure_password
 
 # Optional

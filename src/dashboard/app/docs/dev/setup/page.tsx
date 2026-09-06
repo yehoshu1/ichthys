@@ -31,7 +31,7 @@ const envRows = [
     {
         key: "DATABASE_URL",
         required: "Yes",
-        description: "PostgreSQL DSN (for example: postgresql://ixoye:change_me@localhost:5432/ixoye).",
+        description: "PostgreSQL DSN (for example: postgresql://ichthys:change_me@localhost:5432/ichthys).",
     },
     {
         key: "GUILD_ID",
@@ -129,7 +129,7 @@ export default function DocsDevSetupPage() {
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                     <p>If <code>npm ci</code> fails with lock mismatch, regenerate lock with the project npm version and rerun.</p>
-                    <p>If dashboard package resolution fails in Docker dev, rebuild the dev image and restart <code>ixoye-dev</code>.</p>
+                    <p>If dashboard package resolution fails in Docker dev, rebuild the dev image and restart <code>ichthys-dev</code>.</p>
                     <p>If auth fails, verify both <code>NEXTAUTH_URL</code> and Discord OAuth redirect URI match exactly.</p>
                     <p>If slash command updates do not appear, run <code>npm run deploy</code> with correct app credentials.</p>
                 </CardContent>

@@ -9,7 +9,7 @@ interface TooltipContextType {
 
 const TooltipContext = createContext<TooltipContextType | undefined>(undefined);
 
-const STORAGE_KEY = "ixoye-tooltips-enabled";
+const STORAGE_KEY = "ichthys-tooltips-enabled";
 
 export function TooltipProvider({ children }: { children: React.ReactNode }) {
     const [tooltipsEnabled, setTooltipsEnabled] = useState<boolean>(true);

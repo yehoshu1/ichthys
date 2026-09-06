@@ -49,7 +49,7 @@ function createBackup(): { dbBackup: string; schemaBackup: string } {
     ensureDir(BACKUP_DIR);
 
     const timestamp = getTimestamp();
-    const dbBackupPath = join(BACKUP_DIR, `ixoye-${timestamp}.dump`);
+    const dbBackupPath = join(BACKUP_DIR, `ichthys-${timestamp}.dump`);
     const schemaBackupPath = join(BACKUP_DIR, `schema-${timestamp}.sql`);
 
     execSync(`pg_dump --format=custom --file="${dbBackupPath}" "${DATABASE_URL}"`, {

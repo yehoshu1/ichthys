@@ -8,7 +8,9 @@
  * satisfies `tsc --noEmit` in CI where the build hasn't run yet.
  */
 declare module "@/.source" {
+    import type { StaticSource } from "fumadocs-core/source";
+
     export const docs: {
-        toFumadocsSource(): Record<string, unknown>;
+        toFumadocsSource(): StaticSource;
     };
 }

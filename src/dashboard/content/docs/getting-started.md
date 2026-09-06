@@ -86,10 +86,10 @@ openssl rand -base64 32
 NEXTAUTH_URL=http://localhost:4002
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
-POSTGRES_DB=ixoye
-POSTGRES_USER=ixoye
+POSTGRES_DB=ichthys
+POSTGRES_USER=ichthys
 POSTGRES_PASSWORD=change_me
-DATABASE_URL=postgresql://ixoye:change_me@localhost:5432/ixoye
+DATABASE_URL=postgresql://ichthys:change_me@localhost:5432/ichthys
 NODE_ENV=development
 LOG_LEVEL=info
 WEBHOOK_SECRET_ENCRYPTION_KEY=replace_with_random_16plus_chars
@@ -188,7 +188,7 @@ docker compose -f docker-compose.dev.yml up -d --build
 Tail logs:
 
 ```bash
-docker compose -f docker-compose.dev.yml logs -f ixoye-dev
+docker compose -f docker-compose.dev.yml logs -f ichthys-dev
 ```
 
 Stop:

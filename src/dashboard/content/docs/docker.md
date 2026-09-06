@@ -63,7 +63,7 @@ To deploy on Coolify:
 
 ## Database Backups in Docker
 
-Our Docker stack includes a dedicated `ixoye-pg-backup` container that automatically backs up your PostgreSQL database daily. 
+Our Docker stack includes a dedicated `ichthys-pg-backup` container that automatically backs up your PostgreSQL database daily. 
 
 If you need to manually trigger a backup or restore, use the CLI:
 ```bash

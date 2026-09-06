@@ -28,7 +28,7 @@ This guide explains how to safely update the bot and dashboard to new versions.
 
 ```bash
 # Docker
-docker compose exec ixoye npm run db:backup
+docker compose exec ichthys npm run db:backup
 
 # Manual
 npm run db:backup
@@ -69,7 +69,7 @@ git pull
 docker compose up -d --build
 
 # 3. View logs to verify startup
-docker compose logs -f ixoye
+docker compose logs -f ichthys
 ```
 
 ### Manual Update
@@ -122,7 +122,7 @@ npm run db:generate
 npm run db:migrate
 
 # Or for Docker
-docker compose exec ixoye npm run db:migrate
+docker compose exec ichthys npm run db:migrate
 ```
 
 ### Migration Safety
@@ -169,10 +169,10 @@ docker compose up -d --build
 npm run db:backup:list
 
 # Restore specific backup
-npm run db:restore ./backups/ixoye-2026-01-15T12-00-00Z.dump
+npm run db:restore ./backups/ichthys-2026-01-15T12-00-00Z.dump
 
 # Restart application
-docker compose restart ixoye
+docker compose restart ichthys
 ```
 
 ### Manual Rollback
@@ -239,7 +239,7 @@ pm2 status
 ### 2. Check Logs for Errors
 ```bash
 # Docker
-docker compose logs --tail 50 ixoye
+docker compose logs --tail 50 ichthys
 
 # PM2
 pm2 logs --lines 50

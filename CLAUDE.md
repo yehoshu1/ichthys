@@ -93,7 +93,7 @@ Features are organized as modules (leveling, verification, boosts, birthdays, ev
 - **Two tsconfigs**: `tsconfig.json` for the dashboard, `tsconfig.bot.json` for the bot
 - **Path aliases**: `@` → dashboard src, `@shared` → `src/shared`, `@bot` → `src/bot`
 - **Drizzle config**: `drizzle.config.ts` — schema at `src/shared/database/schema.ts`, migrations in `drizzle/`
-- **PM2**: `ecosystem.config.js` — two processes: `ixoye-bot` (700MB limit) and `ixoye-dashboard` (900MB limit)
+- **PM2**: `ecosystem.config.js` — two processes: `ichthys-bot` (700MB limit) and `ichthys-dashboard` (900MB limit)
 - **Dashboard port config**: `package.json` dashboard scripts (`PORT` env, default `4002`)
 
 ## Environment Variables

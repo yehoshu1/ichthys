@@ -63,19 +63,19 @@ docker compose up -d
 ### 3. Initialize the Database
 
 ```bash
-docker compose exec ixoye npm run db:push
+docker compose exec ichthys npm run db:push
 ```
 
 For production, use migrations instead:
 
 ```bash
-docker compose exec ixoye npm run db:migrate
+docker compose exec ichthys npm run db:migrate
 ```
 
 ### 4. Deploy Discord Commands
 
 ```bash
-docker compose exec ixoye npm run deploy
+docker compose exec ichthys npm run deploy
 ```
 
 ### 5. Access the Dashboard
