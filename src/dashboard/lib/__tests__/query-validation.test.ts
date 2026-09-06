@@ -1,7 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+vi.mock("next/server", () => ({
+    NextResponse: {
+        json: (body: unknown, init?: { status?: number }) => ({
+            body,
+            status: init?.status ?? 200,
+            json: () => Promise.resolve(body),
+        }),
+    },
+}));
+
 import {
     paginationQuerySchema,
     dateRangeQuerySchema,
+    dateRangeRefinedSchema,
     parseQueryParams,
     calculateOffset,
     createPaginationMeta,
@@ -45,7 +57,7 @@ describe("query-validation", () => {
         it("should reject endDate before startDate", () => {
             const start = new Date("2024-12-31");
             const end = new Date("2024-01-01");
-            expect(() => dateRangeQuerySchema.parse({ startDate: start, endDate: end })).toThrow();
+            expect(() => dateRangeRefinedSchema.parse({ startDate: start, endDate: end })).toThrow();
         });
     });
 

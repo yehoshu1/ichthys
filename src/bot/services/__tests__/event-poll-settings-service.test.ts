@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ChannelType, PermissionFlagsBits, type GuildMember } from 'discord.js';
+
+vi.mock('@shared/database/client', () => ({
+    db: { select: vi.fn(), insert: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    pool: {},
+}));
+
 import {
     canMemberCreateEvent,
     canMemberCreatePoll,

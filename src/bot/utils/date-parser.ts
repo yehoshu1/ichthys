@@ -19,12 +19,12 @@ export function parseNaturalLanguageDate(input: string, timezone: string = 'UTC'
     const now = DateTime.now().setZone(timezone);
 
     // Try exact ISO/date formats first
-    const isoDate = DateTime.fromISO(normalized);
+    const isoDate = DateTime.fromISO(normalized, { zone: timezone });
     if (isoDate.isValid) {
         return isoDate.toJSDate();
     }
 
-    const sqlDate = DateTime.fromSQL(normalized);
+    const sqlDate = DateTime.fromSQL(normalized, { zone: timezone });
     if (sqlDate.isValid) {
         return sqlDate.toJSDate();
     }
