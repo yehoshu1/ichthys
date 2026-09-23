@@ -176,11 +176,16 @@ export default function AccessControlPage() {
         }
     }
 
-    // Role options for MultiSelect
-    const roleOptions = discordRoles.map((r) => ({
-        value: r.id,
-        label: r.name,
-    }));
+    // Role options for MultiSelect. @everyone (the guild id) is offered as a
+    // synthetic option — fetchBotMemberRoles injects it during evaluation, so
+    // rules targeting it apply to every member of the server.
+    const roleOptions = [
+        { value: guildId, label: "@everyone" },
+        ...discordRoles.map((r) => ({
+            value: r.id,
+            label: r.name,
+        })),
+    ];
 
     // ─── Render ──────────────────────────────────────────────────────────────────
 

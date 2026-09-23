@@ -3,7 +3,7 @@ import { db, verificationMessageRule } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireGuildManageAccess, requireGuildManageRolesAccess } from "@/lib/guild-auth";
-import { discordIdSchema, optionalEmbedSchema, parseJsonBody } from "@/lib/validation";
+import { discordIdSchema, optionalEmbedSchema, optionalTextSchema, parseJsonBody } from "@/lib/validation";
 import logger from "@/lib/logger";
 
 const createRuleSchema = z.object({
@@ -11,9 +11,9 @@ const createRuleSchema = z.object({
     roleId: discordIdSchema,
     notifyChannelId: discordIdSchema,
     // Notification message optional — allow only welcome message or embed
-    message: z.string().trim().max(2000).optional(),
+    message: optionalTextSchema,
     messageEmbed: optionalEmbedSchema,
-    welcomeMessage: z.string().trim().max(2000).optional(),
+    welcomeMessage: optionalTextSchema,
     enabled: z.boolean().optional(),
 }).strict();
 

@@ -4,11 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Save, AlertCircle, Image as ImageIcon } from "lucide-react";
+import { Save, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { MessageConfigTab } from './components/MessageConfigTab';
 import { RolesTab } from './components/RolesTab';
 
@@ -190,7 +188,7 @@ export default function WelcomePage() {
         fetchData();
     }, [fetchData]);
 
-    const updateConfig = useCallback((key: keyof WelcomeConfig, value: any) => {
+    const updateConfig = useCallback((key: string, value: any) => {
         setConfig(prev => {
             const next = { ...prev, [key]: value };
             
@@ -241,9 +239,10 @@ export default function WelcomePage() {
         }
     }, [config, guildConfig.autoRoleId, guildId]);
 
-    const insertVariable = useCallback((variable: string, key: string = 'messageTemplate') => {
-        const template = (config as any)[key] || '';
-        updateConfig(key as keyof WelcomeConfig, template + variable);
+    const insertVariable = useCallback((variable: string, key?: string) => {
+        const templateKey = key ?? 'messageTemplate';
+        const template = (config as any)[templateKey] || '';
+        updateConfig(templateKey as string, template + variable);
     }, [config, updateConfig]);
 
     if (loading) {

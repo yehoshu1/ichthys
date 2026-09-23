@@ -9,7 +9,7 @@ import logger from "@/lib/logger";
 const createRoleMessageSchema = z.object({
     roleId: discordIdSchema,
     // message is optional: admins may choose to only set a welcome message or embed
-    message: z.string().trim().max(2000).optional(),
+    message: optionalTextSchema,
     messageEmbed: optionalEmbedSchema,
     notifyChannelId: nullableDiscordIdSchema,
     welcomeMessage: optionalTextSchema,

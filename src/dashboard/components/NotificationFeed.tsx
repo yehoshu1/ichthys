@@ -9,12 +9,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-    BellOff, 
-    CheckCheck, 
     Clock,
     Info,
     AlertTriangle,
@@ -22,6 +18,7 @@ import {
     CheckCircle2,
     Loader2
 } from 'lucide-react';
+
 
 interface Notification {
     id: string;

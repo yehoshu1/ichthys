@@ -64,9 +64,13 @@ RUN apt-get update && apt-get install -y procps && npm install -g pm2 && rm -rf 
 # Copy necessary files
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/package-lock.json ./
-RUN npm ci --omit=dev --legacy-peer-deps --no-audit --no-fund \
+# Install production deps without running postinstall scripts (avoids canvas
+# rebuild which needs Python/native build tools not present in runner stage)
+RUN npm ci --omit=dev --legacy-peer-deps --no-audit --no-fund --ignore-scripts \
     && npm cache clean --force \
     && rm -rf /root/.npm /tmp/*
+# Copy pre-built native modules (canvas) from builder where build tools are available
+COPY --from=builder /app/node_modules/canvas ./node_modules/canvas
 COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/dashboard/.next ./src/dashboard/.next

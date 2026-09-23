@@ -52,7 +52,6 @@ import GlobalSearchModal from "../../../components/GlobalSearchModal";
 import { DASHBOARD_NAV_ITEMS, DashboardNavId } from "../../../lib/search/dashboard-nav";
 import type { SearchOpenMethod } from "../../../lib/search/telemetry";
 import { RbacAccessProvider } from "../../../components/RbacAccessContext";
-import { ScrollArea } from "../../../components/ui/scroll-area";
 import { PageTransition } from "../../../components/PageTransition";
 
 interface ModuleStateResponse {
@@ -75,6 +74,7 @@ interface ModuleAccess {
 
 interface AccessResponse {
     isBypassUser: boolean;
+    canManageRbac?: boolean;
     modules: Record<string, ModuleAccess>;
 }
 
@@ -146,8 +146,7 @@ function getNavHref(
         return `/dashboard/${guildId}${item.href}`;
     }
 
-    const moduleId = mapNavItemToModuleId(item);
-    return `/dashboard/${guildId}/settings${moduleId ? `?module=${moduleId}` : ""}`;
+    return `/dashboard/${guildId}/settings`;
 }
 
 export default function DashboardLayout({
@@ -302,8 +301,12 @@ export default function DashboardLayout({
     }, [guildId]);
 
     function isNavItemVisible(item: { id: DashboardNavId }): boolean {
-        // Access Control is exclusively for bypass users; hidden until confirmed.
+        // Access Control is for users who can manage RBAC: bypass users
+        // (owner/admin) and Manage-Guild users. Hidden until confirmed.
         if (item.id === "access") {
+            if (accessData?.canManageRbac !== undefined) {
+                return accessData.canManageRbac;
+            }
             return accessData?.isBypassUser === true;
         }
         // Bypass users and unresolved access: show everything else.

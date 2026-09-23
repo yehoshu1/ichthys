@@ -9,18 +9,23 @@ function buildDatabaseUrl(): string {
         return process.env.DATABASE_URL;
     }
 
-    const host = process.env.POSTGRES_HOST ?? 'localhost';
-    const port = process.env.POSTGRES_PORT ?? '5432';
-    const db = process.env.POSTGRES_DB ?? 'ixoye';
-    const user = process.env.POSTGRES_USER ?? 'ixoye';
-    const password = process.env.POSTGRES_PASSWORD ?? 'ixoye';
+    const host = process.env.POSTGRES_HOST;
+    const port = process.env.POSTGRES_PORT;
+    const db = process.env.POSTGRES_DB;
+    const user = process.env.POSTGRES_USER;
+    const password = process.env.POSTGRES_PASSWORD;
+
+    if (!host || !port || !db || !user || !password) {
+        throw new Error(
+            'Database configuration missing. Set DATABASE_URL or all of POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD.'
+        );
+    }
+
     const encodedUser = encodeURIComponent(user);
     const encodedPassword = encodeURIComponent(password);
 
     return `postgresql://${encodedUser}:${encodedPassword}@${host}:${port}/${db}`;
 }
-
-const databaseUrl = buildDatabaseUrl();
 
 function getNumericEnv(name: string, fallback: number): number {
     const raw = process.env[name];
@@ -46,40 +51,66 @@ function resolveSslConfig(): false | { rejectUnauthorized: boolean } {
     return false;
 }
 
-export const pool = new Pool({
-    connectionString: databaseUrl,
-    max: getNumericEnv('PG_POOL_MAX', 8),
-    idleTimeoutMillis: getNumericEnv('PG_IDLE_TIMEOUT_MS', 30_000),
-    connectionTimeoutMillis: getNumericEnv('PG_CONNECT_TIMEOUT_MS', 10_000),
-    query_timeout: getNumericEnv('PG_QUERY_TIMEOUT_MS', 30_000),
-    statement_timeout: getNumericEnv('PG_STATEMENT_TIMEOUT_MS', 30_000),
-    ssl: resolveSslConfig(),
-});
+let _pool: Pool | null = null;
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
-pool.on('error', (error) => {
-    consoleLogger.error('Unexpected PostgreSQL pool error:', error);
-});
+function getPool(): Pool {
+    if (!_pool) {
+        const databaseUrl = buildDatabaseUrl();
+        _pool = new Pool({
+            connectionString: databaseUrl,
+            max: getNumericEnv('PG_POOL_MAX', 8),
+            idleTimeoutMillis: getNumericEnv('PG_IDLE_TIMEOUT_MS', 30_000),
+            connectionTimeoutMillis: getNumericEnv('PG_CONNECT_TIMEOUT_MS', 10_000),
+            query_timeout: getNumericEnv('PG_QUERY_TIMEOUT_MS', 30_000),
+            statement_timeout: getNumericEnv('PG_STATEMENT_TIMEOUT_MS', 30_000),
+            ssl: resolveSslConfig(),
+        });
 
-pool.on('connect', (client) => {
-    client.on('error', (err) => {
-        consoleLogger.error('PostgreSQL client error:', err);
-    });
-});
+        _pool.on('error', (error) => {
+            consoleLogger.error('Unexpected PostgreSQL pool error:', error);
+        });
 
-pool.on('acquire', () => {
-    if (process.env.NODE_ENV === 'development') {
-        const metrics = {
-            total: pool.totalCount,
-            idle: pool.idleCount,
-            waiting: pool.waitingCount
-        };
-        if (metrics.waiting > 0) {
-            consoleLogger.warn('PostgreSQL pool contention:', metrics);
-        }
+        _pool.on('connect', (client) => {
+            client.on('error', (err) => {
+                consoleLogger.error('PostgreSQL client error:', err);
+            });
+        });
+
+        _pool.on('acquire', () => {
+            if (process.env.NODE_ENV === 'development') {
+                const metrics = {
+                    total: _pool!.totalCount,
+                    idle: _pool!.idleCount,
+                    waiting: _pool!.waitingCount
+                };
+                if (metrics.waiting > 0) {
+                    consoleLogger.warn('PostgreSQL pool contention:', metrics);
+                }
+            }
+        });
     }
+    return _pool;
+}
+
+export function getDb(): ReturnType<typeof drizzle<typeof schema>> {
+    if (!_db) {
+        _db = drizzle(getPool(), { schema });
+    }
+    return _db;
+}
+
+export const pool: Pool = new Proxy({} as Pool, {
+    get(_, prop) {
+        return Reflect.get(getPool(), prop);
+    },
 });
 
-export const db = drizzle(pool, { schema });
+export const db: ReturnType<typeof drizzle<typeof schema>> = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+    get(_, prop) {
+        return Reflect.get(getDb(), prop);
+    },
+});
 
 let shutdownHookRegistered = false;
 
@@ -88,9 +119,11 @@ function registerShutdownHook(): void {
     shutdownHookRegistered = true;
 
     const shutdown = async () => {
-        await pool.end().catch((error) => {
-            consoleLogger.error('Error closing PostgreSQL pool:', error);
-        });
+        if (_pool) {
+            await _pool.end().catch((error) => {
+                consoleLogger.error('Error closing PostgreSQL pool:', error);
+            });
+        }
     };
 
     process.once('SIGINT', () => {
@@ -112,7 +145,7 @@ export interface PoolMetrics {
 
 export async function checkPoolHealth(): Promise<{ healthy: boolean; metrics: PoolMetrics }> {
     try {
-        const client = await pool.connect();
+        const client = await getPool().connect();
         await client.query('SELECT 1');
         client.release();
 
@@ -130,10 +163,11 @@ export async function checkPoolHealth(): Promise<{ healthy: boolean; metrics: Po
 }
 
 export function getPoolMetrics(): PoolMetrics {
+    const p = getPool();
     return {
-        total: pool.totalCount,
-        idle: pool.idleCount,
-        waiting: pool.waitingCount
+        total: p.totalCount,
+        idle: p.idleCount,
+        waiting: p.waitingCount
     };
 }
 

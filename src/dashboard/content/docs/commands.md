@@ -30,9 +30,6 @@ Run scripts with `npm run <script>`.
 | `db:backup:list` | List backups. | Backup audit |
 | `db:restore` | Restore DB from backup. | Recovery |
 | `db:restore:list` | List restore candidates. | Recovery planning |
-| `db:migrate:sqlite-import` | Full SQLite -> PostgreSQL import. | Initial cutover load |
-| `db:migrate:delta` | Delta sync SQLite changes to PostgreSQL. | Near-zero cutover sync |
-| `db:migrate:verify` | Verify SQLite/PostgreSQL parity checksums and counts. | Cutover validation |
 | `deploy:safe` | Safe deployment with backup workflow. | Production deploy safety |
 | `deploy:check` | Check slash command registration. | Verify command sync |
 | `guard:commands` | Validate command catalog completeness. | Pre-deployment check |
@@ -60,7 +57,7 @@ Current slash command files: `47`
 - `/avatar`
 - `/server`
 - `/roles`
-- `/dashboard show`
+- `/dashboard`
 - `/boost status`
 - `/boost claim`
 
@@ -710,6 +707,19 @@ Current slash command files: `47`
   - `description` (string, optional)
   - `duration` (string, optional)
   - `channel` (channel, optional)
+  - `location` (string, optional)
+  - `location_voice_channel` (voice channel, optional)
+  - `image` (string URL, optional)
+  - `mention_on_create` (role, optional)
+  - `mention_on_start` (role, optional)
+  - `max_attendees` (integer, optional)
+  - `enable_waitlist` (boolean, optional)
+  - `required_role` (role, optional)
+  - `blocked_role` (role, optional)
+  - `attendee_role` (role, optional)
+  - `repeat` (string choice: NONE/DAILY/WEEKLY/BIWEEKLY/MONTHLY/YEARLY, optional)
+  - `repeat_until` (string, optional)
+  - `mirror_to_discord` (boolean, optional)
 - Example: `/create title:Movie Night datetime:"tomorrow 8pm" duration:2h`
 
 ### `/list`
@@ -760,6 +770,12 @@ Current slash command files: `47`
   - `options` (string, required)
   - `type` (string, optional): `STANDARD`, `TIME`, `ANONYMOUS`
   - `end_time` (string, optional)
+  - `description` (string, optional)
+  - `channel` (channel, optional)
+  - `allow_multiple` (boolean, optional)
+  - `max_votes` (integer, optional)
+  - `allow_custom_options` (boolean, optional)
+  - `allowed_role` (role, optional)
 - Example: `/poll question:"Best time?" options:"Mon 9pm, Tue 8pm" type:TIME`
 
 ### `/timestamp`

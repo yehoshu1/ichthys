@@ -20,7 +20,7 @@ The Logs module shows execution history for automated and system actions:
 
 ## API Endpoints
 
-- `GET /api/guilds/[guildId]/logs?page=<n>&limit=<n>`
+- None - The logs page is a server component that queries the database directly.
 
 ## Database Tables
 

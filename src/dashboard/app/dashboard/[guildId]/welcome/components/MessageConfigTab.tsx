@@ -1,8 +1,6 @@
-import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
@@ -10,12 +8,21 @@ import { MessageSquare, Bot } from 'lucide-react';
 import { ImageDesigner } from './ImageDesigner';
 import { EmbedDesigner } from './EmbedDesigner';
 
-export function MessageConfigTab({ config, updateConfig, channels, insertVariable, variableExamples, prefix = '', guildId = '' }) {
+export function MessageConfigTab({ config, updateConfig, channels, insertVariable, variableExamples, prefix = '', guildId = '' }: {
+    config: any;
+    updateConfig: (key: string, value: any) => void;
+    channels?: any[];
+    insertVariable: (name: string) => void;
+    variableExamples: any;
+    prefix?: string;
+    guildId?: string;
+}) {
     const enabledKey = prefix ? `${prefix}Enabled` : 'enabled';
     const botsEnabledKey = prefix ? `${prefix}BotsEnabled` : 'welcomeBotsEnabled';
+
+
     const channelIdKey = prefix ? `${prefix}ChannelId` : 'channelId';
     const messageTemplateKey = prefix ? `${prefix}MessageTemplate` : 'messageTemplate';
-    const embedEnabledKey = prefix ? `${prefix}EmbedEnabled` : 'embedEnabled';
     
     // Private message does not have channel config
     const showChannelConfig = prefix !== 'private';
@@ -90,7 +97,7 @@ export function MessageConfigTab({ config, updateConfig, channels, insertVariabl
                                         <SelectValue placeholder="Select a channel" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {channels.map(channel => (
+                                        {(channels ?? []).map(channel => (
                                             <SelectItem key={channel.id} value={channel.id}>
                                                 # {channel.name}
                                             </SelectItem>
@@ -107,12 +114,12 @@ export function MessageConfigTab({ config, updateConfig, channels, insertVariabl
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="message-template">Message Text</Label>
                                 <div className="flex gap-1">
-                                    {variableExamples.slice(0, 3).map(v => (
+                                    {variableExamples.slice(0, 3).map((v: any) => (
                                         <Badge
                                             key={v.code}
                                             variant="secondary"
                                             className="cursor-pointer hover:bg-primary/20"
-                                            onClick={() => insertVariable(v.code, messageTemplateKey)}
+                                            onClick={() => insertVariable(v.code)}
                                         >
                                             {v.code}
                                         </Badge>

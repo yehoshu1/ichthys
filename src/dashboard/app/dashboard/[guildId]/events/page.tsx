@@ -74,7 +74,6 @@ import { format } from "date-fns";
 import { LabelWithTooltip, HelperText } from "../../../../components/HelpTooltip";
 import { DateTimePicker, DatePicker } from "../../../../components/ui/datetime-picker";
 import { RoleMultiSelect } from "../../../../components/DiscordSelectors";
-import { ScrollArea } from "../../../../components/ui/scroll-area";
 import EventCalendar from "../../../../components/EventCalendar";
 import { FadeInStagger, FadeInItem } from "../../../../components/MotionWrapper";
 

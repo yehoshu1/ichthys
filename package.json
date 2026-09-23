@@ -1,6 +1,6 @@
 {
   "name": "ixoye-discord-bot",
-  "version": "0.2.0",
+  "version": "0.1.0-beta.1",
   "description": "A scalable Discord bot built with TypeScript",
   "packageManager": "npm@11.9.0",
   "main": "dist/index.js",
@@ -44,13 +44,13 @@
     "bot",
     "typescript"
   ],
-  "author": "Your Name <your.email@example.com>",
+  "author": "Ixoye Contributors",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/ixoye-discord-bot.git"
+    "url": "https://github.com/yehoshu1/ichthys.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/ixoye-discord-bot/issues"
+    "url": "https://github.com/yehoshu1/ichthys/issues"
   },
   "license": "GPL-3.0",
   "dependencies": {

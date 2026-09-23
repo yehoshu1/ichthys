@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -12,8 +11,6 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-
 interface ConfirmDeleteDialogProps {
     title?: string;
     description?: string;

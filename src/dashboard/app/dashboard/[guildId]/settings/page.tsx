@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useParams } from "next/navigation";
 import { Button } from "../../../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "../../../../components/ui/card";
 import { Input } from "../../../../components/ui/input";
@@ -11,60 +11,14 @@ import { Alert, AlertDescription, AlertTitle } from "../../../../components/ui/a
 import { Download, Upload, FileJson, AlertTriangle, CheckCircle2, HelpCircle } from "lucide-react";
 import { useTooltips } from "../../../../components/TooltipContext";
 
-interface GuildModuleState {
-    moduleId: string;
-    enabled: boolean;
-    source: string;
-    name?: string;
-    description?: string | null;
-}
-
 export default function SettingsPage() {
     const params = useParams();
-    const searchParams = useSearchParams();
     const guildId = params.guildId as string;
-    const highlightedModuleId = (searchParams.get("module") || "").trim();
     const { tooltipsEnabled, setTooltipsEnabled } = useTooltips();
 
     const [importFile, setImportFile] = useState<File | null>(null);
     const [isImporting, setIsImporting] = useState(false);
     const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-    const [modules, setModules] = useState<GuildModuleState[]>([]);
-    const [modulesLoading, setModulesLoading] = useState(true);
-    const [moduleBusyId, setModuleBusyId] = useState<string | null>(null);
-    const [moduleStatus, setModuleStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
-    useEffect(() => {
-        let active = true;
-
-        async function loadModules() {
-            setModulesLoading(true);
-            try {
-                const res = await fetch(`/api/guilds/${guildId}/modules`);
-                if (!res.ok) {
-                    throw new Error('Failed to load modules');
-                }
-                const payload = await res.json() as { modules: GuildModuleState[] };
-                if (!active) return;
-                setModules(payload.modules ?? []);
-            } catch {
-                if (!active) return;
-                setModuleStatus({ type: 'error', message: 'Failed to load module states.' });
-            } finally {
-                if (active) {
-                    setModulesLoading(false);
-                }
-            }
-        }
-
-        if (guildId) {
-            void loadModules();
-        }
-
-        return () => {
-            active = false;
-        };
-    }, [guildId]);
 
     const handleExport = async () => {
         try {
@@ -120,35 +74,6 @@ export default function SettingsPage() {
         }
     };
 
-    const handleModuleToggle = async (moduleId: string, enabled: boolean): Promise<void> => {
-        setModuleBusyId(moduleId);
-        setModuleStatus(null);
-        try {
-            const res = await fetch(`/api/guilds/${guildId}/modules`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ moduleId, enabled }),
-            });
-
-            const payload = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                throw new Error(payload.error || "Failed to update module state");
-            }
-
-            setModules((current) => current.map((module) => (
-                module.moduleId === moduleId ? { ...module, enabled, source: "module_state" } : module
-            )));
-            setModuleStatus({
-                type: "success",
-                message: `Module ${enabled ? "enabled" : "disabled"}: ${moduleId.replace(/_/g, " ")}.`,
-            });
-        } catch (error: any) {
-            setModuleStatus({ type: "error", message: error.message || "Failed to update module state." });
-        } finally {
-            setModuleBusyId(null);
-        }
-    };
-
     return (
         <div className="space-y-6">
             <div>
@@ -180,59 +105,6 @@ export default function SettingsPage() {
                             onCheckedChange={setTooltipsEnabled}
                         />
                     </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Modules</CardTitle>
-                    <CardDescription>
-                        Enable or disable modules. Disabled modules are blocked in commands, routes, and scheduled jobs.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {moduleStatus && (
-                        <Alert variant={moduleStatus.type === "success" ? "default" : "destructive"}>
-                            <AlertTitle>{moduleStatus.type === "success" ? "Updated" : "Error"}</AlertTitle>
-                            <AlertDescription>{moduleStatus.message}</AlertDescription>
-                        </Alert>
-                    )}
-
-                    {modulesLoading ? (
-                        <p className="text-sm text-muted-foreground">Loading modules...</p>
-                    ) : (
-                        <div className="space-y-2">
-                            {modules
-                                .slice()
-                                .sort((a, b) => (a.name ?? a.moduleId).localeCompare(b.name ?? b.moduleId))
-                                .map((module) => {
-                                    const isCore = module.moduleId === "core";
-                                    const isBusy = moduleBusyId === module.moduleId;
-                                    return (
-                                        <div
-                                            key={module.moduleId}
-                                            className={`flex items-center justify-between rounded-lg border p-3 ${highlightedModuleId === module.moduleId ? "border-primary bg-primary/5" : ""}`}
-                                        >
-                                            <div>
-                                                <p className="font-medium">
-                                                    {module.name ?? module.moduleId}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {module.description || module.moduleId}
-                                                </p>
-                                            </div>
-                                            <Switch
-                                                checked={module.enabled}
-                                                disabled={isBusy || isCore}
-                                                onCheckedChange={(checked) => {
-                                                    void handleModuleToggle(module.moduleId, checked);
-                                                }}
-                                            />
-                                        </div>
-                                    );
-                                })}
-                        </div>
-                    )}
                 </CardContent>
             </Card>
 

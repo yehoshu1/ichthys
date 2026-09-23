@@ -4,7 +4,9 @@ import { db, dashboardRbacConfig, dashboardRbacRules } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { requireGuildManageStrictAccess } from "@/lib/guild-auth";
 import { RBAC_MODULE_IDS } from "@/lib/rbac-modules";
+import { invalidateRbacCache } from "@/lib/rbac";
 import logger from "@/lib/logger";
+import { emitGuildNotification } from "@shared/services/notification-service";
 
 function getRbacStorageError(error: unknown): string | null {
     const message = error instanceof Error ? error.message : String(error);
@@ -21,8 +23,8 @@ function getRbacStorageError(error: unknown): string | null {
 
 // ─── Validation Schemas ────────────────────────────────────────────────────────
 
-// Discord snowflake IDs are 17–19 digits.
-const roleIdSchema = z.string().regex(/^\d{17,19}$/, "Invalid Discord role ID");
+// Discord snowflake IDs are 17–20 digits (matches guild-ID validation elsewhere).
+const roleIdSchema = z.string().regex(/^\d{17,20}$/, "Invalid Discord role ID");
 
 const rbacRuleSchema = z.object({
     // Only known module IDs are accepted; unknown strings are rejected.
@@ -113,6 +115,8 @@ export async function GET(
             config: config ?? null,
             rules,
             discordRoles,
+            // Synthetic @everyone entry so the UI can offer "all members" in rules.
+            everyoneRoleId: guildId,
         });
     } catch (error) {
         logger.error("Error fetching RBAC config", {
@@ -195,6 +199,34 @@ export async function PUT(
                     }))
                 );
             }
+        });
+
+        // Ensure permission changes take effect immediately.
+        invalidateRbacCache(guildId);
+
+        // Audit trail: RBAC changes are security-sensitive and must be
+        // observable. Failures here are logged but do not fail the request.
+        emitGuildNotification({
+            guildId,
+            eventType: 'DASHBOARD_SETTINGS_CHANGED',
+            severity: 'WARNING',
+            source: 'DASHBOARD_API',
+            title: enabled ? 'Access control updated' : 'Access control disabled',
+            body: `Access control ${enabled ? 'enabled' : 'disabled'} (default: ${defaultAccess}); ${rules.length} module rule(s) saved.`,
+            actorUserId: auth.userId,
+            metadata: {
+                enabled,
+                defaultAccess,
+                ruleCount: rules.length,
+                moduleIds: rules.map((r) => r.moduleId),
+            },
+            dedupeKey: `dashboard-rbac-updated:${guildId}`,
+            dedupeWindowSeconds: 60,
+        }).catch((err) => {
+            logger.warn('Failed to emit RBAC audit notification', {
+                error: err instanceof Error ? err.message : String(err),
+                guildId,
+            });
         });
 
         return NextResponse.json({ success: true });

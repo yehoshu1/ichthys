@@ -1,6 +1,85 @@
-# ΙΧΘΥΣ (Ixoye) Discord Bot & Dashboard - Agent Guide
+# ΙΧΘΥΣ (Ichthys) Discord Bot & Dashboard - Agent Guide
 
-This document provides essential information for AI coding agents working on the ΙΧΘΥΣ project.
+This document provides essential information for AI coding agents working on the Ichthys project.
+
+> **CRITICAL**: All agents MUST follow the branching guidelines below for every change.
+> Never commit directly to `main`. Always create a feature/fix/chore/refactor branch.
+
+## Branching Guidelines
+
+### Branch Structure
+
+```
+main                    # Production-ready code, protected
+├── feature/*           # New features and enhancements
+├── fix/*               # Bug fixes
+├── chore/*             # Maintenance, deps, config, docs
+└── refactor/*          # Code refactoring (no functional changes)
+```
+
+### Branch Naming Convention
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| Feature | `feature/<short-description>` | `feature/birthday-timezone-selector` |
+| Fix | `fix/<short-description>` | `fix/welcome-image-canvas-size` |
+| Chore | `chore/<short-description>` | `chore/update-deps-sept-2026` |
+| Refactor | `refactor/<short-description>` | `refactor/extract-event-service` |
+
+Use lowercase with hyphens. Keep descriptions under 50 characters.
+
+### Workflow for ALL Changes
+
+Every change, no matter how small, MUST follow this workflow:
+
+1. **Create a branch from `main`:**
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b <type>/<description>
+   ```
+
+2. **Make your changes** on the branch
+
+3. **Verify before committing:**
+   ```bash
+   npm run typecheck    # Must pass
+   npm run test         # Must pass (pre-existing failures are OK)
+   npm run build        # Must succeed
+   ```
+
+4. **Commit with conventional format:**
+   ```
+   type(scope): short description
+
+   - detail 1
+   - detail 2
+   ```
+
+   Types: `feat`, `fix`, `chore`, `refactor`, `docs`, `test`, `ci`
+
+5. **Push and create a Pull Request:**
+   ```bash
+   git push origin <branch>
+   ```
+
+6. **Merge only after CI passes and review**
+
+### What Counts as Each Type
+
+- **feature/**: New functionality, new commands, new dashboard pages, new API endpoints
+- **fix/**: Bug fixes, error handling improvements, behavior corrections
+- **chore/**: Dependency updates, config changes, documentation, cleanup, CI changes
+- **refactor/**: Code restructuring with no behavior change, extracting functions, reorganizing files
+
+### Rules
+
+- **NEVER** commit directly to `main`
+- **NEVER** skip typecheck/tests before committing
+- **ALWAYS** use conventional commit messages
+- **ALWAYS** create a PR even for small changes (enables review and CI)
+- Database schema changes MUST be non-destructive (no data loss)
+- Schema changes MUST have a backup step documented in the PR
 
 ## Project Overview
 
@@ -52,6 +131,10 @@ ixoye/
 │   │   │   └── ...             # Public pages
 │   │   ├── components/         # React components
 │   │   │   └── ui/             # shadcn/ui components
+│   │   ├── content/docs/       # User-facing documentation (served at /docs)
+│   │   │   ├── commands.md     # Bot commands reference
+│   │   │   ├── dashboard.md    # Dashboard user guide
+│   │   │   └── modules/        # Module-specific documentation
 │   │   ├── lib/                # Utilities (auth, db, helpers)
 │   │   └── types/              # TypeScript declarations
 │   ├── shared/                 # Code shared between bot and dashboard
@@ -60,9 +143,9 @@ ixoye/
 │   └── utils/                  # Build/deployment utilities
 ├── docs/                       # Documentation
 │   ├── SETUP.md               # Setup and installation guide
-│   ├── COMMANDS.md            # Bot commands reference
-│   ├── DASHBOARD.md           # Dashboard user guide
-│   └── MODULES.md             # Module documentation
+│   ├── TROUBLESHOOTING.md     # Troubleshooting guide
+│   ├── UPDATING.md            # Update procedures
+│   └── modules/               # Module documentation
 ├── drizzle/                    # Database migrations (generated)
 ├── logs/                       # Application logs (runtime)
 ├── drizzle.config.ts          # Drizzle ORM configuration
@@ -163,19 +246,33 @@ DISCORD_CLIENT_ID=your_client_id
 DISCORD_CLIENT_SECRET=your_client_secret
 
 # NextAuth (Required for dashboard)
-NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_URL=https://bot.ichthys.qzz.io
 NEXTAUTH_SECRET=generate_with_openssl_rand_base64_32
 
-# Database
-DATABASE_URL=postgresql://ixoye:change_me@localhost:5432/ixoye
+# Database (all required - no defaults)
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=ixoye
+POSTGRES_USER=ixoye
+POSTGRES_PASSWORD=your_secure_password
 
 # Optional
 LOG_LEVEL=info                    # debug, info, warn, error
 NODE_ENV=development              # development, production
-PORT=3000                         # Dashboard port
+PORT=4002                         # Dashboard port
 GUILD_ID=your_test_guild_id       # For testing slash commands
-DASHBOARD_URL=https://yourdomain.com  # For /dashboard command
-DOMAIN=yourdomain.com             # Domain for Traefik routing
+DASHBOARD_URL=https://bot.ichthys.qzz.io  # For /dashboard command
+DOMAIN=bot.ichthys.qzz.io         # Domain for Traefik routing
+
+# Security (dashboard)
+# Comma-separated allowlist of origins for CSRF same-origin checks. When set,
+# client-supplied X-Forwarded-* headers are ignored for origin validation.
+TRUSTED_ORIGINS=https://bot.ichthys.qzz.io
+# Number of trusted proxies in front of the dashboard (e.g. 1 behind Traefik
+# or a reverse proxy). 0/unset = treat the app as directly exposed and ignore
+# X-Forwarded-For for rate limiting.
+TRUST_PROXY_DEPTH=1
 ```
 
 ## Security Considerations
@@ -254,6 +351,7 @@ Key tables (defined in `src/shared/database/schema.ts`):
 |-------|---------|
 | `moderation_case` | Moderation action cases |
 | `moderation_settings` | Server moderation configuration |
+| `member_watchlist` | Staff watchlist for suspicious members |
 | `action_log` | Audit trail of executed actions |
 | `message_activity` | Analytics data for message heatmaps |
 
@@ -265,8 +363,15 @@ Key tables (defined in `src/shared/database/schema.ts`):
 | `birthday_log` | Birthday celebration history |
 | `message_alias` | Auto-responder trigger words and responses |
 | `command_config` | Per-command configuration |
+| `module_state` | Module enable/disable states per guild |
 | `discord_user_cache` | Cached Discord user information |
 | `guild_growth` | Server growth analytics |
+
+### Dashboard RBAC
+| Table | Purpose |
+|-------|---------|
+| `dashboard_rbac_config` | Dashboard role-based access control configuration |
+| `dashboard_rbac_rules` | Dashboard role-based access control rules per module |
 
 ### Notifications
 | Table | Purpose |
@@ -334,42 +439,68 @@ const signature = crypto
 
 ### Command Categories
 
-**General Commands**: `/ping`, `/info`, `/moveme`
+**General Commands**:
+- `/ping` - Bot latency check
+- `/info` - Server analytics overview
+- `/avatar [user] [type]` - Display user's avatar or banner
+- `/user [user]` - Display detailed user information
+- `/server` - Display server information
+- `/roles [role]` - List server roles or view role details
+- `/dashboard` - Show server dashboard link
+- `/moveme [channel] [user]` - Move yourself to a voice channel
+- `/move <user> [channel] [to_user]` - Move a user to a voice channel
+- `/moveall <from> <to>` - Move all users from one voice channel to another
+- `/setup` - Interactive setup panel
+- `/config view|toggle|sync` - View or update server configuration
+- `/module list|enable|disable` - Manage module enable/disable states
+- `/timestamp <datetime> [timezone]` - Generate Discord-formatted timestamps
 
-**Leveling Commands**: `/rank`, `/profile`, `/leaderboard`, `/top`, `/setxp`, `/setlevel`
-
-**Info Commands**: `/user`, `/avatar`, `/server`, `/roles`, `/dashboard`
+**Leveling Commands**:
+- `/rank [user]` - Check current level and XP
+- `/profile [user]` - View profile card with level and XP
+- `/leaderboard [type]` - View server XP leaderboard
+- `/top [period]` - View leaderboard with time-based filtering
+- `/setxp <user> <type> <xp>` - Set a user's XP (Admin only)
+- `/setlevel <user> <type> <level>` - Set a user's level (Admin only)
 
 **Event Commands**:
-- `/event create` - Create a new event
-- `/event list` - List upcoming events
-- `/event info [id]` - Get event details
-- `/event edit [id]` - Edit an event
-- `/event cancel [id]` - Cancel an event
-- `/rsvp [event] [status]` - RSVP to an event
-- `/reminder [event] [minutes]` - Set a reminder
+- `/create <title> <datetime> [description] [duration] ...` - Create a new event
+- `/list <type> [channel] [limit]` - List upcoming events or active polls
+- `/delete <type> <id> [reason]` - Delete an event or poll
+- `/remind <event_id> <when>` - Set a personal reminder for an event
+- `/settings view|channel|timezone|mentions|permissions|ai|discord` - Configure event and poll settings
 
 **Poll Commands**:
-- `/poll create` - Create a standard poll
-- `/poll create time` - Create a time poll
-- `/poll close [id]` - Close a poll early
-- `/poll results [id]` - View poll results
+- `/poll <question> <options> [description] [channel] ...` - Create a poll
 
-**Birthday Commands**: `/birthday set`, `/birthday remove`, `/birthday view`, `/birthday list`, `/birthday next`, `/birthday stats`, `/birthday admin-set`, `/birthday admin-remove`, `/birthday test`
+**Birthday Commands**:
+- `/birthday set <day> <month> [year]` - Set your birthday
+- `/birthday remove` - Remove your birthday
+- `/birthday view [user]` - View a user's birthday
+- `/birthday list [limit]` - List upcoming birthdays
+- `/birthday next` - View next birthday
+- `/birthday admin-set <user> <day> <month> [year]` - Admin: set user's birthday
+- `/birthday admin-remove <user>` - Admin: remove user's birthday
+- `/birthday test` - Test birthday announcement
+- `/birthday stats` - View birthday statistics
 
 **Moderation Commands**: 
-- Warnings: `/warn add`, `/warn remove`, `/warn list`
-- Mutes: `/mute text`, `/mute voice`, `/unmute text`, `/unmute voice`
-- Timeouts: `/timeout`, `/untimeout`
-- Kicks: `/kick`, `/vkick`
-- Bans: `/ban`, `/unban`
-- Utility: `/clear`, `/cases`, `/move`, `/lock`, `/unlock`, `/slowmode`, `/setnick`
+- Warnings: `/warn add <user> [reason]`, `/warn remove [user] [warn_id] [scope]`, `/warn list [user]`
+- Mutes: `/mute text <user> [duration] [reason]`, `/mute voice <user> [duration] [reason]`
+- Unmutes: `/unmute text <user> [reason]`, `/unmute voice <user> [reason]`
+- Timeouts: `/timeout <user> <duration> [reason]`, `/untimeout <user> [reason]`
+- Kicks: `/kick <user> [reason]`, `/vkick <user> [reason]`
+- Bans: `/ban <user> [reason] [duration] [delete_messages]`, `/unban <user_id> [reason]`
+- Utility: `/clear <amount> [user] [reason]`, `/cases <user> [active_only] [page]`, `/lock [channel] [reason]`, `/unlock [channel]`, `/slowmode [time] [seconds]`, `/setnick <user> [nickname]`
+- Watchlist: `/watchlist add|remove|view|list|note` - Manage staff watchlist for suspicious members
 
-**Role Management**: `/role give`, `/role remove`
+**Role Management**: `/role give <user> <role> [bulk]`, `/role remove <user> <role> [bulk]`
 
-**Reaction Roles**: `/reactionrole create`, `/reactionrole add`, `/reactionrole remove`, `/reactionrole list`, `/reactionrole delete`
+**Welcome/Verification**: `/welcome test <role>`, `/verify <user> [profile]`
 
-**Admin/Setup**: `/setup`, `/config`, `/welcome`, `/verify`, `/boost`, `/reactionrole`
+**Boosts**: `/boost status|claim|setup` - Manage boost rewards
+
+**Admin/Setup**: `/setup`, `/config view|toggle|sync`, `/welcome`, `/verify`, `/boost`, `/module list|enable|disable`
 
 ### Adding a New Dashboard Page
 1. Create folder in `src/dashboard/app/dashboard/[guildId]/{feature}/`
@@ -407,6 +538,44 @@ Backups are stored in `./backups/` with a retention policy of 10 most recent bac
 2. Export HTTP method handlers (GET, POST, PATCH, DELETE)
 3. Validate input with Zod
 4. Return JSON responses
+
+### Updating User-Facing Documentation
+
+User-facing documentation is served at `/docs` in the dashboard. These files are located at:
+
+```
+src/dashboard/content/docs/
+├── index.md              # Documentation home
+├── commands.md           # Bot commands reference
+├── dashboard.md          # Dashboard user guide
+├── getting-started.md    # Setup guide
+├── docker.md             # Docker deployment
+└── modules/              # Module-specific documentation
+    ├── index.md          # Module documentation index
+    ├── welcome.md        # Welcome system
+    ├── verification.md   # Verification system
+    ├── leveling.md       # Leveling system
+    ├── boosts.md         # Boost management
+    ├── birthdays.md      # Birthday system
+    ├── events.md         # Events system
+    ├── polls.md          # Polls system
+    ├── moderation.md     # Moderation system
+    ├── role-actions.md   # Role actions
+    ├── aliases.md        # Message aliases
+    ├── analytics.md      # Analytics dashboard
+    ├── logs.md           # Action logs
+    ├── notifications.md  # Notifications
+    ├── watchlist.md      # Staff watchlist
+    ├── webhooks.md       # Webhooks & API
+    ├── settings-and-backups.md  # Settings & import/export
+    └── reaction-roles.md # Reaction roles (planned)
+```
+
+When updating documentation:
+1. Keep command references in sync with actual bot commands
+2. Ensure all file paths and API endpoints mentioned exist
+3. Mark planned features clearly with "Planned" note
+4. Test documentation by running `npm run dashboard:dev` and visiting `/docs`
 
 ## Deployment
 
