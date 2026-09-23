@@ -19,7 +19,7 @@ interface RoleAction {
     id: string;
     roleId: string;
     triggerType: "ADD" | "REMOVE";
-    actionType: "DM" | "KICK" | "LOG" | "MSG";
+    actionType: "DM" | "KICK" | "BAN" | "LOG" | "MSG";
     actionDelay: number;
     dmMessage: string | null;
     dmMessageEmbed?: EmbedData;
@@ -174,7 +174,7 @@ export default function RoleActionsPage() {
                                     <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-white ring-1 ring-inset ring-gray-500/10 ${action.triggerType === 'REMOVE' ? 'bg-orange-500' : 'bg-blue-500'}`}>
                                         {action.triggerType === 'REMOVE' ? 'REMOVED' : 'ADDED'}
                                     </span>
-                                    <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-white ring-1 ring-inset ring-gray-500/10 ${action.actionType === 'KICK' ? 'bg-destructive'
+                                    <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-white ring-1 ring-inset ring-gray-500/10 ${action.actionType === 'KICK' || action.actionType === 'BAN' ? 'bg-destructive'
                                         : action.actionType === 'MSG' ? 'bg-purple-500'
                                             : action.actionType === 'DM' ? 'bg-primary'
                                                 : 'bg-green-600'
@@ -299,7 +299,7 @@ export default function RoleActionsPage() {
                             <div className="space-y-2">
                                 <LabelWithTooltip
                                     label="Action Type"
-                                    tooltip="DM = Private message to user. MSG = Public channel post. KICK = Remove user from server. LOG = Silent audit log entry."
+                                    tooltip="DM = Private message to user. MSG = Public channel post. KICK = Remove user from server. BAN = Ban user from server. LOG = Silent audit log entry."
                                 />
                                 <Select
                                     value={editingAction?.actionType || "DM"}
@@ -312,6 +312,7 @@ export default function RoleActionsPage() {
                                         <SelectItem value="DM">Send Direct Message</SelectItem>
                                         <SelectItem value="MSG">Send Channel Message</SelectItem>
                                         <SelectItem value="KICK">Kick Member</SelectItem>
+                                        <SelectItem value="BAN">Ban Member</SelectItem>
                                         <SelectItem value="LOG">Post to Log Channel</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -362,10 +363,10 @@ export default function RoleActionsPage() {
                                 <HelperText>Only trigger this action if the member currently holds these roles.</HelperText>
                             </div>
 
-                            {(editingAction?.actionType === "DM" || editingAction?.actionType === "LOG" || editingAction?.actionType === "KICK" || editingAction?.actionType === "MSG") && (
+                            {(editingAction?.actionType === "DM" || editingAction?.actionType === "LOG" || editingAction?.actionType === "KICK" || editingAction?.actionType === "BAN" || editingAction?.actionType === "MSG") && (
                                 <div className="space-y-2">
                                     <Label>
-                                        {editingAction.actionType === "KICK" ? "DM Message (Optional)" : "Message Content"}
+                                        {editingAction.actionType === "KICK" || editingAction.actionType === "BAN" ? "DM Message (Optional)" : "Message Content"}
                                     </Label>
                                     <MessageEditor
                                         content={editingAction?.dmMessage || ""}
@@ -393,10 +394,10 @@ export default function RoleActionsPage() {
                                 </div>
                             )}
 
-                            {editingAction?.actionType === "KICK" && (
+                            {(editingAction?.actionType === "KICK" || editingAction?.actionType === "BAN") && (
                                 <div className="space-y-2">
                                     <LabelWithTooltip
-                                        label="Kick Reason (Internal)"
+                                        label={editingAction.actionType === "BAN" ? "Ban Reason (Internal)" : "Kick Reason (Internal)"}
                                         tooltip="This reason appears in Discord's audit log. Users will see this if they try to rejoin."
                                     />
                                     <Input

@@ -165,6 +165,13 @@ async function executeScheduledAction(entry: typeof scheduledRoleAction.$inferSe
                 await member.kick(action.kickReason || "Automated role action");
                 break;
 
+            case "BAN":
+                if (messageData) {
+                    await member.send(messageData).catch((error) => { logger.warn(`Failed to send DM to ${member.user.tag} for scheduled BAN action:`, error); return null; });
+                }
+                await member.ban({ reason: action.kickReason || "Automated role action" });
+                break;
+
             case "LOG":
                 if (action.logChannelId && messageData) {
                     const channel = await member.guild.channels.fetch(action.logChannelId);

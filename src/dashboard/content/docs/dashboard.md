@@ -554,6 +554,7 @@ Automate actions when members receive or lose roles.
    - **Send Direct Message**: DM the user
    - **Send Channel Message**: Post to specific channel
    - **Kick Member**: Remove from server
+   - **Ban Member**: Ban from server
    - **Post to Log**: Record in log channel
 4. Set delay (minutes): 0 for immediate, or schedule later
 5. Configure message content (if applicable)
@@ -696,7 +697,7 @@ Most data updates automatically:
 1. **Test Welcome Messages**: Use `/welcome test` before going live
 2. **Start with Defaults**: Use default XP rates, adjust based on activity
 3. **Set Reasonable Grace Periods**: 7-30 days for verification
-4. **Use Role Actions Carefully**: Test kick actions thoroughly
+4. **Use Role Actions Carefully**: Test kick/ban actions thoroughly
 5. **Regular Backups**: Export config monthly
 6. **Monitor Analytics**: Check weekly for trends
 7. **Poll Engagement**: Use time polls for scheduling with multiple people

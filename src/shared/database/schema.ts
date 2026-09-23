@@ -14,7 +14,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 export const roleActionTriggerEnum = pgEnum('role_action_trigger', ['ADD', 'REMOVE']);
-export const roleActionTypeEnum = pgEnum('role_action_type', ['DM', 'KICK', 'LOG', 'MSG', 'MESSAGE']);
+export const roleActionTypeEnum = pgEnum('role_action_type', ['DM', 'KICK', 'BAN', 'LOG', 'MSG', 'MESSAGE']);
 export const roleActionRequiredLogicEnum = pgEnum('role_action_required_logic', ['AND', 'OR']);
 export const welcomeTargetTypeEnum = pgEnum('welcome_target_type', ['CHANNEL', 'DM']);
 export const welcomeBackgroundTypeEnum = pgEnum('welcome_background_type', ['COLOR', 'GRADIENT', 'IMAGE']);

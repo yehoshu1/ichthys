@@ -1123,7 +1123,7 @@ export const modules: ModuleDoc[] = [
     {
         slug: "role-actions",
         title: "Role Actions",
-        summary: "Automate DM/log/kick/message actions when roles are added/removed.",
+        summary: "Automate DM/log/kick/ban/message actions when roles are added/removed.",
         dashboardRoute: "/dashboard/[guildId]/role-actions",
         apiRoutes: [
             "GET/POST /api/guilds/[guildId]/role-actions",
@@ -1135,14 +1135,14 @@ export const modules: ModuleDoc[] = [
         workflow: [
             "Create rule with trigger type (ADD/REMOVE), action type, and optional delay.",
             "For message actions, set destination channel.",
-            "For kick actions, set reason and optional DM text.",
+            "For kick/ban actions, set reason and optional DM text.",
             "Enable rule and test by changing target role membership.",
             "Inspect action outcome in logs module.",
         ],
         failureModes: [
             "Delayed actions never execute when scheduled processor is down.",
             "DM sends fail because target user blocks DMs.",
-            "Kick action fails due to missing permissions or role hierarchy.",
+            "Kick/ban actions fail due to missing permissions or role hierarchy.",
         ],
     },
     {
