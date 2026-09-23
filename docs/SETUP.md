@@ -32,8 +32,8 @@ Docker is the recommended approach for production deployment.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yehoshu1/ichthys.git
-cd ichthys
+git clone https://github.com/yehoshu1/ixoye.git
+cd ixoye
 ```
 
 ### 2. Configure Environment
@@ -111,8 +111,8 @@ For development or if you prefer not to use Docker.
 ### 1. Install Dependencies
 
 ```bash
-git clone https://github.com/yehoshu1/ichthys.git
-cd ichthys
+git clone https://github.com/yehoshu1/ixoye.git
+cd ixoye
 npm install
 ```
 

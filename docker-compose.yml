@@ -38,7 +38,7 @@ services:
       DASHBOARD_URL: ${DASHBOARD_URL:-http://localhost:4002}
       METRICS_TOKEN: ${METRICS_TOKEN:-}
       TRUST_PROXY_DEPTH: "1"
-      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-https://${DOMAIN:-bot.ichthys.qzz.io}}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-https://${DOMAIN:-bot.ixoye.qzz.io}}
       PG_SSL: "false"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
@@ -51,12 +51,12 @@ services:
         condition: service_healthy
     labels:
       - traefik.docker.network=dokploy-network
-      - traefik.http.routers.ixoye-web.rule=Host(`${DOMAIN:-bot.ichthys.qzz.io}`)
+      - traefik.http.routers.ixoye-web.rule=Host(`${DOMAIN:-bot.ixoye.qzz.io}`)
       - traefik.http.routers.ixoye-web.entrypoints=web
       - traefik.http.services.ixoye-web.loadbalancer.server.port=4002
       - traefik.http.routers.ixoye-web.service=ixoye-web
       - traefik.http.routers.ixoye-web.middlewares=redirect-to-https@file
-      - traefik.http.routers.ixoye-websecure.rule=Host(`${DOMAIN:-bot.ichthys.qzz.io}`)
+      - traefik.http.routers.ixoye-websecure.rule=Host(`${DOMAIN:-bot.ixoye.qzz.io}`)
       - traefik.http.routers.ixoye-websecure.entrypoints=websecure
       - traefik.http.services.ixoye-websecure.loadbalancer.server.port=4002
       - traefik.http.routers.ixoye-websecure.service=ixoye-websecure

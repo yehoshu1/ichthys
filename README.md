@@ -47,8 +47,8 @@ The easiest way to get started is with Docker Compose. This sets up the bot, das
 ### 1. Clone and Configure
 
 ```bash
-git clone https://github.com/yehoshu1/ichthys.git
-cd ichthys
+git clone https://github.com/yehoshu1/ixoye.git
+cd ixoye
 
 cp .env.example .env
 # Edit .env with your Discord credentials and database password
@@ -99,8 +99,8 @@ Open **http://localhost:4002** in your browser and click **"Sign in with Discord
 ### Steps
 
 ```bash
-git clone https://github.com/yehoshu1/ichthys.git
-cd ichthys
+git clone https://github.com/yehoshu1/ixoye.git
+cd ixoye
 npm install --legacy-peer-deps
 
 cp .env.example .env

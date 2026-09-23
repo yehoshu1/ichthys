@@ -246,7 +246,7 @@ DISCORD_CLIENT_ID=your_client_id
 DISCORD_CLIENT_SECRET=your_client_secret
 
 # NextAuth (Required for dashboard)
-NEXTAUTH_URL=https://bot.ichthys.qzz.io
+NEXTAUTH_URL=https://bot.ixoye.qzz.io
 NEXTAUTH_SECRET=generate_with_openssl_rand_base64_32
 
 # Database (all required - no defaults)
@@ -262,13 +262,13 @@ LOG_LEVEL=info                    # debug, info, warn, error
 NODE_ENV=development              # development, production
 PORT=4002                         # Dashboard port
 GUILD_ID=your_test_guild_id       # For testing slash commands
-DASHBOARD_URL=https://bot.ichthys.qzz.io  # For /dashboard command
-DOMAIN=bot.ichthys.qzz.io         # Domain for Traefik routing
+DASHBOARD_URL=https://bot.ixoye.qzz.io  # For /dashboard command
+DOMAIN=bot.ixoye.qzz.io         # Domain for Traefik routing
 
 # Security (dashboard)
 # Comma-separated allowlist of origins for CSRF same-origin checks. When set,
 # client-supplied X-Forwarded-* headers are ignored for origin validation.
-TRUSTED_ORIGINS=https://bot.ichthys.qzz.io
+TRUSTED_ORIGINS=https://bot.ixoye.qzz.io
 # Number of trusted proxies in front of the dashboard (e.g. 1 behind Traefik
 # or a reverse proxy). 0/unset = treat the app as directly exposed and ignore
 # X-Forwarded-For for rate limiting.
