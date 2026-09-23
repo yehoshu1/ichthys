@@ -5,6 +5,6 @@ export function baseOptions(): BaseLayoutProps {
         nav: {
             title: "ΙΧΘΥΣ Docs",
         },
-        githubUrl: "https://github.com/yehoshu1/ixoye",
+        githubUrl: "https://github.com/yehoshu1/ichthys",
     };
 }

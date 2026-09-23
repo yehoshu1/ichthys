@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm run test
+
+      - name: Guard - Command Catalog
+        run: npm run guard:commands
+
+      - name: Guard - Module Guards
+        run: npm run guard:modules
+
+      - name: Guard - Module Ownership
+        run: npm run guard:module-ownership
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: validate
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build bot
+        run: npm run build
+
+      - name: Build dashboard
+        run: npm run dashboard:build
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: validate
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker compose build

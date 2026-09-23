@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const path = require('path');
+const { execSync } = require('child_process');
 const { Pool } = require('pg');
 const { drizzle } = require('drizzle-orm/node-postgres');
 const { migrate } = require('drizzle-orm/node-postgres/migrator');
@@ -10,11 +11,18 @@ function buildDatabaseUrl() {
         return process.env.DATABASE_URL;
     }
 
-    const host = process.env.POSTGRES_HOST ?? 'localhost';
-    const port = process.env.POSTGRES_PORT ?? '5432';
-    const db = process.env.POSTGRES_DB ?? 'ixoye';
-    const user = process.env.POSTGRES_USER ?? 'ixoye';
-    const password = process.env.POSTGRES_PASSWORD ?? 'ixoye';
+    const host = process.env.POSTGRES_HOST;
+    const port = process.env.POSTGRES_PORT;
+    const db = process.env.POSTGRES_DB;
+    const user = process.env.POSTGRES_USER;
+    const password = process.env.POSTGRES_PASSWORD;
+
+    if (!host || !port || !db || !user || !password) {
+        throw new Error(
+            'Database configuration missing. Set DATABASE_URL or all of POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD.'
+        );
+    }
+
     const encodedUser = encodeURIComponent(user);
     const encodedPassword = encodeURIComponent(password);
 
@@ -46,9 +54,43 @@ function resolveSslConfig() {
     return false;
 }
 
+function createBackup(databaseUrl) {
+    if (process.env.NODE_ENV !== 'production') {
+        console.log('Skipping backup (not in production).');
+        return;
+    }
+
+    const backupDir = path.resolve(__dirname, '..', 'backups');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const dumpPath = path.join(backupDir, `pre-migrate-${ts}.dump`);
+
+    try {
+        const { mkdirSync } = require('fs');
+        mkdirSync(backupDir, { recursive: true });
+    } catch {
+        // directory already exists
+    }
+
+    console.log(`Creating pre-migration backup: ${dumpPath}`);
+    try {
+        execSync(
+            `pg_dump --format=custom --file="${dumpPath}" "${databaseUrl}"`,
+            { stdio: 'inherit', timeout: 120_000 }
+        );
+        console.log('Backup created successfully.');
+    } catch (error) {
+        console.error('Backup failed. Aborting migration to protect production data.');
+        process.exit(1);
+    }
+}
+
 async function main() {
+    const databaseUrl = buildDatabaseUrl();
+
+    createBackup(databaseUrl);
+
     const pool = new Pool({
-        connectionString: buildDatabaseUrl(),
+        connectionString: databaseUrl,
         max: getNumericEnv('PG_POOL_MAX', 8),
         idleTimeoutMillis: getNumericEnv('PG_IDLE_TIMEOUT_MS', 30_000),
         connectionTimeoutMillis: getNumericEnv('PG_CONNECT_TIMEOUT_MS', 10_000),

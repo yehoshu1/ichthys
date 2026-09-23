@@ -2,7 +2,15 @@ import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://ixoye:ixoye@localhost:5432/ixoye';
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+    console.error('❌ DATABASE_URL environment variable is required');
+    console.error('   Set it in .env or pass it directly:');
+    console.error('   DATABASE_URL=postgresql://user:pass@host:5432/dbname npm run db:backup');
+    process.exit(1);
+}
+
 const BACKUP_DIR = './backups';
 const MAX_BACKUPS = Number(process.env.BACKUP_RETENTION_COUNT ?? 10);
 

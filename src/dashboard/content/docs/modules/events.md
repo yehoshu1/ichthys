@@ -83,12 +83,11 @@ The calendar view is the primary interface for managing events:
 
 ## Bot Commands
 
-- `/event create` - Create a new event
-- `/event list` - List upcoming events
-- `/event info [id]` - Get event details
-- `/event edit [id]` - Edit an event
-- `/event cancel [id]` - Cancel an event
-- `/rsvp [event] [status]` - RSVP to an event
+- `/create <title> <datetime> [description] [duration] ...` - Create a new event
+- `/list <type> [channel] [limit]` - List upcoming events or active polls
+- `/delete <type> <id> [reason]` - Delete an event or poll
+- `/remind <event_id> <when>` - Set a personal reminder for an event
+- `/settings view|channel|timezone|mentions|permissions|ai|discord` - Configure event and poll settings
 
 ## Webhook Events
 

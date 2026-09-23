@@ -5,64 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1770733889625,
-      "tag": "0000_furry_adam_destine",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1770755443610,
-      "tag": "0001_bright_blazing_skull",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1770789814978,
-      "tag": "0002_fast_wolf_cub",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1773476700000,
-      "tag": "0007_schema_catchup",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1773480000000,
-      "tag": "0008_reaction_role_message_publish_queue",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1773490000000,
-      "tag": "0009_remove_reaction_roles",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1774015000000,
-      "tag": "0010_dashboard_rbac",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1774026000000,
-      "tag": "0011_member_watchlist",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1779441600000,
-      "tag": "0012_add_role_action_required_role_columns",
+      "when": 1788675095957,
+      "tag": "0000_bored_firestar",
       "breakpoints": true
     }
   ]

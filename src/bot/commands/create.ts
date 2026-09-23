@@ -2,17 +2,12 @@ import {
     SlashCommandBuilder,
     ChatInputCommandInteraction,
     ChannelType,
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    TextChannel,
 } from 'discord.js';
 import { Command } from '../types/Command';
 import { eventService } from '../services/event-service';
 import { isSupportedPostChannel, getEventPollSettingsForGuild } from '../services/event-poll-settings-service';
 import { getCommandPolicyContext } from '../services/command-policy-service';
-import { parseNaturalLanguageDate, formatDiscordTimestamp } from '../utils/date-parser';
+import { parseNaturalLanguageDate } from '../utils/date-parser';
 import logger from '../utils/logger';
 import { eventDiscordService } from '../services/event-discord-service';
 

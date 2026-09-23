@@ -1,34 +1,31 @@
-# ΙΧΘΥΣ (Ixoye) Discord Bot & Dashboard
+# ΙΧΘΥΣ (Ichthys) Discord Bot & Dashboard
 
 A powerful, production-ready Discord bot with a comprehensive web dashboard for community management. Built with modern web technologies to ensure performance, reliability, and ease of use.
 
-> **Status**: ✅ Production Ready - Currently serving 2 guilds with all features operational.
-
-## 🚀 Features
+## Features
 
 ### Core Modules
-- **📊 Analytics Dashboard**: Visualize server growth, member retention, module usage, and message activity heatmaps with interactive charts.
-- **👋 Welcome System**: Customizable welcome messages (text & embed) with role-based triggers, image generation, and placeholder support.
-- **🛡️ Verification**: Automated verification tracking with profile-based messages, grace periods, and auto-kick for unverified members.
-- **🚀 Boost Management**: Track server boosts, reward boosters with custom roles, and send personalized thank-you messages.
-- **⭐ Leveling System**: Dual XP tracking (text & voice), customizable level-up messages, leaderboards, and role rewards at specific levels.
-- **🤖 Role Actions**: Automate actions (DM, Message, Kick, Log) when members gain or lose specific roles with optional delays.
-- **🎂 Birthdays**: Automatic birthday announcements with timezone support, age calculation, and optional birthday roles.
-- **📅 Events**: Create and manage server events with RSVP tracking (Yes/No/Maybe/Waitlist), recurring schedules, reminders, and role restrictions.
-- **📊 Polls**: Standard polls, time polls (When2meet-style), and anonymous voting with template support.
-- **🎭 Reaction Roles**: Self-assignable roles via reactions, buttons, or dropdown menus.
-- **🔧 Moderation**: Warnings, text/voice mutes, kicks, bans, timeouts, message cleanup, and comprehensive case tracking.
-- **📝 Message Aliases**: Auto-responder system with custom triggers and responses.
+- **Analytics Dashboard**: Visualize server growth, member retention, module usage, and message activity heatmaps with interactive charts.
+- **Welcome System**: Customizable welcome messages (text & embed) with role-based triggers, image generation, and placeholder support.
+- **Verification**: Automated verification tracking with profile-based messages, grace periods, and auto-kick for unverified members.
+- **Boost Management**: Track server boosts, reward boosters with custom roles, and send personalized thank-you messages.
+- **Leveling System**: Dual XP tracking (text & voice), customizable level-up messages, leaderboards, and role rewards at specific levels.
+- **Role Actions**: Automate actions (DM, Message, Kick, Log) when members gain or lose specific roles with optional delays.
+- **Birthdays**: Automatic birthday announcements with timezone support, age calculation, and optional birthday roles.
+- **Events**: Create and manage server events with RSVP tracking (Yes/No/Maybe/Waitlist), recurring schedules, reminders, and role restrictions.
+- **Polls**: Standard polls, time polls (When2meet-style), and anonymous voting with template support.
+- **Moderation**: Warnings, text/voice mutes, kicks, bans, timeouts, message cleanup, and comprehensive case tracking.
+- **Message Aliases**: Auto-responder system with custom triggers and responses.
 
 ### Integration & API
-- **🔗 Webhooks**: Real-time event notifications via HTTP POST with HMAC signature verification, automatic retry, and SSRF protection.
-- **🔑 API Keys**: Programmatic access to server data with granular permissions (read/write/delete) and SHA-256 hash storage.
-- **🔔 Notifications**: In-app notification stream for operational events with user preferences and read tracking.
+- **Webhooks**: Real-time event notifications via HTTP POST with HMAC signature verification, automatic retry, and SSRF protection.
+- **API Keys**: Programmatic access to server data with granular permissions (read/write/delete) and SHA-256 hash storage.
+- **Notifications**: In-app notification stream for operational events with user preferences and read tracking.
 
 ### Infrastructure
-- **🚀 Performance**: PM2 process management, Redis-backed distributed rate limiting (optional), automatic in-memory fallback.
-- **🔒 Security**: HTTPS-only webhooks, CSP headers, CSRF protection with proxy support, encrypted secrets at rest.
-- **🔄 Deployment**: Docker Compose setup with PostgreSQL 17, automated database backups, and health checks.
+- **Performance**: PM2 process management, automatic in-memory rate limiting with optional Redis backend.
+- **Security**: HTTPS-only webhooks, CSP headers, CSRF protection with proxy support, encrypted secrets at rest.
+- **Deployment**: Docker Compose setup with PostgreSQL 17, automated database backups, and health checks.
 
 ### Tech Stack
 - **Bot**: [Discord.js](https://discord.js.org/) v14, TypeScript, Node.js 22
@@ -39,243 +36,215 @@ A powerful, production-ready Discord bot with a comprehensive web dashboard for 
 - **Charts**: [Recharts](https://recharts.org/) for analytics visualization
 - **Process Manager**: [PM2](https://pm2.keymetrics.io/) for production deployment
 
-## 📂 Documentation
+## Quick Start (Docker - Recommended)
 
-- **[Getting Started](/docs/getting-started)**: How to install, configure, and run the bot locally or in production.
-- **[Dashboard Guide](/docs/dashboard)**: A walkthrough of the web dashboard features and configuration.
-- **[Commands Reference](/docs/commands)**: Complete npm and slash command catalog with options and examples.
-- **[Feature Guides](/docs/modules)**: Deep-dive pages for each module and subsystem.
-
-The docs live at `/docs` when the dashboard is running, and the MDX sources are
-under `src/dashboard/content/docs/`.
-
-## 🛠️ Quick Start
+The easiest way to get started is with Docker Compose. This sets up the bot, dashboard, and PostgreSQL database automatically.
 
 ### Prerequisites
-- Node.js 22+ (npm 11.9.0)
-- PostgreSQL 17
-- Discord Bot Token & OAuth2 credentials
-- (Optional) Redis for distributed rate limiting
+- Docker & Docker Compose installed
+- A Discord Bot Token and OAuth2 credentials ([create an app](https://discord.com/developers/applications))
 
-### Local Development
-
-1.  **Clone the repository**
-    ```bash
-    git clone https://github.com/yehoshu1/ixoye.git
-    cd ixoye
-    ```
-
-2.  **Install dependencies**
-    ```bash
-    npm install --legacy-peer-deps
-    ```
-
-3.  **Setup Environment**
-    Create `.env` file with your credentials:
-    ```bash
-    # Discord Bot Configuration
-    DISCORD_TOKEN=your_bot_token
-    DISCORD_CLIENT_ID=your_client_id
-    DISCORD_CLIENT_SECRET=your_client_secret
-
-    # NextAuth Configuration
-    NEXTAUTH_URL=http://localhost:4002
-    NEXTAUTH_SECRET=$(openssl rand -base64 32)
-
-    # Database
-    DATABASE_URL=postgresql://ixoye:password@localhost:5432/ixoye
-    PG_SSL=false
-
-    # Optional
-    LOG_LEVEL=info
-    PORT=4002
-    DASHBOARD_URL=http://localhost:4002
-    DOMAIN=bot.example.com
-    ```
-
-4.  **Initialize Database**
-    ```bash
-    # Push schema to database
-    npm run db:push
-
-    # Or use migrations (recommended for production)
-    npm run db:generate
-    npm run db:migrate
-    ```
-
-5.  **Deploy Slash Commands**
-    ```bash
-    # Deploy to specific guild (instant, for testing)
-    GUILD_ID=your_test_guild_id npm run deploy
-
-    # Or deploy globally (takes up to 1 hour to propagate)
-    npm run deploy
-    ```
-
-6.  **Run Development**
-    ```bash
-    # Run both bot and dashboard with hot reload
-    npm run dev:all
-
-    # Or run separately:
-    npm run dev              # Bot only
-    npm run dashboard:dev    # Dashboard only (http://localhost:4002)
-    ```
-
-## 🐳 Docker Deployment (Recommended)
-
-The project includes a production-ready Docker setup with PostgreSQL, automated backups, and PM2 process management.
-
-### Production Deployment (Using Built-in CLI)
-
-We provide a robust Node CLI to manage deployments safely. It automatically handles database backups, code updates, and rollback on failure.
-
-1.  **Configure environment variables** in `.env`:
-    ```bash
-    DISCORD_TOKEN=your_production_token
-    DISCORD_CLIENT_ID=your_client_id
-    DISCORD_CLIENT_SECRET=your_client_secret
-    NEXTAUTH_URL=https://yourdomain.com
-    NEXTAUTH_SECRET=$(openssl rand -base64 32)
-    DATABASE_URL=postgresql://ixoye:change_me@postgres:5432/ixoye
-    PG_SSL=false
-    PORT=4002
-    DASHBOARD_URL=https://bot.example.com
-    DOMAIN=bot.example.com
-    ```
-
-2.  **Deploy for the first time**:
-    ```bash
-    npm run cli -- deploy
-    ```
-    This builds the containers and runs migrations automatically.
-
-3.  **Update Safely** (Pulls code, backs up DB, rebuilds, and auto-rolls back on failure):
-    ```bash
-    npm run cli -- update
-    ```
-
-4.  **Check logs**:
-    ```bash
-    npm run cli -- logs
-    ```
-
-### Services Included
-- **ixoye-app**: Bot + Dashboard (PM2 managed, port 4002)
-- **ixoye-postgres**: PostgreSQL 17 database
-- **ixoye-redis**: Optional Redis for rate limiting
-- **ixoye-pg-backup**: Automated database backups (daily)
-
-### Reverse Proxy Setup
-If behind Cloudflare or nginx, the bot automatically detects `X-Forwarded-*` headers for proper origin validation.
-
-## 💾 Database Management
-
-### Backups
-
-### Backups
+### 1. Clone and Configure
 
 ```bash
-# Create manual backup (timestamped)
-npm run cli -- backup
+git clone https://github.com/yehoshu1/ichthys.git
+cd ichthys
 
-# Restore from backup
-npm run cli -- restore
+cp .env.example .env
+# Edit .env with your Discord credentials and database password
 ```
 
-**Docker:** Automated daily backups via `ixoye-pg-backup` container with configurable retention (default: 10 most recent).
-
-### Schema Management
+### 2. Start the Application
 
 ```bash
-# Push schema changes directly (development)
+docker compose up -d
+```
+
+### 3. Initialize the Database
+
+```bash
+docker compose exec ixoye npm run db:push
+```
+
+For production, use migrations instead:
+
+```bash
+docker compose exec ixoye npm run db:migrate
+```
+
+### 4. Deploy Discord Commands
+
+```bash
+docker compose exec ixoye npm run deploy
+```
+
+### 5. Access the Dashboard
+
+Open **http://localhost:4002** in your browser and click **"Sign in with Discord"** to connect your account.
+
+### 6. Add the Bot to Your Server
+
+- Use the OAuth2 URL generator in the Discord Developer Portal
+- Select `bot` and `applications.commands` scopes
+- Grant the necessary permissions
+
+---
+
+## Alternative: Manual Setup (Without Docker)
+
+### Prerequisites
+- Node.js 22+ and npm 11+
+- PostgreSQL 17 running locally or on a server
+
+### Steps
+
+```bash
+git clone https://github.com/yehoshu1/ichthys.git
+cd ichthys
+npm install --legacy-peer-deps
+
+cp .env.example .env
+# Edit .env with your credentials
+
 npm run db:push
-
-# Generate migration files (production)
-npm run db:generate
-
-# Open Drizzle Studio (GUI)
-npm run db:studio
+npm run deploy
+npm run dev:all
 ```
 
-### Safe Deployment
+The dashboard will be available at **http://localhost:4002**.
+
+---
+
+## Updating Safely
+
+We provide a safe update command that automatically backs up your database, pulls the latest code, and rolls back if anything fails:
+
 ```bash
-# Safely deploy updates with automatic backup and rollback
 npm run cli -- update
 ```
 
-## 🔧 Available Scripts
+For Docker deployments, this handles everything including rebuilding containers.
+
+---
+
+## Configuration
+
+The bot is configured via environment variables. Copy `.env.example` to `.env` and edit:
+
+### Required Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DISCORD_TOKEN` | Your bot token from Discord Developer Portal |
+| `DISCORD_CLIENT_ID` | Your application's client ID |
+| `DISCORD_CLIENT_SECRET` | Your application's client secret |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `POSTGRES_HOST` | Database host |
+| `POSTGRES_PORT` | Database port |
+| `POSTGRES_DB` | Database name |
+| `POSTGRES_USER` | Database user |
+| `POSTGRES_PASSWORD` | Database password |
+| `NEXTAUTH_URL` | URL where the dashboard is hosted |
+| `NEXTAUTH_SECRET` | Random secret for session encryption |
+
+### Optional Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DASHBOARD_URL` | Public URL for the dashboard (for `/dashboard` command) |
+| `DOMAIN` | Domain name (for Docker/Traefik routing) |
+| `METRICS_TOKEN` | Token to protect health/metrics endpoints |
+| `WEBHOOK_SECRET_ENCRYPTION_KEY` | Encrypts webhook secrets (min 16 chars) |
+| `ANONYMIZE_SECRET` | Anonymizes poll votes (min 16 chars) |
+
+See `.env.example` for all configuration options with explanations.
+
+---
+
+## Security Best Practices
+
+1. **Never commit your `.env` file** - It's in `.gitignore` for a reason
+2. **Use strong passwords** for PostgreSQL - Don't use weak defaults
+3. **Enable HTTPS** - Use a reverse proxy (nginx, Traefik, Caddy) with TLS
+4. **Protect health endpoints** - Set `METRICS_TOKEN` in production
+5. **Keep secrets encrypted** - Use `WEBHOOK_SECRET_ENCRYPTION_KEY` and `ANONYMIZE_SECRET`
+6. **Regular backups** - Automated backups are included with Docker
+
+---
+
+## Documentation
+
+- **[Setup Guide](docs/SETUP.md)** - Detailed installation instructions
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Updating Guide](docs/UPDATING.md)** - Safe update procedures
+- **[Security Policy](SECURITY.md)** - How to report vulnerabilities
+- **In-Dashboard Docs** - Available at `/docs` when the dashboard is running
+
+---
+
+## Available Scripts
 
 ```bash
-# Bot commands
+# Bot
 npm run dev              # Start bot with hot reload
-npm run build            # Compile TypeScript to dist/
+npm run build            # Compile TypeScript
 npm start                # Run compiled bot (production)
 npm run deploy           # Deploy slash commands to Discord
 
-# Dashboard commands
-npm run dashboard:dev    # Start Next.js dev server (port 4002)
-npm run dashboard:build  # Build dashboard for production
-npm run dashboard:start  # Start Next.js production server
+# Dashboard
+npm run dashboard:dev    # Start Next.js dev server
+npm run dashboard:build  # Build for production
+npm run dashboard:start  # Start production server
 
 # Combined
 npm run dev:all          # Run both bot and dashboard
 
 # Database
-npm run db:push          # Push schema changes
-npm run db:generate      # Generate migrations
-npm run db:studio        # Open Drizzle Studio
+npm run db:push          # Push schema changes (dev)
+npm run db:migrate       # Run migrations (production)
+npm run db:backup        # Create backup
+npm run db:restore       # Restore from backup
 
 # Docker
 docker compose build     # Build images
 docker compose up -d     # Start services
 docker compose down      # Stop services
-docker logs ixoye-app -f # View logs
+
+# CLI
+npm run cli -- deploy    # Deploy with Docker
+npm run cli -- update    # Safe update with backup
+npm run cli -- backup    # Manual backup
+npm run cli -- restore   # Restore from backup
 ```
 
-## 📝 Recent Updates (v0.2.0)
+---
 
-### Fixed
-- ✅ `/setup` command button interactions now fully functional
-- ✅ Dashboard config saves no longer fail with validation errors
-- ✅ Verification profile messages no longer send twice
-- ✅ JSON serialization errors in verification embeds resolved
-- ✅ PostgreSQL boolean comparisons fixed for verification stats
-- ✅ Level data properly calculated from XP (115 profiles recalculated)
-- ✅ CSRF protection now works behind Cloudflare proxy
+## Contributing
 
-### Added
-- ✅ Setup command handlers for toggle buttons and selects
-- ✅ Role and channel select menu support in component router
-- ✅ Deduplication for verification profile messages
-- ✅ Support for `X-Forwarded-*` headers in CSRF validation
-- ✅ Command deployment script for production containers
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-### Changed
-- ✅ Config validation schemas changed from `.strict()` to `.passthrough()`
-- ✅ Port changed from 3000 to 4002 for dashboard
-- ✅ `PG_SSL=false` required for local PostgreSQL connections
+Branch structure:
+- `main` - Production-ready code
+- `feature/*` - New features
+- `fix/*` - Bug fixes
+- `chore/*` - Maintenance tasks
+- `refactor/*` - Code refactoring
 
-## 🤝 Contributing
+---
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## License
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+This project is licensed under the [GNU GPL-3.0 License](LICENSE).
 
-## 📄 License
+---
 
-This project is licensed under the GPL-3.0 License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built with [Discord.js](https://discord.js.org/)
 - UI components from [shadcn/ui](https://ui.shadcn.com/)
 - Icons from [Lucide](https://lucide.dev/)
+- Database ORM: [Drizzle](https://orm.drizzle.team/)
 
 ---
 
-**Made with ❤️ for Discord communities**
+**Made with for Discord communities**

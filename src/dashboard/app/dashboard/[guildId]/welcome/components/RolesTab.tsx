@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RoleMultiSelect } from '@/components/DiscordSelectors';

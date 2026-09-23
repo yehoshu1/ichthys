@@ -72,7 +72,6 @@ import { Badge } from "../../../../components/ui/badge";
 import { Textarea } from "../../../../components/ui/textarea";
 import { format, addDays, addMinutes, setHours, setMinutes, startOfDay } from "date-fns";
 import { LabelWithTooltip, HelperText } from "../../../../components/HelpTooltip";
-import { ScrollArea } from "../../../../components/ui/scroll-area";
 
 import { DateTimePicker, DatePicker, TimePicker } from "../../../../components/ui/datetime-picker";
 import { RoleMultiSelect, ChannelSelect } from "../../../../components/DiscordSelectors";
@@ -1798,8 +1797,10 @@ function PollCard({
                                 <span className="text-xs text-muted-foreground mr-1">Restricted to:</span>
                                 {poll.allowedRoleIds.map(roleId => {
                                     const role = rolesById.get(roleId);
+                                    const color = role?.color ?? '#000000';
+                                    const textColor = color !== '#000000' ? String(color) : undefined;
                                     return (
-                                        <Badge key={roleId} variant="secondary" className="text-xs font-normal" style={{ backgroundColor: role?.color ? `${role.color}20` : undefined, color: role?.color && role.color !== '#000000' ? role.color : undefined }}>
+                                        <Badge key={roleId} variant="secondary" className="text-xs font-normal" style={{ backgroundColor: textColor ? `${textColor}20` : undefined, color: textColor }}>
                                             {role?.name || roleId}
                                         </Badge>
                                     );

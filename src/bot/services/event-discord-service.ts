@@ -322,10 +322,6 @@ export class EventDiscordService {
         if (status === 'ACTIVE') return '';
         return '';
     }
-
-    private isEventInteractable(status?: EventDisplayData['status']): boolean {
-        return status === 'SCHEDULED' || status === 'ACTIVE' || status === undefined;
-    }
 }
 
 export let eventDiscordService: EventDiscordService;

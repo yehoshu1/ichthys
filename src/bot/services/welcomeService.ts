@@ -4,7 +4,6 @@ import { welcomeConfig, WelcomeConfig } from '../../shared/database/schema';
 import { eq } from 'drizzle-orm';
 import { generateWelcomeImage, processWelcomeTemplate } from './welcomeImageGenerator';
 import logger from '../utils/logger';
-import { emitGuildNotificationSafe } from './notificationEmitter';
 
 // Cooldown tracking
 const welcomeCooldowns = new Map<string, number>();
@@ -66,7 +65,6 @@ async function sendConfiguredMessage(
     channelId: string | null = null,
     isBot: boolean
 ): Promise<boolean> {
-    const isWelcome = type === 'welcome';
     const isPrivate = type === 'private';
     const isGoodbye = type === 'goodbye';
 

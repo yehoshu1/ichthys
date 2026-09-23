@@ -14,7 +14,6 @@ import { Switch } from "../../../../components/ui/switch";
 import { useDiscordData } from "../../../../components/useDiscordData";
 import { ExampleBox, HelperText, LabelWithTooltip } from "../../../../components/HelpTooltip";
 import { ConfirmDeleteDialog } from "../../../../components/ConfirmDeleteDialog";
-import { ScrollArea } from "../../../../components/ui/scroll-area";
 
 interface RoleAction {
     id: string;

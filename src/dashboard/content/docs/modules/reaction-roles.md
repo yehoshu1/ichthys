@@ -1,7 +1,9 @@
 ---
-title: "Reaction Roles Module"
+title: "Reaction Roles Module (Planned)"
 description: "Self-assignable roles via reactions, buttons or dropdowns."
 ---
+
+> **Note:** This module is planned but not yet implemented. The documentation describes the intended functionality.
 
 ## Purpose
 

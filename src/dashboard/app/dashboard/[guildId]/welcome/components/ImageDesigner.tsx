@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { 
     Image as ImageIcon, 
-    Palette, User, Type, AlignLeft, AlignCenter, AlignRight, Layout, Sparkles, X, AlertCircle
+    AlignLeft, AlignCenter, AlignRight, Layout, AlertCircle
 } from 'lucide-react';
 
 export function ImageDesigner({ config, updateConfig, prefix = '', guildId = '' }: any) {

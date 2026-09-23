@@ -1,5 +1,7 @@
 logs/
 node_modules/
+data-old/
+debug_auth.txt
 dist/
 data/
 backups/
@@ -21,3 +23,10 @@ src/dashboard/.next.root*
 src/dashboard/.source/
 .source/
 .mimocode/
+
+# One-off utility scripts (should not be committed)
+test-discord.js
+extract_image.js
+patch_*.js
+refactor.js
+rewrite_page.js
