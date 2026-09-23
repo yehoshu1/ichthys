@@ -1,7 +1,19 @@
 # Base stage with Node.js
 FROM node:22-bookworm-slim AS base
-# Install OpenSSL and PostgreSQL client tooling (required for NextAuth and backup scripts)
-RUN apt-get update -y && apt-get install -y openssl postgresql-client && rm -rf /var/lib/apt/lists/*
+# Install OpenSSL and PostgreSQL client tooling (required for NextAuth and backup scripts).
+# Server runs PostgreSQL 17, so install the matching client (bookworm default is 15,
+# whose pg_dump refuses to dump a newer server).
+RUN set -eux; \
+    apt-get update -y \
+      && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+      && install -d /usr/share/postgresql-common/pgdg \
+      && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+         https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+      && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+         > /etc/apt/sources.list.d/pgdg.list \
+      && apt-get update -y \
+      && apt-get install -y openssl postgresql-client-17 \
+      && rm -rf /var/lib/apt/lists/*
 # Use latest npm across all stages
 RUN npm install -g npm@11.9.0
 
