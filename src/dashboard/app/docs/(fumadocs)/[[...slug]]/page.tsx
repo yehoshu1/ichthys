@@ -7,16 +7,6 @@ import {
 } from "fumadocs-ui/page";
 import { notFound } from "next/navigation";
 import { getMDXComponents } from "@/mdx-components";
-import type { MDXContent } from "mdx/types";
-import type { TOCItemType } from "fumadocs-core/toc";
-
-interface FumadocsPageData {
-    body: MDXContent;
-    toc: TOCItemType[];
-    full: boolean;
-    title: string;
-    description?: string;
-}
 
 function normalizeSlug(slug?: string[]) {
     return slug ?? [];
@@ -29,13 +19,12 @@ export default async function Page(props: {
     const page = source.getPage(normalizeSlug(params.slug));
     if (!page) notFound();
 
-    const data = page.data as unknown as FumadocsPageData;
-    const MDX = data.body;
+    const MDX = page.data.body;
 
     return (
-        <DocsPage toc={data.toc} full={data.full}>
-            <DocsTitle>{data.title}</DocsTitle>
-            <DocsDescription>{data.description}</DocsDescription>
+        <DocsPage toc={page.data.toc} full={page.data.full}>
+            <DocsTitle>{page.data.title}</DocsTitle>
+            <DocsDescription>{page.data.description}</DocsDescription>
             <DocsBody>
                 <MDX components={getMDXComponents()} />
             </DocsBody>
@@ -50,9 +39,8 @@ export async function generateMetadata(props: {
     const page = source.getPage(normalizeSlug(params.slug));
     if (!page) notFound();
 
-    const data = page.data as unknown as FumadocsPageData;
     return {
-        title: data.title,
-        description: data.description,
+        title: page.data.title,
+        description: page.data.description,
     };
 }

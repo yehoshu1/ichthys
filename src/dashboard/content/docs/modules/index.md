@@ -20,7 +20,7 @@ This section breaks down every major Ixoye module with implementation-level deta
 
 ### Role Management
 - [Role Actions](/docs/modules/role-actions)
-- [Reaction Roles](/docs/modules/reaction-roles)
+- [Reaction Roles](/docs/modules/reaction-roles) (Planned)
 
 ### Moderation & Analytics
 - [Moderation](/docs/modules/moderation)

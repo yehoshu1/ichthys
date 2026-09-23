@@ -77,7 +77,7 @@ if (!isDevelopment) {
 const logger = winston.createLogger({
     level: process.env.LOG_LEVEL || "info",
     defaultMeta: {
-        service: "ichthys-dashboard",
+        service: "ixoye-dashboard",
         environment: process.env.NODE_ENV || "development",
     },
     transports,

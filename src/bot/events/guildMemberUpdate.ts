@@ -511,6 +511,18 @@ async function executeRoleAction(member: GuildMember, action: typeof roleAction.
                     }
                     break;
 
+                case 'BAN':
+                    try {
+                        if (messageData) {
+                            await member.send(messageData).catch((error) => { logger.warn(`Failed to send DM to ${member.user.tag} for BAN action:`, error); return null; });
+                        }
+                        await member.ban({ reason: action.kickReason || 'Automated role action' });
+                    } catch (err) {
+                        success = false;
+                        errorMessage = 'Failed to ban (Permissions?)';
+                    }
+                    break;
+
                 case 'LOG':
                     if (action.logChannelId && messageData) {
                         const channel = await member.guild.channels.fetch(action.logChannelId);

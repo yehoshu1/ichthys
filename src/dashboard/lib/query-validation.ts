@@ -16,9 +16,7 @@ export const paginationQuerySchema = z.object({
 export const dateRangeQuerySchema = z.object({
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
-});
-
-export const dateRangeRefinedSchema = dateRangeQuerySchema.refine((data) => {
+}).refine((data) => {
     if (data.startDate && data.endDate) {
         return data.startDate <= data.endDate;
     }

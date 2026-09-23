@@ -64,10 +64,7 @@ The Polls module provides flexible polling capabilities including standard polls
 
 ## Bot Commands
 
-- `/poll create` - Create a new poll
-- `/poll create time` - Create a time poll
-- `/poll close [id]` - Close a poll early
-- `/poll results [id]` - View poll results
+- `/poll <question> <options> [description] [channel] ...` - Create a poll
 
 ## Webhook Events
 
@@ -99,7 +96,7 @@ function anonymizeUserId(userId: string, pollId: string): string {
 
 - Question: max 256 characters
 - Description: max 1000 characters
-- Options: max 20
+- Options: max 25
 - Option text: max 100 characters
 - Max votes per user: 1-20, cannot exceed number of options
 

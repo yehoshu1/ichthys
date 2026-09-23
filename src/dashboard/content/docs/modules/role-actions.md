@@ -12,6 +12,7 @@ Supported action types include:
 - `DM` (send direct message)
 - `MSG` (send channel message)
 - `KICK` (remove member)
+- `BAN` (ban member)
 - `LOG` (write to log channel)
 
 ## Dashboard Location
@@ -51,7 +52,7 @@ Supported action types include:
 1. Create action with role + trigger + action type.
 2. Add optional message content/embed.
 3. For `MSG`, configure target channel.
-4. For `KICK`, set kick reason and optional message.
+4. For `KICK`/`BAN`, set reason and optional message.
 5. Enable action and test by adding/removing target role.
 6. Inspect `/dashboard/[guildId]/logs` for execution outcome.
 

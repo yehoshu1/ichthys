@@ -1123,7 +1123,7 @@ export const modules: ModuleDoc[] = [
     {
         slug: "role-actions",
         title: "Role Actions",
-        summary: "Automate DM/log/kick/message actions when roles are added/removed.",
+        summary: "Automate DM/log/kick/ban/message actions when roles are added/removed.",
         dashboardRoute: "/dashboard/[guildId]/role-actions",
         apiRoutes: [
             "GET/POST /api/guilds/[guildId]/role-actions",
@@ -1135,14 +1135,14 @@ export const modules: ModuleDoc[] = [
         workflow: [
             "Create rule with trigger type (ADD/REMOVE), action type, and optional delay.",
             "For message actions, set destination channel.",
-            "For kick actions, set reason and optional DM text.",
+            "For kick/ban actions, set reason and optional DM text.",
             "Enable rule and test by changing target role membership.",
             "Inspect action outcome in logs module.",
         ],
         failureModes: [
             "Delayed actions never execute when scheduled processor is down.",
             "DM sends fail because target user blocks DMs.",
-            "Kick action fails due to missing permissions or role hierarchy.",
+            "Kick/ban actions fail due to missing permissions or role hierarchy.",
         ],
     },
     {
@@ -1321,7 +1321,7 @@ export const setupSections = [
             "DISCORD_CLIENT_SECRET",
             "NEXTAUTH_SECRET",
             "NEXTAUTH_URL (local: http://localhost:4002)",
-            "DATABASE_URL (default: postgresql://ichthys:change_me@localhost:5432/ichthys)",
+            "DATABASE_URL (default: postgresql://ixoye:change_me@localhost:5432/ixoye)",
         ],
     },
     {
@@ -1337,7 +1337,7 @@ export const setupSections = [
         title: "Docker Development",
         commands: [
             "docker compose -f docker-compose.dev.yml up -d --build",
-            "docker compose -f docker-compose.dev.yml logs -f ichthys-dev",
+            "docker compose -f docker-compose.dev.yml logs -f ixoye-dev",
             "docker compose -f docker-compose.dev.yml down",
         ],
         bullets: [

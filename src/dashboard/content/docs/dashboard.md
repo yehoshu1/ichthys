@@ -60,7 +60,7 @@ This will display:
 
 ### Method 2: Direct URL
 
-1. Navigate to your dashboard URL (e.g., `http://localhost:4000`)
+1. Navigate to your dashboard URL (e.g., `http://localhost:4002`)
 2. Click **Login with Discord**
 3. Authorize the application to access your guilds
 4. Select the server you wish to manage from the list
@@ -89,17 +89,21 @@ The dashboard is organized into several modules accessible from the left sidebar
 | **Overview** | Server stats, activity heatmap, top members |
 | **Events** | Event creation, RSVP management, templates |
 | **Polls** | Standard polls, time polls, anonymous voting |
+| **Timestamp** | Discord timestamp generator tool |
+| **Logs** | Notification and activity logs |
 | **Welcome** | Welcome messages, triggers, templates |
 | **Verification** | Auto-kick settings, verification profiles |
 | **Leveling** | XP settings, level rewards, leaderboard |
 | **Boosts** | Boost rewards configuration |
 | **Birthdays** | Birthday announcements and celebration settings |
 | **Role Actions** | Automated role-based actions |
-| **Reaction Roles** | Reaction-based self-role management |
-| **Webhooks & API** | Webhook endpoints, API keys |
+| **Aliases** | Auto-responder trigger words and responses |
+| **Commands** | Per-command configuration and access |
 | **Moderation** | Auto-mod filters and moderation controls |
-| **Analytics** | Activity heatmap, top members |
+| **Watchlist** | Staff watchlist for suspicious members |
 | **Settings** | Import/export configuration |
+| **Access Control** | Dashboard role-based access control |
+| **Webhooks & API** | Webhook endpoints, API keys |
 | **Documentation** | Quick reference guide |
 
 ---
@@ -550,6 +554,7 @@ Automate actions when members receive or lose roles.
    - **Send Direct Message**: DM the user
    - **Send Channel Message**: Post to specific channel
    - **Kick Member**: Remove from server
+   - **Ban Member**: Ban from server
    - **Post to Log**: Record in log channel
 4. Set delay (minutes): 0 for immediate, or schedule later
 5. Configure message content (if applicable)
@@ -569,7 +574,9 @@ Automate actions when members receive or lose roles.
 
 ---
 
-### 🎭 Reaction Roles
+### 🎭 Reaction Roles (Planned)
+
+> **Note:** Reaction Roles is a planned feature that is not yet implemented. This section describes the intended functionality.
 
 Create self-assignable roles via reactions, buttons, or dropdowns.
 
@@ -690,7 +697,7 @@ Most data updates automatically:
 1. **Test Welcome Messages**: Use `/welcome test` before going live
 2. **Start with Defaults**: Use default XP rates, adjust based on activity
 3. **Set Reasonable Grace Periods**: 7-30 days for verification
-4. **Use Role Actions Carefully**: Test kick actions thoroughly
+4. **Use Role Actions Carefully**: Test kick/ban actions thoroughly
 5. **Regular Backups**: Export config monthly
 6. **Monitor Analytics**: Check weekly for trends
 7. **Poll Engagement**: Use time polls for scheduling with multiple people

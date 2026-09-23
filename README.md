@@ -47,8 +47,8 @@ The easiest way to get started is with Docker Compose. This sets up the bot, das
 ### 1. Clone and Configure
 
 ```bash
-git clone https://github.com/yehoshu1/ichthys.git
-cd ichthys
+git clone https://github.com/yehoshu1/ixoye.git
+cd ixoye
 
 cp .env.example .env
 # Edit .env with your Discord credentials and database password
@@ -63,19 +63,19 @@ docker compose up -d
 ### 3. Initialize the Database
 
 ```bash
-docker compose exec ichthys npm run db:push
+docker compose exec ixoye npm run db:push
 ```
 
 For production, use migrations instead:
 
 ```bash
-docker compose exec ichthys npm run db:migrate
+docker compose exec ixoye npm run db:migrate
 ```
 
 ### 4. Deploy Discord Commands
 
 ```bash
-docker compose exec ichthys npm run deploy
+docker compose exec ixoye npm run deploy
 ```
 
 ### 5. Access the Dashboard
@@ -99,8 +99,8 @@ Open **http://localhost:4002** in your browser and click **"Sign in with Discord
 ### Steps
 
 ```bash
-git clone https://github.com/yehoshu1/ichthys.git
-cd ichthys
+git clone https://github.com/yehoshu1/ixoye.git
+cd ixoye
 npm install --legacy-peer-deps
 
 cp .env.example .env

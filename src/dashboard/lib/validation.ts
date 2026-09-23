@@ -323,7 +323,7 @@ export const roleActionSchema = z.object({
     id: uuid.optional(),
     roleId: snowflake,
     triggerType: z.enum(["ADD", "REMOVE"]).default("ADD"),
-    actionType: z.enum(["DM", "KICK", "LOG", "MSG"]),
+    actionType: z.enum(["DM", "KICK", "BAN", "LOG", "MSG"]),
     actionGroup: z.string().max(50).nullable().optional(),
     actionDelay: z.number().int().min(0).max(10080).default(0), // Max 1 week (10080 minutes)
     dmMessage: messageContent,

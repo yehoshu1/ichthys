@@ -1,27 +1,26 @@
 services:
   postgres:
     image: postgres:17
-    container_name: ichthys-postgres
+    container_name: ixoye-postgres
     restart: always
     ports:
       - 5432:5432
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-ichthys}
-      POSTGRES_USER: ${POSTGRES_USER:-ichthys}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ichthys}
+      POSTGRES_DB: ${POSTGRES_DB:-ixoye}
+      POSTGRES_USER: ${POSTGRES_USER:-ixoye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
     volumes:
-      - ichthys_pg_data:/var/lib/postgresql/data
+      - ixoye_pg_data:/var/lib/postgresql/data
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready -U ${POSTGRES_USER:-ichthys} -d ${POSTGRES_DB:-ichthys}
+        - pg_isready -U ${POSTGRES_USER:-ixoye} -d ${POSTGRES_DB:-ixoye}
       interval: 10s
       timeout: 5s
       retries: 10
-
-  ichthys:
+  ixoye:
     build: .
-    container_name: ichthys-app
+    container_name: ixoye-app
     restart: always
     command:
       - pm2-runtime
@@ -39,21 +38,36 @@ services:
       DASHBOARD_URL: ${DASHBOARD_URL:-http://localhost:4002}
       METRICS_TOKEN: ${METRICS_TOKEN:-}
       TRUST_PROXY_DEPTH: "1"
-      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-https://${DOMAIN:-yourdomain.com}}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-https://${DOMAIN:-bot.ixoye.qzz.io}}
       PG_SSL: "false"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
-      POSTGRES_DB: ${POSTGRES_DB:-ichthys}
-      POSTGRES_USER: ${POSTGRES_USER:-ichthys}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ichthys}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ichthys}:${POSTGRES_PASSWORD:-ichthys}@postgres:5432/${POSTGRES_DB:-ichthys}
+      POSTGRES_DB: ${POSTGRES_DB:-ixoye}
+      POSTGRES_USER: ${POSTGRES_USER:-ixoye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ixoye}:${POSTGRES_PASSWORD:-ixoye}@postgres:5432/${POSTGRES_DB:-ixoye}
     depends_on:
       postgres:
         condition: service_healthy
-
+    labels:
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.ixoye-web.rule=Host(`${DOMAIN:-bot.ixoye.qzz.io}`)
+      - traefik.http.routers.ixoye-web.entrypoints=web
+      - traefik.http.services.ixoye-web.loadbalancer.server.port=4002
+      - traefik.http.routers.ixoye-web.service=ixoye-web
+      - traefik.http.routers.ixoye-web.middlewares=redirect-to-https@file
+      - traefik.http.routers.ixoye-websecure.rule=Host(`${DOMAIN:-bot.ixoye.qzz.io}`)
+      - traefik.http.routers.ixoye-websecure.entrypoints=websecure
+      - traefik.http.services.ixoye-websecure.loadbalancer.server.port=4002
+      - traefik.http.routers.ixoye-websecure.service=ixoye-websecure
+      - traefik.http.routers.ixoye-websecure.tls.certresolver=letsencrypt
+      - traefik.enable=true
+    networks:
+      - dokploy-network
+      - default
   caddy:
     image: caddy:2-alpine
-    container_name: ichthys-caddy
+    container_name: ixoye-caddy
     restart: always
     ports:
       - "80:80"
@@ -64,50 +78,10 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - ichthys
-
-  # =============================================================================
-  # Alternative: Traefik (uncomment below and comment out the Caddy service above)
-  # =============================================================================
-  # traefik:
-  #   image: traefik:v3.0
-  #   container_name: ichthys-traefik
-  #   restart: always
-  #   command:
-  #     - --providers.docker=true
-  #     - --providers.docker.exposedbydefault=false
-  #     - --entrypoints.web.address=:80
-  #     - --entrypoints.websecure.address=:443
-  #     - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
-  #     - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
-  #     - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-you@example.com}
-  #     - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-  #     - traefik_certs:/letsencrypt
-  #   networks:
-  #     - ichthys-net
-  #
-  # # Then add these labels to the ichthys service:
-  # #   labels:
-  # #     - traefik.enable=true
-  # #     - traefik.http.routers.ichthys-web.rule=Host(`${DOMAIN:-example.com}`)
-  # #     - traefik.http.routers.ichthys-web.entrypoints=web
-  # #     - traefik.http.routers.ichthys-web.middlewares=redirect-to-https
-  # #     - traefik.http.routers.ichthys-websecure.rule=Host(`${DOMAIN:-example.com}`)
-  # #     - traefik.http.routers.ichthys-websecure.entrypoints=websecure
-  # #     - traefik.http.routers.ichthys-websecure.tls.certresolver=letsencrypt
-  # #     - traefik.http.services.ichthys.loadbalancer.server.port=4002
-  # #     - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
-  # #   networks:
-  # #     - ichthys-net
-
-  ichthys-pg-backup:
+      - ixoye
+  ixoye-pg-backup:
     image: postgres:17
-    container_name: ichthys-pg-backup
+    container_name: ixoye-pg-backup
     restart: always
     depends_on:
       postgres:
@@ -117,12 +91,12 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
-      POSTGRES_DB: ${POSTGRES_DB:-ichthys}
-      POSTGRES_USER: ${POSTGRES_USER:-ichthys}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ichthys}
+      POSTGRES_DB: ${POSTGRES_DB:-ixoye}
+      POSTGRES_USER: ${POSTGRES_USER:-ixoye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ixoye}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
       BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-10}
-      PGPASSWORD: ${POSTGRES_PASSWORD:-ichthys}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-ixoye}
     volumes:
       - ./backups:/backups
     command:
@@ -133,7 +107,7 @@ services:
         mkdir -p /backups
         while true; do
           TS=$$(date -u +"%Y-%m-%dT%H-%M-%SZ")
-          DUMP_PATH="/backups/ichthys-$${TS}.dump"
+          DUMP_PATH="/backups/ixoye-$${TS}.dump"
           pg_dump \
             --host="$${POSTGRES_HOST}" \
             --port="$${POSTGRES_PORT}" \
@@ -147,9 +121,10 @@ services:
 
           sleep "$${BACKUP_INTERVAL_SECONDS:-86400}"
         done
-
 volumes:
-  ichthys_pg_data: null
+  ixoye_pg_data: null
   caddy_data: null
   caddy_config: null
-  # traefik_certs: null
+networks:
+  dokploy-network:
+    external: true

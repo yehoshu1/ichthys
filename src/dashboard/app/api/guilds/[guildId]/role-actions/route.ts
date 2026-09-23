@@ -11,7 +11,7 @@ const roleActionSchema = z.object({
     id: z.string().trim().min(1).optional(),
     roleId: discordIdSchema,
     triggerType: z.enum(["ADD", "REMOVE"]).optional(),
-    actionType: z.enum(["DM", "KICK", "LOG", "MSG", "MESSAGE"]),
+    actionType: z.enum(["DM", "KICK", "BAN", "LOG", "MSG", "MESSAGE"]),
     actionGroup: z.union([z.string().trim().min(1).max(100), z.null()]).optional(),
     actionDelay: z.number().int().min(0).max(10080).optional(),
     dmMessage: optionalTextSchema,

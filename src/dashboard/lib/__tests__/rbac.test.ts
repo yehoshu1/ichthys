@@ -1,10 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
-
-vi.mock('@shared/database/client', () => ({
-    db: { select: vi.fn(), insert: vi.fn(), update: vi.fn(), delete: vi.fn() },
-    pool: {},
-}));
-
+import { describe, expect, it } from 'vitest';
 import {
     isHardBypassUser,
     isManageGuildUser,

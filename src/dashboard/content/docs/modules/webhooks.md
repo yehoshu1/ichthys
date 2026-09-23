@@ -151,7 +151,6 @@ X-Webhook-Signature: sha256=<hash> (if secret configured)
 | `/api/guilds/[guildId]/webhooks` | GET/POST | List/create webhooks |
 | `/api/guilds/[guildId]/webhooks/[webhookId]` | PATCH/DELETE | Update/delete webhook |
 | `/api/guilds/[guildId]/webhooks/[webhookId]/test` | POST | Send test webhook |
-| `/api/guilds/[guildId]/webhooks/[webhookId]/logs` | GET | View delivery logs |
 
 ### API Keys
 
@@ -182,7 +181,7 @@ Webhooks use immediate delivery with logging:
 
 ## Security Considerations
 
-- Webhook secrets stored as SHA-256 hashes
+- Webhook secrets encrypted with AES-256-GCM
 - API keys stored as SHA-256 hashes
 - Private IPs blocked (SSRF protection)
 - HTTPS enforced for all webhook URLs

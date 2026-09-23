@@ -1,4 +1,4 @@
-import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
 // eslint-disable-next-line no-restricted-imports
@@ -51,10 +51,8 @@ function resolveSslConfig(): false | { rejectUnauthorized: boolean } {
     return false;
 }
 
-// Lazy initialization — pool and db are created on first access, not at import time.
-// This allows the module to be imported during Next.js build without a database.
 let _pool: Pool | null = null;
-let _db: NodePgDatabase<typeof schema> | null = null;
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
 function getPool(): Pool {
     if (!_pool) {
@@ -95,23 +93,22 @@ function getPool(): Pool {
     return _pool;
 }
 
-function getDb(): NodePgDatabase<typeof schema> {
+export function getDb(): ReturnType<typeof drizzle<typeof schema>> {
     if (!_db) {
         _db = drizzle(getPool(), { schema });
     }
     return _db;
 }
 
-// Proxy that delegates to the lazy getters on access
 export const pool: Pool = new Proxy({} as Pool, {
-    get(_target, prop) {
-        return (getPool() as unknown as Record<string | symbol, unknown>)[prop];
+    get(_, prop) {
+        return Reflect.get(getPool(), prop);
     },
 });
 
-export const db: NodePgDatabase<typeof schema> = new Proxy({} as NodePgDatabase<typeof schema>, {
-    get(_target, prop) {
-        return (getDb() as unknown as Record<string | symbol, unknown>)[prop];
+export const db: ReturnType<typeof drizzle<typeof schema>> = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+    get(_, prop) {
+        return Reflect.get(getDb(), prop);
     },
 });
 

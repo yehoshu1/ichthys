@@ -1,5 +1,5 @@
 {
-  "name": "ichthys-discord-bot",
+  "name": "ixoye-discord-bot",
   "version": "0.1.0-beta.1",
   "description": "A scalable Discord bot built with TypeScript",
   "packageManager": "npm@11.9.0",
@@ -36,7 +36,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.bot.json",
-    "lint": "eslint .",
+    "lint": "next lint",
     "validate": "npm run guard:commands && npm run guard:modules && npm run guard:module-ownership && npm run typecheck && npm run test"
   },
   "keywords": [
@@ -47,10 +47,10 @@
   "author": "Ixoye Contributors",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yehoshu1/ichthys.git"
+     "url": "https://github.com/yehoshu1/ixoye.git"
   },
   "bugs": {
-    "url": "https://github.com/yehoshu1/ichthys/issues"
+     "url": "https://github.com/yehoshu1/ixoye/issues"
   },
   "license": "GPL-3.0",
   "dependencies": {

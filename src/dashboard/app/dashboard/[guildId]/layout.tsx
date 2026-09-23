@@ -146,8 +146,7 @@ function getNavHref(
         return `/dashboard/${guildId}${item.href}`;
     }
 
-    const moduleId = mapNavItemToModuleId(item);
-    return `/dashboard/${guildId}/settings${moduleId ? `?module=${moduleId}` : ""}`;
+    return `/dashboard/${guildId}/settings`;
 }
 
 export default function DashboardLayout({

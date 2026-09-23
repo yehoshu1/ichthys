@@ -14,8 +14,8 @@ The project consists of a Discord bot written in standard TypeScript and a Dashb
 ### Getting Started
 1. **Clone the repo**
    ```bash
-   git clone https://github.com/yehoshu1/ichthys.git
-   cd ichthys
+   git clone https://github.com/yehoshu1/ixoye.git
+   cd ixoye
    ```
 
 2. **Install Dependencies**
