@@ -47,10 +47,10 @@
   "author": "Ixoye Contributors",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yehoshu1/ichthys.git"
+     "url": "https://github.com/yehoshu1/ixoye.git"
   },
   "bugs": {
-    "url": "https://github.com/yehoshu1/ichthys/issues"
+     "url": "https://github.com/yehoshu1/ixoye/issues"
   },
   "license": "GPL-3.0",
   "dependencies": {
